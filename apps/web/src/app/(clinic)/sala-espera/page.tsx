@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -34,6 +35,7 @@ import { getOrganization, getUserBranches } from '@/actions/settings';
 import { getSessionContext } from '@/lib/session';
 import { WaitingRoomBoard } from '@/components/waiting-room/waiting-room-board';
 import { WaitingRoomOpsDashboard } from '@/components/waiting-room/waiting-room-ops-dashboard';
+import { RouteLoading } from '@/components/layout/route-loading';
 import { Button } from '@/components/ui/button';
 
 interface SalaEsperaPageProps {
@@ -234,24 +236,26 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
         listBranchId={listBranchId}
       />
 
-      <WaitingRoomBoard
-        key={`${selectedDate}-${mineOnly}-${params.q ?? ''}-${params.wrStatus ?? ''}-${params.wrAssigned ?? ''}-${params.wrBranch ?? ''}`}
-        entries={visibleEntries}
-        checkInCandidates={checkInCandidates}
-        canWrite={canWrite}
-        canSendWhatsApp={canWhatsApp}
-        canStartConsultation={canStartConsultation}
-        whatsAppAutoEnabled={whatsAppAutoEnabled}
-        boardSoundEnabled={boardSoundEnabled}
-        todayLabel={selectedDate}
-        isToday={isToday}
-        roomPresets={roomPresets}
-        initialFilters={boardFilters}
-        syncFiltersToUrl
-        branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
-        sessionBranchId={session?.branchId ?? null}
-        listBranchId={listBranchId}
-      />
+      <Suspense fallback={<RouteLoading label="Cargando cola de sala de espera" variant="board" />}>
+        <WaitingRoomBoard
+          key={`${selectedDate}-${mineOnly}-${params.q ?? ''}-${params.wrStatus ?? ''}-${params.wrAssigned ?? ''}-${params.wrBranch ?? ''}`}
+          entries={visibleEntries}
+          checkInCandidates={checkInCandidates}
+          canWrite={canWrite}
+          canSendWhatsApp={canWhatsApp}
+          canStartConsultation={canStartConsultation}
+          whatsAppAutoEnabled={whatsAppAutoEnabled}
+          boardSoundEnabled={boardSoundEnabled}
+          todayLabel={selectedDate}
+          isToday={isToday}
+          roomPresets={roomPresets}
+          initialFilters={boardFilters}
+          syncFiltersToUrl
+          branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
+          sessionBranchId={session?.branchId ?? null}
+          listBranchId={listBranchId}
+        />
+      </Suspense>
     </div>
   );
 }

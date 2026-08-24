@@ -307,7 +307,9 @@ export function compareWaitingRoomQueue(
   if (posA == null && posB != null) return 1;
   if (posA != null && posB == null) return -1;
   if (posA != null && posB != null && posA !== posB) return posA - posB;
-  return a.checked_in_at.localeCompare(b.checked_in_at);
+  const checkedA = a.checked_in_at ?? '';
+  const checkedB = b.checked_in_at ?? '';
+  return checkedA.localeCompare(checkedB);
 }
 
 export function sortWaitingRoomQueue<T extends Pick<WaitingRoomListRow, 'priority' | 'queue_position' | 'checked_in_at'>>(
