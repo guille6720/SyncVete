@@ -1,14 +1,11 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@/lib/supabase/client';
+import { ResetPasswordForm } from '@/components/auth/reset-password-form';
 
-interface RecoverySessionBootstrapProps {
-  children: (hasSession: boolean) => ReactNode;
-}
-
-export function RecoverySessionBootstrap({ children }: RecoverySessionBootstrapProps) {
+export function RecoverySessionBootstrap() {
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready'>('loading');
   const [hasSession, setHasSession] = useState(false);
@@ -100,5 +97,5 @@ export function RecoverySessionBootstrap({ children }: RecoverySessionBootstrapP
     );
   }
 
-  return <>{children(hasSession)}</>;
+  return <ResetPasswordForm hasSession={hasSession} />;
 }
