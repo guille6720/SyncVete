@@ -4,6 +4,7 @@ import { Providers } from '@/components/providers';
 import { PwaRegister } from '@/components/pwa-register';
 import { InstallAppPrompt } from '@/components/pwa/install-app-prompt';
 import { APP_NAME } from '@sincvete/shared';
+import { AUTH_RECOVERY_REDIRECT_SCRIPT } from '@/lib/auth/recovery-redirect';
 import './globals.css';
 
 const dmSans = DM_Sans({
@@ -57,6 +58,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es-AR" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
+        <script dangerouslySetInnerHTML={{ __html: AUTH_RECOVERY_REDIRECT_SCRIPT }} />
       </head>
       <body className={`${dmSans.variable} ${fraunces.variable} font-sans antialiased`}>
         <Providers>
