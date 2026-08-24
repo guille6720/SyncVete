@@ -6,6 +6,7 @@ import {
   signInSchema,
   signUpSchema,
   updatePasswordSchema,
+  APP_CANONICAL_HOST,
   type ActionResult,
   type SessionContext,
 } from '@sincvete/shared';
@@ -201,7 +202,11 @@ function getAppOrigin(headerStore: Headers): string {
   const forwardedHost = headerStore.get('x-forwarded-host');
   const host = forwardedHost ?? headerStore.get('host');
   const proto = headerStore.get('x-forwarded-proto') ?? 'https';
-  if (host) return `${proto}://${host}`;
+  if (host && !host.includes('localhost')) return `${proto}://${host}`;
+
+  if (process.env.NODE_ENV === 'production') {
+    return `https://${APP_CANONICAL_HOST}`;
+  }
 
   return 'http://localhost:3000';
 }
@@ -226,7 +231,7 @@ export async function requestPasswordReset(
     const supabase = await createServerClient();
     const headerStore = await headers();
     const origin = getAppOrigin(headerStore);
-    const redirectTo = `${origin}/auth/callback?next=${encodeURIComponent('/actualizar-contrasena')}`;
+    const redirectTo = `${origin}/actualizar-contrasena`;
 
     const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
       redirectTo,

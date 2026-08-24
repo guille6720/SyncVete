@@ -57,11 +57,6 @@ export function MarketingFooter() {
                   Iniciar sesión
                 </Link>
               </li>
-              <li>
-                <Link href="/recuperar-contrasena" className="hover:text-white">
-                  Olvidé mi contraseña
-                </Link>
-              </li>
             </ul>
           </div>
           <div>

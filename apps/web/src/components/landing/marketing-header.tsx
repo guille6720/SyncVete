@@ -60,12 +60,6 @@ export function MarketingHeader() {
           >
             Iniciar sesión
           </Link>
-          <Link
-            href="/recuperar-contrasena"
-            className="text-sm text-[var(--land-muted)] hover:text-[var(--land-ink)]"
-          >
-            Olvidé mi contraseña
-          </Link>
           <Button
             className="rounded-none bg-[var(--land-accent)] px-5 text-white hover:bg-[var(--land-ink)]"
             asChild
@@ -99,9 +93,6 @@ export function MarketingHeader() {
             ))}
             <Link href="/login" className="text-sm" onClick={() => setOpen(false)}>
               Iniciar sesión
-            </Link>
-            <Link href="/recuperar-contrasena" className="text-sm" onClick={() => setOpen(false)}>
-              Olvidé mi contraseña
             </Link>
             <InstallAppButton landing className="w-full" />
             <Button

@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/portal/activar',
   '/check-in',
   '/recuperar-contrasena',
+  '/actualizar-contrasena',
   '/manifest.webmanifest',
   '/sw.js',
   '/manual',
