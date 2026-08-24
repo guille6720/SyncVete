@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { APP_NAME } from '@sincvete/shared';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
+import { InstallAppButton } from '@/components/pwa/install-app-button';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -52,6 +53,7 @@ export function MarketingHeader() {
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          <InstallAppButton landing />
           <Link
             href="/login"
             className="text-sm font-medium text-[var(--land-ink)]/80 hover:text-[var(--land-ink)]"
@@ -101,6 +103,7 @@ export function MarketingHeader() {
             <Link href="/recuperar-contrasena" className="text-sm" onClick={() => setOpen(false)}>
               Olvidé mi contraseña
             </Link>
+            <InstallAppButton landing className="w-full" />
             <Button
               className="mt-1 rounded-none bg-[var(--land-accent)] text-white hover:bg-[var(--land-ink)]"
               asChild

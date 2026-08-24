@@ -1,18 +1,28 @@
 {
-  "name": "SincVete",
-  "short_name": "SincVete",
+  "id": "/",
+  "name": "SyncVete",
+  "short_name": "SyncVete",
   "description": "Gestión veterinaria para clínicas y profesionales.",
-  "start_url": "/",
+  "start_url": "/dashboard?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
   "background_color": "#0f1714",
   "theme_color": "#3f6b4a",
   "lang": "es-AR",
+  "categories": ["medical", "business", "productivity"],
   "icons": [
     {
       "src": "/icons/syncvete.svg",
       "sizes": "any",
       "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
       "purpose": "any"
     },
     {
@@ -26,6 +36,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
+    },
+    {
+      "src": "/icons/syncvete-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

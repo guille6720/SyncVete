@@ -82,7 +82,7 @@ export function SyncVeteHomeLanding({
   addons?: PublicAddonCatalogItem[];
 }) {
   return (
-    <div className="landing-root min-h-screen bg-[var(--land-bg)] text-[var(--land-ink)]">
+    <div className="landing-root min-h-dvh bg-[var(--land-bg)] text-[var(--land-ink)]">
       <MarketingHeader />
 
       {/* HERO — brand first, one CTA group, one dominant visual */}
