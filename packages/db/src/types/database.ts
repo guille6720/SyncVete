@@ -1883,6 +1883,121 @@ export interface Database {
           },
         ];
       };
+      appointment_check_in_tokens: {
+        Row: {
+          id: string;
+          organization_id: string;
+          appointment_id: string;
+          token_hash: string;
+          expires_at: string;
+          redeemed_at: string | null;
+          redeemed_waiting_room_entry_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          appointment_id: string;
+          token_hash: string;
+          expires_at: string;
+          redeemed_at?: string | null;
+          redeemed_waiting_room_entry_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          appointment_id?: string;
+          token_hash?: string;
+          expires_at?: string;
+          redeemed_at?: string | null;
+          redeemed_waiting_room_entry_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_check_in_tokens_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_check_in_tokens_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_check_in_tokens_redeemed_waiting_room_entry_id_fkey';
+            columns: ['redeemed_waiting_room_entry_id'];
+            isOneToOne: false;
+            referencedRelation: 'waiting_room_entries';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      owner_portal_alerts: {
+        Row: {
+          id: string;
+          organization_id: string;
+          owner_id: string;
+          portal_user_id: string;
+          title: string;
+          body: string | null;
+          href: string;
+          related_type: string | null;
+          related_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          owner_id: string;
+          portal_user_id: string;
+          title: string;
+          body?: string | null;
+          href?: string;
+          related_type?: string | null;
+          related_id?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          owner_id?: string;
+          portal_user_id?: string;
+          title?: string;
+          body?: string | null;
+          href?: string;
+          related_type?: string | null;
+          related_id?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'owner_portal_alerts_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'owner_portal_alerts_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'owners';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       clinical_entries: {
         Row: {
           id: string;
@@ -6180,6 +6295,70 @@ export interface Database {
           p_priority?: number | null;
         };
         Returns: Json;
+      };
+      list_owner_portal_waiting_room: {
+        Args: {
+          p_date?: string | null;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          patient_id: string;
+          patient_name: string;
+          patient_species: PatientSpecies;
+          appointment_type: AppointmentType;
+          appointment_starts_at: string;
+          waiting_room_status: WaitingRoomStatus;
+          checked_in_at: string;
+          called_at: string | null;
+          consultation_started_at: string | null;
+          payment_pending_at: string | null;
+          completed_at: string | null;
+          queue_position: number | null;
+          priority: number;
+          room: string | null;
+          ahead_count: number;
+        }[];
+      };
+      create_appointment_check_in_token: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: Json;
+      };
+      preview_appointment_check_in: {
+        Args: {
+          p_token: string;
+        };
+        Returns: Json;
+      };
+      redeem_appointment_check_in: {
+        Args: {
+          p_token: string;
+        };
+        Returns: Json;
+      };
+      list_owner_portal_alerts: {
+        Args: {
+          p_unread_only?: boolean;
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          title: string;
+          body: string | null;
+          href: string;
+          related_type: string | null;
+          related_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        }[];
+      };
+      mark_owner_portal_alerts_read: {
+        Args: {
+          p_ids?: string[] | null;
+        };
+        Returns: number;
       };
       search_clinical_entries: {
         Args: {

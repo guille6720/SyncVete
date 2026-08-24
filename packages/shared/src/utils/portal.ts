@@ -10,12 +10,14 @@ import type {
   PortalPatientSummary,
   PortalVaccineDueRow,
 } from '../types/portal';
+import type { PortalWaitingRoomRow } from '../types/waiting-room';
 import type { PatientSpecies, PatientSex } from '../constants/patients';
 import type { AppointmentStatus, AppointmentType } from '../constants/appointments';
 import type { ClinicalEntryType } from '../constants/clinical';
 import type { InvoiceStatus } from '../constants/billing';
 import type { VaccinationDueStatus } from '../constants/vaccinations';
 import type { PortalAccessStatus } from '../constants/portal';
+import { isWaitingRoomStatus } from '../constants/waiting-room';
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
@@ -213,4 +215,37 @@ export function parseOwnerPortalPatient(raw: unknown): OwnerPortalPatient | null
     appointments: mapList(data.appointments, parseAppointment),
     clinical: mapList(data.clinical, parseClinical),
   };
+}
+
+function parsePortalWaitingRoomRow(raw: unknown): PortalWaitingRoomRow | null {
+  const data = asRecord(raw);
+  if (!data || !data.waiting_room_entry_id || !data.appointment_id || !data.patient_id) {
+    return null;
+  }
+  const status = str(data.waiting_room_status);
+  if (!isWaitingRoomStatus(status)) return null;
+
+  return {
+    waiting_room_entry_id: str(data.waiting_room_entry_id),
+    appointment_id: str(data.appointment_id),
+    patient_id: str(data.patient_id),
+    patient_name: str(data.patient_name),
+    patient_species: str(data.patient_species) as PatientSpecies,
+    appointment_type: str(data.appointment_type) as AppointmentType,
+    appointment_starts_at: str(data.appointment_starts_at),
+    waiting_room_status: status,
+    checked_in_at: str(data.checked_in_at),
+    called_at: strOrNull(data.called_at),
+    consultation_started_at: strOrNull(data.consultation_started_at),
+    payment_pending_at: strOrNull(data.payment_pending_at),
+    completed_at: strOrNull(data.completed_at),
+    queue_position: numOrNull(data.queue_position),
+    priority: num(data.priority),
+    room: strOrNull(data.room),
+    ahead_count: Math.max(0, num(data.ahead_count)),
+  };
+}
+
+export function parsePortalWaitingRoomRows(raw: unknown): PortalWaitingRoomRow[] {
+  return mapList(raw, parsePortalWaitingRoomRow);
 }

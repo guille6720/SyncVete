@@ -10,6 +10,7 @@ import {
   reorderWaitingRoom,
   updateWaitingRoomStatus,
 } from '@/actions/waiting-room';
+import { WaitingRoomCheckInQrButton } from '@/components/waiting-room/waiting-room-check-in-qr-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
@@ -240,10 +241,14 @@ function CheckInCandidateRow({ appointment }: { appointment: AppointmentListRow 
           {APPOINTMENT_TYPE_LABELS[appointment.appointment_type]} · {appointment.owner_full_name}
         </p>
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <Button variant="ghost" size="sm" asChild>
           <Link href={`/agenda/${appointment.id}`}>Ver cita</Link>
         </Button>
+        <WaitingRoomCheckInQrButton
+          appointmentId={appointment.id}
+          patientName={appointment.patient_name}
+        />
         <Button size="sm" isPending={pending} onClick={handleCheckIn}>
           <CalendarPlus className="h-4 w-4" />
           {pending ? 'Ingresando...' : 'Check-in'}

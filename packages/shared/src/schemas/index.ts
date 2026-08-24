@@ -1167,7 +1167,22 @@ export const waitingRoomReorderSchema = z
     { message: 'Debés indicar queue_position y/o priority', path: ['queuePosition'] }
   );
 
+export const waitingRoomCheckInTokenSchema = z.object({
+  appointmentId: z.string().uuid('Cita inválida'),
+});
+
+export const waitingRoomCheckInRedeemSchema = z.object({
+  token: z
+    .string()
+    .trim()
+    .min(16, 'Código inválido')
+    .max(128, 'Código inválido')
+    .regex(/^[a-fA-F0-9]+$/, 'Código inválido'),
+});
+
 export type WaitingRoomListInput = z.infer<typeof waitingRoomListSchema>;
 export type WaitingRoomCheckInInput = z.infer<typeof waitingRoomCheckInSchema>;
 export type WaitingRoomUpdateStatusInput = z.infer<typeof waitingRoomUpdateStatusSchema>;
 export type WaitingRoomReorderInput = z.infer<typeof waitingRoomReorderSchema>;
+export type WaitingRoomCheckInTokenInput = z.infer<typeof waitingRoomCheckInTokenSchema>;
+export type WaitingRoomCheckInRedeemInput = z.infer<typeof waitingRoomCheckInRedeemSchema>;

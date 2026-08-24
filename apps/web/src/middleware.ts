@@ -9,6 +9,7 @@ const PUBLIC_ROUTES = [
   '/register',
   '/auth/callback',
   '/portal/activar',
+  '/check-in',
   '/recuperar-contrasena',
   '/manifest.webmanifest',
   '/sw.js',

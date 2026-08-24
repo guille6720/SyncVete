@@ -12,6 +12,11 @@ import {
   FEATURES,
   getPermissionsForRole,
   isFeatureKey,
+  parsePortalWaitingRoomRows,
+  parseWaitingRoomCheckInPreview,
+  parseWaitingRoomCheckInTokenResult,
+  parseOwnerPortalAlerts,
+  PORTAL_WAITING_ROOM_STATUS_MESSAGES,
 } from '../index';
 
 describe('waiting room permissions & entitlements registry', () => {
@@ -118,5 +123,89 @@ describe('waiting room schemas', () => {
     ).toBe(true);
     expect(waitingRoomReorderSchema.safeParse({ entryId, priority: 10 }).success).toBe(true);
     expect(waitingRoomReorderSchema.safeParse({ entryId }).success).toBe(false);
+  });
+});
+
+describe('portal waiting room rows', () => {
+  it('parses tutor-facing rows and drops invalid status', () => {
+    const rows = parsePortalWaitingRoomRows([
+      {
+        waiting_room_entry_id: '550e8400-e29b-41d4-a716-446655440010',
+        appointment_id: '550e8400-e29b-41d4-a716-446655440011',
+        patient_id: '550e8400-e29b-41d4-a716-446655440012',
+        patient_name: 'Luna',
+        patient_species: 'Canino',
+        appointment_type: 'consulta',
+        appointment_starts_at: '2026-08-24T12:00:00.000Z',
+        waiting_room_status: 'called',
+        checked_in_at: '2026-08-24T11:00:00.000Z',
+        called_at: '2026-08-24T11:30:00.000Z',
+        consultation_started_at: null,
+        payment_pending_at: null,
+        completed_at: null,
+        queue_position: 1,
+        priority: 0,
+        room: '1',
+        ahead_count: 0,
+      },
+      {
+        waiting_room_entry_id: 'x',
+        appointment_id: 'y',
+        patient_id: 'z',
+        waiting_room_status: 'en_curso',
+      },
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.patient_name).toBe('Luna');
+    expect(PORTAL_WAITING_ROOM_STATUS_MESSAGES.called).toMatch(/llamando/i);
+  });
+});
+
+describe('waiting room QR check-in parsers', () => {
+  it('parses token result with absolute URL', () => {
+    const token = parseWaitingRoomCheckInTokenResult(
+      {
+        token: 'abc123',
+        expires_at: '2026-08-24T20:00:00Z',
+        appointment_id: '11111111-1111-1111-1111-111111111111',
+        path: '/check-in/abc123',
+      },
+      'https://syncvete.example'
+    );
+    expect(token?.url).toBe('https://syncvete.example/check-in/abc123');
+  });
+
+  it('parses preview valid and invalid payloads', () => {
+    expect(parseWaitingRoomCheckInPreview({ valid: false, reason: 'expired' })).toEqual({
+      valid: false,
+      reason: 'expired',
+    });
+    expect(
+      parseWaitingRoomCheckInPreview({
+        valid: true,
+        patient_name: 'Luna',
+        patient_species: 'Canino',
+        appointment_type: 'consulta',
+        organization_name: 'Clínica Demo',
+      }).patient_name
+    ).toBe('Luna');
+  });
+
+  it('parses portal alerts', () => {
+    const alerts = parseOwnerPortalAlerts([
+      {
+        id: 'a1',
+        title: '¡Te están llamando!',
+        body: 'Luna · Consultorio 2',
+        href: '/portal/sala-espera',
+        related_type: 'waiting_room_entry',
+        related_id: 'w1',
+        read_at: null,
+        created_at: '2026-08-24T12:00:00Z',
+      },
+      { id: null, title: 'bad' },
+    ]);
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0]?.title).toMatch(/llamando/i);
   });
 });

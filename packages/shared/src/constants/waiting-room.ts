@@ -37,6 +37,14 @@ export const WAITING_ROOM_NEXT_ACTION_LABELS: Record<
   payment_pending: 'Completar',
 };
 
+export const PORTAL_WAITING_ROOM_STATUS_MESSAGES: Record<WaitingRoomStatus, string> = {
+  waiting: 'Tu mascota está en la sala de espera',
+  called: '¡Te están llamando! Acercate a la clínica',
+  in_consultation: 'Tu mascota está en consulta',
+  payment_pending: 'Atención lista · pendiente de pago en recepción',
+  completed: 'Atención finalizada',
+};
+
 /** Valid sequential transitions for Waiting Room workflow. */
 export const WAITING_ROOM_TRANSITIONS: Record<WaitingRoomStatus, WaitingRoomStatus | null> = {
   waiting: 'called',

@@ -7,6 +7,7 @@ import { ArrowLeft, CalendarPlus, MessageCircle, Pencil, Stethoscope, Trash2 } f
 import { deleteAppointment, updateAppointmentStatus } from '@/actions/appointments';
 import { startConsultationFromAppointment } from '@/actions/consultations';
 import { checkInAppointment } from '@/actions/waiting-room';
+import { WaitingRoomCheckInQrButton } from '@/components/waiting-room/waiting-room-check-in-qr-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -135,10 +136,16 @@ export function AppointmentDetail({
             </Button>
           )}
           {canCheckIn && (
-            <Button variant="outline" size="sm" isPending={pending} onClick={handleCheckIn}>
-              <CalendarPlus className="h-4 w-4" />
-              {pending ? 'Ingresando...' : 'Check-in'}
-            </Button>
+            <>
+              <WaitingRoomCheckInQrButton
+                appointmentId={appointment.id}
+                patientName={appointment.patient_name}
+              />
+              <Button variant="outline" size="sm" isPending={pending} onClick={handleCheckIn}>
+                <CalendarPlus className="h-4 w-4" />
+                {pending ? 'Ingresando...' : 'Check-in'}
+              </Button>
+            </>
           )}
           {consultationId ? (
             <Button variant="outline" size="sm" asChild>

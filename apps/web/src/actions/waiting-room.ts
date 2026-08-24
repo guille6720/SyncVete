@@ -1,12 +1,20 @@
 'use server';
 
 import {
+  parseWaitingRoomCheckInPreview,
+  parseWaitingRoomCheckInRedeemResult,
+  parseWaitingRoomCheckInTokenResult,
+  waitingRoomCheckInRedeemSchema,
   waitingRoomCheckInSchema,
+  waitingRoomCheckInTokenSchema,
   waitingRoomListSchema,
   waitingRoomReorderSchema,
   waitingRoomUpdateStatusSchema,
   type ActionResult,
+  type WaitingRoomCheckInPreview,
+  type WaitingRoomCheckInRedeemResult,
   type WaitingRoomCheckInResult,
+  type WaitingRoomCheckInTokenResult,
   type WaitingRoomListRow,
   type WaitingRoomMutationResult,
 } from '@sincvete/shared';
@@ -19,6 +27,10 @@ import {
 import { FEATURES, planRestrictionResult } from '@/lib/entitlements';
 import { getSessionContext } from '@/actions/auth';
 import { revalidateWaitingRoom, revalidateWaitingRoomSurfaces } from '@/lib/cache-revalidate';
+
+function appBaseUrl(): string {
+  return (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000').replace(/\/$/, '');
+}
 
 function isNextRedirect(error: unknown): boolean {
   return (
@@ -166,5 +178,83 @@ export async function reorderWaitingRoom(input: {
     return { success: true, data: data as unknown as WaitingRoomMutationResult };
   } catch (error) {
     return actionError<WaitingRoomMutationResult>(error);
+  }
+}
+
+export async function createAppointmentCheckInToken(
+  appointmentId: string
+): Promise<ActionResult<WaitingRoomCheckInTokenResult>> {
+  try {
+    await requirePermissionAndFeature('waiting_room:write', FEATURES.WAITING_ROOM);
+    const parsed = waitingRoomCheckInTokenSchema.safeParse({ appointmentId });
+    if (!parsed.success) {
+      return { success: false, error: 'Cita inválida' };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('create_appointment_check_in_token', {
+      p_appointment_id: parsed.data.appointmentId,
+    });
+
+    if (error) {
+      return { success: false, error: rpcErrorMessage(error) };
+    }
+
+    const token = parseWaitingRoomCheckInTokenResult(data, appBaseUrl());
+    if (!token) {
+      return { success: false, error: 'No se pudo generar el código QR' };
+    }
+    return { success: true, data: token };
+  } catch (error) {
+    return actionError<WaitingRoomCheckInTokenResult>(error);
+  }
+}
+
+export async function previewAppointmentCheckIn(
+  token: string
+): Promise<WaitingRoomCheckInPreview> {
+  const parsed = waitingRoomCheckInRedeemSchema.safeParse({ token });
+  if (!parsed.success) {
+    return { valid: false, reason: 'invalid_token' };
+  }
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc('preview_appointment_check_in', {
+    p_token: parsed.data.token,
+  });
+  if (error) {
+    console.error('[waiting-room] preview_appointment_check_in', error.message);
+    return { valid: false, reason: 'preview_failed' };
+  }
+  return parseWaitingRoomCheckInPreview(data);
+}
+
+export async function redeemAppointmentCheckIn(
+  token: string
+): Promise<ActionResult<WaitingRoomCheckInRedeemResult>> {
+  try {
+    const parsed = waitingRoomCheckInRedeemSchema.safeParse({ token });
+    if (!parsed.success) {
+      return { success: false, error: 'Código inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('redeem_appointment_check_in', {
+      p_token: parsed.data.token,
+    });
+
+    if (error) {
+      return { success: false, error: rpcErrorMessage(error) };
+    }
+
+    const entry = parseWaitingRoomCheckInRedeemResult(data);
+    if (!entry) {
+      return { success: false, error: 'No se pudo completar el check-in' };
+    }
+
+    revalidateWaitingRoomSurfaces(entry.appointment_id);
+    return { success: true, data: entry };
+  } catch (error) {
+    return actionError<WaitingRoomCheckInRedeemResult>(error);
   }
 }

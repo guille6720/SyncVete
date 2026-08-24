@@ -38,6 +38,7 @@ export const NOTIFICATION_KIND_VARIANT: Record<
 
 export const NOTIFICATION_RELATED_TYPES = [
   'appointment',
+  'waiting_room_entry',
   'lab_order',
   'inventory_product',
   'hospitalization',
