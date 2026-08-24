@@ -133,6 +133,12 @@ export function AppShell({
     }
   }, [router, entitledHrefs]);
 
+  const isWaitingRoomDisplay = pathname.startsWith('/sala-espera/pantalla');
+
+  if (isWaitingRoomDisplay) {
+    return <>{children}</>;
+  }
+
   return (
     <div className="flex min-h-screen" style={{ background: 'var(--shell-bg)' }}>
       <AppUpdateBanner />

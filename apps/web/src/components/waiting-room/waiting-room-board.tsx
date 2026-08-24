@@ -1,16 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowUp, CalendarPlus } from 'lucide-react';
 import {
   checkInAppointment,
+  listWaitingRoom,
   reorderWaitingRoom,
   updateWaitingRoomStatus,
 } from '@/actions/waiting-room';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
+import { useWaitingRoomLive } from '@/hooks/use-waiting-room-live';
 import {
   APPOINTMENT_TYPE_LABELS,
   SPECIES_EMOJI,
@@ -32,11 +35,32 @@ interface WaitingRoomBoardProps {
 }
 
 export function WaitingRoomBoard({
-  entries,
+  entries: initialEntries,
   checkInCandidates,
   canWrite,
   todayLabel,
 }: WaitingRoomBoardProps) {
+  const router = useRouter();
+  const [entries, setEntries] = useState(initialEntries);
+
+  useEffect(() => {
+    setEntries(initialEntries);
+  }, [initialEntries]);
+
+  const refresh = useCallback(async () => {
+    try {
+      const next = await listWaitingRoom({ date: todayLabel });
+      setEntries(next);
+      router.refresh();
+    } catch (error) {
+      console.error('[waiting-room board] refresh failed', error);
+    }
+  }, [router, todayLabel]);
+
+  useWaitingRoomLive(() => {
+    void refresh();
+  });
+
   const active = entries.filter((row) => row.waiting_room_status !== 'completed');
   const completed = entries.filter((row) => row.waiting_room_status === 'completed');
 
@@ -47,7 +71,9 @@ export function WaitingRoomBoard({
           <h2 className="text-lg font-semibold">Cola activa</h2>
           <p className="text-sm text-muted-foreground">
             {todayLabel} · {active.length} en sala
-            {completed.length > 0 ? ` · ${completed.length} completado${completed.length === 1 ? '' : 's'}` : ''}
+            {completed.length > 0
+              ? ` · ${completed.length} completado${completed.length === 1 ? '' : 's'}`
+              : ''}
           </p>
         </div>
 
@@ -109,7 +135,9 @@ function WaitingRoomRow({
   const nextStatus = WAITING_ROOM_TRANSITIONS[entry.waiting_room_status];
   const nextLabel =
     nextStatus && entry.waiting_room_status !== 'completed'
-      ? WAITING_ROOM_NEXT_ACTION_LABELS[entry.waiting_room_status as Exclude<WaitingRoomStatus, 'completed'>]
+      ? WAITING_ROOM_NEXT_ACTION_LABELS[
+          entry.waiting_room_status as Exclude<WaitingRoomStatus, 'completed'>
+        ]
       : null;
 
   const advance = () => {
