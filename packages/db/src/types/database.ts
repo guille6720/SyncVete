@@ -57,6 +57,13 @@ export type AppointmentType =
   | 'emergencia'
   | 'otro';
 
+export type WaitingRoomStatus =
+  | 'waiting'
+  | 'called'
+  | 'in_consultation'
+  | 'payment_pending'
+  | 'completed';
+
 export type ClinicalEntryType =
   | 'consulta'
   | 'cirugia'
@@ -1787,6 +1794,91 @@ export interface Database {
             columns: ['owner_id'];
             isOneToOne: false;
             referencedRelation: 'owners';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      waiting_room_entries: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          appointment_id: string;
+          status: WaitingRoomStatus;
+          checked_in_at: string;
+          called_at: string | null;
+          consultation_started_at: string | null;
+          payment_pending_at: string | null;
+          completed_at: string | null;
+          queue_position: number | null;
+          priority: number;
+          room: string | null;
+          internal_notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          appointment_id: string;
+          status?: WaitingRoomStatus;
+          checked_in_at?: string;
+          called_at?: string | null;
+          consultation_started_at?: string | null;
+          payment_pending_at?: string | null;
+          completed_at?: string | null;
+          queue_position?: number | null;
+          priority?: number;
+          room?: string | null;
+          internal_notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          appointment_id?: string;
+          status?: WaitingRoomStatus;
+          checked_in_at?: string;
+          called_at?: string | null;
+          consultation_started_at?: string | null;
+          payment_pending_at?: string | null;
+          completed_at?: string | null;
+          queue_position?: number | null;
+          priority?: number;
+          room?: string | null;
+          internal_notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'waiting_room_entries_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'waiting_room_entries_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'waiting_room_entries_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
             referencedColumns: ['id'];
           },
         ];
@@ -6039,6 +6131,56 @@ export interface Database {
           updated_at: string;
         }[];
       };
+      check_in_appointment: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: Json;
+      };
+      list_waiting_room: {
+        Args: {
+          p_branch_id?: string | null;
+          p_date?: string | null;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          patient_id: string;
+          patient_name: string;
+          patient_species: PatientSpecies;
+          owner_id: string;
+          owner_full_name: string;
+          assigned_user_id: string | null;
+          assigned_user_name: string | null;
+          appointment_type: AppointmentType;
+          appointment_starts_at: string;
+          waiting_room_status: WaitingRoomStatus;
+          checked_in_at: string;
+          called_at: string | null;
+          consultation_started_at: string | null;
+          payment_pending_at: string | null;
+          completed_at: string | null;
+          queue_position: number | null;
+          priority: number;
+          room: string | null;
+        }[];
+      };
+      update_waiting_room_status: {
+        Args: {
+          p_entry_id: string;
+          p_new_status: WaitingRoomStatus;
+          p_room?: string | null;
+        };
+        Returns: Json;
+      };
+      reorder_waiting_room: {
+        Args: {
+          p_entry_id: string;
+          p_queue_position?: number | null;
+          p_priority?: number | null;
+        };
+        Returns: Json;
+      };
       search_clinical_entries: {
         Args: {
           p_search?: string | null;
@@ -6665,6 +6807,7 @@ export interface Database {
       patient_sex: PatientSex;
       appointment_status: AppointmentStatus;
       appointment_type: AppointmentType;
+      waiting_room_status: WaitingRoomStatus;
       clinical_entry_type: ClinicalEntryType;
       consultation_status: ConsultationStatus;
       hospitalization_status: HospitalizationStatus;

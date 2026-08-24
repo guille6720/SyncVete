@@ -1126,3 +1126,48 @@ export const auditLogListSchema = paginationSchema
   );
 
 export type AuditLogListInput = z.infer<typeof auditLogListSchema>;
+
+export const waitingRoomListSchema = z.object({
+  branchId: z.string().uuid().optional(),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
+    .optional(),
+});
+
+export const waitingRoomCheckInSchema = z.object({
+  appointmentId: z.string().uuid('Cita inválida'),
+});
+
+export const waitingRoomUpdateStatusSchema = z.object({
+  entryId: z.string().uuid('Entrada inválida'),
+  newStatus: z.enum([
+    'waiting',
+    'called',
+    'in_consultation',
+    'payment_pending',
+    'completed',
+  ]),
+  room: z
+    .string()
+    .max(80)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? undefined : v)),
+});
+
+export const waitingRoomReorderSchema = z
+  .object({
+    entryId: z.string().uuid('Entrada inválida'),
+    queuePosition: z.coerce.number().int().min(1).optional(),
+    priority: z.coerce.number().int().optional(),
+  })
+  .refine(
+    (value) => value.queuePosition !== undefined || value.priority !== undefined,
+    { message: 'Debés indicar queue_position y/o priority', path: ['queuePosition'] }
+  );
+
+export type WaitingRoomListInput = z.infer<typeof waitingRoomListSchema>;
+export type WaitingRoomCheckInInput = z.infer<typeof waitingRoomCheckInSchema>;
+export type WaitingRoomUpdateStatusInput = z.infer<typeof waitingRoomUpdateStatusSchema>;
+export type WaitingRoomReorderInput = z.infer<typeof waitingRoomReorderSchema>;

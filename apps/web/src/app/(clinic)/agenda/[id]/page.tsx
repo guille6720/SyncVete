@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getAppointment, canReadAppointments, canManageAppointments } from '@/actions/appointments';
 import { canManageConsultations, getConsultationByAppointment } from '@/actions/consultations';
 import { canSendWhatsApp } from '@/actions/whatsapp';
+import { canManageWaitingRoom } from '@/actions/waiting-room';
 import { AppointmentDetail } from '@/components/appointments/appointment-detail';
 
 interface CitaPageProps {
@@ -13,13 +14,15 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp] = await Promise.all([
-    getAppointment(id),
-    canManageAppointments(),
-    canManageConsultations(),
-    getConsultationByAppointment(id).catch(() => null),
-    canSendWhatsApp(),
-  ]);
+  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp, canCheckIn] =
+    await Promise.all([
+      getAppointment(id),
+      canManageAppointments(),
+      canManageConsultations(),
+      getConsultationByAppointment(id).catch(() => null),
+      canSendWhatsApp(),
+      canManageWaitingRoom(),
+    ]);
 
   if (!appointment) notFound();
 
@@ -29,6 +32,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       canWrite={canWrite}
       canStartConsultation={canStart}
       canSendWhatsApp={canWhatsApp}
+      canCheckInWaitingRoom={canCheckIn}
       consultationId={existingConsultation?.id ?? null}
     />
   );

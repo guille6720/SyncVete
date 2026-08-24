@@ -22,6 +22,8 @@ export const PERMISSION_LABELS: Record<string, string> = {
   'patients:write': 'Editar pacientes',
   'appointments:read': 'Ver agenda',
   'appointments:write': 'Gestionar agenda',
+  'waiting_room:read': 'Ver sala de espera',
+  'waiting_room:write': 'Gestionar sala de espera',
   'clinical:read': 'Ver historias clínicas',
   'clinical:write': 'Editar historias clínicas',
   'billing:read': 'Ver facturación',

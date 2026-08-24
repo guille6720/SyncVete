@@ -27,6 +27,7 @@ import {
   Images,
   Inbox,
   ScrollText,
+  Hourglass,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, useTransition } from 'react';
@@ -36,6 +37,12 @@ import { isClinicPathEntitled } from '@sincvete/shared';
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, keywords: 'inicio home' },
   { label: 'Agenda', href: '/agenda', icon: Calendar, keywords: 'citas turnos calendario' },
+  {
+    label: 'Sala de espera',
+    href: '/sala-espera',
+    icon: Hourglass,
+    keywords: 'cola checkin llamado recepcion espera',
+  },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, keywords: 'mascotas animales' },
   { label: 'Propietarios', href: '/propietarios', icon: Users, keywords: 'clientes tutores' },
   { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList, keywords: 'historia clinica evolucion' },

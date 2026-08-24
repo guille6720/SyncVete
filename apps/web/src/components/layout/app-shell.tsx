@@ -29,6 +29,7 @@ import {
   Inbox,
   ScrollText,
   Shield,
+  Hourglass,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { signOut } from '@/actions/auth';
@@ -46,6 +47,7 @@ import type { ClinicCommercialBanner } from '@/lib/entitlements';
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Agenda', href: '/agenda', icon: Calendar },
+  { label: 'Sala de espera', href: '/sala-espera', icon: Hourglass },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint },
   { label: 'Propietarios', href: '/propietarios', icon: Users },
   { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList },
@@ -72,6 +74,7 @@ const NAV_ITEMS = [
 const PREFETCH_HREFS = [
   '/dashboard',
   '/agenda',
+  '/sala-espera',
   '/pacientes',
   '/historia-clinica',
   '/consultas',

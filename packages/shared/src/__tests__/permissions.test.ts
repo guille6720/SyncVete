@@ -33,6 +33,7 @@ describe('getPermissionsForRole', () => {
     const perms = getPermissionsForRole('receptionist');
     expect(perms).toContain('appointments:write');
     expect(perms).toContain('whatsapp:send');
+    expect(perms).toContain('waiting_room:write');
     expect(perms).not.toContain('audit:read');
   });
 

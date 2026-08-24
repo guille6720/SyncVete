@@ -9,6 +9,7 @@ export const FEATURES = {
   OWNERS: 'owners.enabled',
   PATIENTS: 'patients.enabled',
   APPOINTMENTS: 'appointments.enabled',
+  WAITING_ROOM: 'waiting_room.enabled',
 
   CLINICAL_HISTORY: 'clinical.history',
   CONSULTATIONS: 'clinical.consultations',
@@ -88,6 +89,7 @@ export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/propietarios': FEATURES.OWNERS,
   '/pacientes': FEATURES.PATIENTS,
   '/agenda': FEATURES.APPOINTMENTS,
+  '/sala-espera': FEATURES.WAITING_ROOM,
   '/historia-clinica': FEATURES.CLINICAL_HISTORY,
   '/consultas': FEATURES.CONSULTATIONS,
   '/internacion': FEATURES.HOSPITALIZATION,

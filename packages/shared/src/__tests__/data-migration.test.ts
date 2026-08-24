@@ -915,6 +915,7 @@ describe('data-migration specialty + chunks', () => {
       {
         rowNumber: 2,
         externalProductId: 'P1',
+        externalBranchId: null,
         name: 'Amox',
         sku: 'A1',
         category: 'medicamento',

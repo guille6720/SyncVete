@@ -3,9 +3,10 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MessageCircle, Pencil, Stethoscope, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, MessageCircle, Pencil, Stethoscope, Trash2 } from 'lucide-react';
 import { deleteAppointment, updateAppointmentStatus } from '@/actions/appointments';
 import { startConsultationFromAppointment } from '@/actions/consultations';
+import { checkInAppointment } from '@/actions/waiting-room';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +27,7 @@ interface AppointmentDetailProps {
   canWrite: boolean;
   canStartConsultation?: boolean;
   canSendWhatsApp?: boolean;
+  canCheckInWaitingRoom?: boolean;
   consultationId?: string | null;
 }
 
@@ -49,11 +51,17 @@ export function AppointmentDetail({
   canWrite,
   canStartConsultation = false,
   canSendWhatsApp = false,
+  canCheckInWaitingRoom = false,
   consultationId = null,
 }: AppointmentDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
   const actions = STATUS_ACTIONS[appointment.status] ?? [];
+  const canCheckIn =
+    canCheckInWaitingRoom &&
+    appointment.status !== 'cancelada' &&
+    appointment.status !== 'completada' &&
+    appointment.status !== 'ausente';
 
   const handleStatusChange = (status: AppointmentStatus) => {
     if (status === 'cancelada') {
@@ -79,6 +87,17 @@ export function AppointmentDetail({
       if (result && !result.success) {
         alert(result.error ?? 'No se pudo iniciar la consulta');
       }
+    });
+  };
+
+  const handleCheckIn = () => {
+    void runPending(async () => {
+      const result = await checkInAppointment(appointment.id);
+      if (!result.success) {
+        alert(result.error ?? 'No se pudo hacer check-in');
+        return;
+      }
+      router.push('/sala-espera');
     });
   };
 
@@ -113,6 +132,12 @@ export function AppointmentDetail({
                 <MessageCircle className="mr-2 h-4 w-4" />
                 WhatsApp
               </Link>
+            </Button>
+          )}
+          {canCheckIn && (
+            <Button variant="outline" size="sm" isPending={pending} onClick={handleCheckIn}>
+              <CalendarPlus className="h-4 w-4" />
+              {pending ? 'Ingresando...' : 'Check-in'}
             </Button>
           )}
           {consultationId ? (
