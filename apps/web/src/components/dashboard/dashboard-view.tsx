@@ -1,5 +1,13 @@
 import { Suspense } from 'react';
+import {
+  formatDateParam,
+  getWeekStartDate,
+  isClinicPathEntitled,
+  type AppointmentListRow,
+} from '@sincvete/shared';
 import { getDashboardActivity, getDashboardContext, getDashboardSummary } from '@/actions/dashboard';
+import { listAppointments } from '@/actions/appointments';
+import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import { getSessionContext } from '@/lib/session';
 import { getClinicCommercialShell } from '@/lib/entitlements';
 import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity-feed';
@@ -8,6 +16,7 @@ import { DashboardQuickActions } from '@/components/dashboard/dashboard-quick-ac
 import { DashboardRecentLists } from '@/components/dashboard/dashboard-recent-lists';
 import { DashboardSpeciesBreakdown } from '@/components/dashboard/dashboard-species-breakdown';
 import { DashboardStatCards } from '@/components/dashboard/dashboard-stat-cards';
+import { DashboardWaitingRoomSnapshot } from '@/components/dashboard/dashboard-waiting-room-snapshot';
 
 function DashboardPrioritySkeleton() {
   return (
@@ -36,6 +45,57 @@ function DashboardSecondarySkeleton() {
         <div className="h-56 rounded-xl border bg-muted/30 xl:col-span-2" />
       </div>
     </div>
+  );
+}
+
+function DashboardWaitingRoomSkeleton() {
+  return (
+    <div
+      className="h-44 animate-pulse rounded-xl border border-teal-200/70 bg-muted/40"
+      aria-busy="true"
+      aria-label="Cargando sala de espera"
+    />
+  );
+}
+
+/** Live waiting-room snapshot — only when feature + permission allow. */
+async function DashboardWaitingRoomSection({
+  entitledHrefs,
+}: {
+  entitledHrefs: string[] | null;
+}) {
+  if (!isClinicPathEntitled('/sala-espera', entitledHrefs)) return null;
+  const canRead = await canReadWaitingRoom();
+  if (!canRead) return null;
+
+  const today = formatDateParam(new Date());
+  const weekStart = getWeekStartDate(today);
+  const session = await getSessionContext();
+
+  const [entries, weekAppointments] = await Promise.all([
+    listWaitingRoom({ date: today, branchId: session?.branchId ?? undefined }),
+    listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[]),
+  ]);
+
+  const checkedInIds = new Set(entries.map((row) => row.appointment_id));
+  const pendingCheckInCount = weekAppointments.filter((appointment) => {
+    if (checkedInIds.has(appointment.id)) return false;
+    const day = formatDateParam(new Date(appointment.starts_at));
+    if (day !== today) return false;
+    return (
+      appointment.status === 'programada' ||
+      appointment.status === 'confirmada' ||
+      appointment.status === 'en_curso'
+    );
+  }).length;
+
+  return (
+    <DashboardWaitingRoomSnapshot
+      initialEntries={entries}
+      pendingCheckInCount={pendingCheckInCount}
+      today={today}
+      listBranchId={session?.branchId ?? undefined}
+    />
   );
 }
 
@@ -115,6 +175,9 @@ export async function DashboardView() {
       />
       <Suspense fallback={<DashboardPrioritySkeleton />}>
         <DashboardPrioritySection entitledHrefs={commercial.entitledHrefs} />
+      </Suspense>
+      <Suspense fallback={<DashboardWaitingRoomSkeleton />}>
+        <DashboardWaitingRoomSection entitledHrefs={commercial.entitledHrefs} />
       </Suspense>
       <Suspense fallback={<DashboardSecondarySkeleton />}>
         <DashboardSecondarySection

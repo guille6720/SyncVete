@@ -37,6 +37,11 @@ import { listPublicAddonsCatalog, listPublicPlanSeatLimits, listPublicPlansCatal
 import { createMercadoPagoCheckoutUrl } from '@/lib/billing/mercadopago';
 import { createStripeBillingPortalUrl, createStripeCheckoutUrl } from '@/lib/billing/stripe';
 import { getMeteredUsageMeters, getOrganizationEntitlements, getSeatUsageMeters } from '@/lib/entitlements';
+import {
+  dismissClinicPlanRecommendationNotice,
+  getClinicFacingPlanRecommendationHint,
+  type ClinicPlanRecommendationNotice,
+} from '@/lib/plan-recommendations';
 
 function actionError<T = void>(error: unknown): ActionResult<T> {
   if (error instanceof PermissionError) {
@@ -140,12 +145,13 @@ export type PlanBillingState = {
   events: PlanBillingEvent[];
   addonOffers: ClinicAddonOffer[];
   checkoutIntents: ClinicCheckoutIntent[];
+  upgradeNotice: ClinicPlanRecommendationNotice | null;
 };
 
 export async function getPlanBillingState(): Promise<PlanBillingState> {
   const session = await requirePermission('org:manage');
   const supabase = await createServerClient();
-  const [plans, addonCatalog, subRes, customerRes, usage, seats, eventsRes, addonsRes, entitlements, intentsRes] =
+  const [plans, addonCatalog, subRes, customerRes, usage, seats, eventsRes, addonsRes, entitlements, intentsRes, upgradeNotice] =
     await Promise.all([
     listPublicPlansCatalog(),
     listPublicAddonsCatalog(),
@@ -169,6 +175,7 @@ export async function getPlanBillingState(): Promise<PlanBillingState> {
     supabase.rpc('list_own_addons'),
     getOrganizationEntitlements(session.organizationId),
     supabase.rpc('list_own_open_checkout_intents'),
+    getClinicFacingPlanRecommendationHint(session.organizationId).catch(() => null),
   ]);
 
   const planJoin = subRes.data?.plans as { key?: string; name?: string } | { key?: string; name?: string }[] | null;
@@ -261,7 +268,19 @@ export async function getPlanBillingState(): Promise<PlanBillingState> {
         expiresAt: row.expires_at,
         checkoutUrl: row.checkout_url,
       })),
+    upgradeNotice,
   };
+}
+
+export async function dismissClinicUpgradeNotice(): Promise<ActionResult> {
+  try {
+    await requirePermission('org:manage');
+    await dismissClinicPlanRecommendationNotice();
+    revalidatePath('/configuracion');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
 }
 
 export async function startPlanCheckout(formData: FormData): Promise<ActionResult<{ url: string }>> {

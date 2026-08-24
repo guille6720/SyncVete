@@ -13,7 +13,7 @@ export const OWNER_COLUMNS =
   'id, organization_id, branch_id, full_name, email, phone, phone_whatsapp, document_type, document_number, address, city, province, postal_code, notes, is_active, portal_user_id, created_at, updated_at, deleted_at';
 
 export const CLINICAL_ENTRY_COLUMNS =
-  'id, organization_id, branch_id, patient_id, owner_id, appointment_id, recorded_by, entry_date, entry_type, title, anamnesis, physical_exam, diagnosis, treatment, plan, weight_kg, temperature_c, notes, created_at, updated_at, deleted_at';
+  'id, organization_id, branch_id, patient_id, owner_id, appointment_id, recorded_by, entry_date, entry_type, title, anamnesis, physical_exam, diagnosis, treatment, plan, weight_kg, temperature_c, notes, import_batch_id, source_system, source_record_id, original_created_at, original_professional_name, imported_at, imported_by, created_at, updated_at, deleted_at';
 
 export const PRESCRIPTION_COLUMNS =
   'id, organization_id, branch_id, patient_id, owner_id, consultation_id, clinical_entry_id, prescribed_by, dispensed_by, voided_by, status, number, notes, void_reason, prescribed_at, dispensed_at, voided_at, created_at, updated_at, deleted_at';

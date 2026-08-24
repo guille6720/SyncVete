@@ -16,7 +16,11 @@ import {
 import { createServerClient } from '@/lib/supabase/server';
 import { PermissionError, requirePermission, requirePermissionAndFeature, canPermissionAndFeature } from '@/lib/permissions';
 import { getSessionContext } from '@/actions/auth';
-import { revalidateAgenda, revalidateDashboard } from '@/lib/cache-revalidate';
+import {
+  revalidateAgenda,
+  revalidateDashboard,
+  revalidateWaitingRoomSurfaces,
+} from '@/lib/cache-revalidate';
 import { APPOINTMENT_COLUMNS } from '@/lib/db-columns';
 import { FEATURES, planRestrictionResult } from '@/lib/entitlements';
 import { cache } from 'react';
@@ -246,7 +250,11 @@ export async function updateAppointmentStatus(
       return { success: false, error: 'No se pudo actualizar el estado' };
     }
 
-    revalidateAgenda(appointmentId);
+    if (status === 'completada' || status === 'ausente' || status === 'cancelada') {
+      revalidateWaitingRoomSurfaces(appointmentId);
+    } else {
+      revalidateAgenda(appointmentId);
+    }
     return { success: true };
   } catch (error) {
     return actionError(error);

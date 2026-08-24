@@ -22,6 +22,7 @@ import {
   revalidateConsultation,
   revalidateConsultationDetail,
   revalidatePatientHistoria,
+  revalidateWaitingRoomSurfaces,
 } from '@/lib/cache-revalidate';
 import { CONSULTATION_COLUMNS } from '@/lib/db-columns';
 
@@ -401,7 +402,7 @@ export async function completeConsultationAction(
     const result = data as { consultation_id?: string; clinical_entry_id?: string } | null;
 
     revalidateConsultation(consultationId);
-    revalidateAgenda(consultationMeta?.appointment_id);
+    revalidateWaitingRoomSurfaces(consultationMeta?.appointment_id);
 
     if (result?.clinical_entry_id) {
       revalidateClinicalEntry(result.clinical_entry_id, consultationMeta?.patient_id);

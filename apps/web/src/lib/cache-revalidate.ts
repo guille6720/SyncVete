@@ -51,6 +51,10 @@ export function revalidateAgenda(appointmentId?: string | null) {
   if (appointmentId) revalidatePath(`/agenda/${appointmentId}`);
 }
 
+export function revalidateWaitingRoom() {
+  revalidatePath('/sala-espera');
+}
+
 export function revalidatePatientsList() {
   revalidatePath('/pacientes');
 }
@@ -58,4 +62,11 @@ export function revalidatePatientsList() {
 /** Only when a dashboard counter truly must refresh (create/delete volume events). */
 export function revalidateDashboard() {
   revalidatePath('/dashboard');
+}
+
+/** Waiting Room mutations that also affect agenda/dashboard widgets. */
+export function revalidateWaitingRoomSurfaces(appointmentId?: string | null) {
+  revalidateWaitingRoom();
+  revalidateAgenda(appointmentId);
+  revalidateDashboard();
 }

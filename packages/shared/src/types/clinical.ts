@@ -20,6 +20,13 @@ export interface ClinicalEntry {
   weight_kg: number | null;
   temperature_c: number | null;
   notes: string | null;
+  import_batch_id?: string | null;
+  source_system?: string | null;
+  source_record_id?: string | null;
+  original_created_at?: string | null;
+  original_professional_name?: string | null;
+  imported_at?: string | null;
+  imported_by?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

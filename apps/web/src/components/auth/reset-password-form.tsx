@@ -21,7 +21,7 @@ export function ResetPasswordForm({ hasSession }: ResetPasswordFormProps) {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-4 text-center">
           <div className="flex justify-center">
-            <BrandLogo href="/" size="lg" priority />
+            <BrandLogo href="/login" size="lg" priority />
           </div>
           <div>
             <CardTitle>Enlace inválido o vencido</CardTitle>
@@ -48,7 +48,7 @@ export function ResetPasswordForm({ hasSession }: ResetPasswordFormProps) {
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-4 text-center">
         <div className="flex justify-center">
-          <BrandLogo href="/" size="lg" priority />
+          <BrandLogo href="/login" size="lg" priority />
         </div>
         <div>
           <CardTitle>Nueva contraseña</CardTitle>

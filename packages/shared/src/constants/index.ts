@@ -39,6 +39,10 @@ export const PERMISSIONS = [
   'reports:read',
   'audit:read',
   'whatsapp:send',
+  'data:import',
+  'data:export',
+  'waiting_room:read',
+  'waiting_room:write',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -62,6 +66,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'reports:read',
     'audit:read',
     'whatsapp:send',
+    'data:import',
+    'data:export',
+    'waiting_room:read',
+    'waiting_room:write',
   ],
   veterinarian: [
     'patients:read',
@@ -73,6 +81,9 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'inventory:read',
     'reports:read',
     'whatsapp:send',
+    'data:export',
+    'waiting_room:read',
+    'waiting_room:write',
   ],
   nurse: [
     'patients:read',
@@ -83,6 +94,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'clinical:write',
     'inventory:read',
     'whatsapp:send',
+    'waiting_room:read',
+    'waiting_room:write',
   ],
   receptionist: [
     'patients:read',
@@ -91,10 +104,33 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'appointments:write',
     'billing:read',
     'whatsapp:send',
+    'waiting_room:read',
+    'waiting_room:write',
   ],
-  cashier: ['patients:read', 'appointments:read', 'billing:read', 'billing:write', 'whatsapp:send'],
-  lab_tech: ['patients:read', 'clinical:read', 'clinical:write', 'inventory:read', 'whatsapp:send'],
-  readonly: ['patients:read', 'appointments:read', 'clinical:read', 'reports:read'],
+  cashier: [
+    'patients:read',
+    'appointments:read',
+    'billing:read',
+    'billing:write',
+    'whatsapp:send',
+    'waiting_room:read',
+    'waiting_room:write',
+  ],
+  lab_tech: [
+    'patients:read',
+    'clinical:read',
+    'clinical:write',
+    'inventory:read',
+    'whatsapp:send',
+    'waiting_room:read',
+  ],
+  readonly: [
+    'patients:read',
+    'appointments:read',
+    'clinical:read',
+    'reports:read',
+    'waiting_room:read',
+  ],
 };
 
 export const DEFAULT_PAGE_SIZE = 25;

@@ -57,6 +57,13 @@ export type AppointmentType =
   | 'emergencia'
   | 'otro';
 
+export type WaitingRoomStatus =
+  | 'waiting'
+  | 'called'
+  | 'in_consultation'
+  | 'payment_pending'
+  | 'completed';
+
 export type ClinicalEntryType =
   | 'consulta'
   | 'cirugia'
@@ -169,7 +176,8 @@ export type NotificationKind =
   | 'internacion'
   | 'factura'
   | 'receta'
-  | 'plan';
+  | 'plan'
+  | 'migracion';
 
 export interface Database {
   public: {
@@ -219,6 +227,11 @@ export interface Database {
           timezone: string;
           is_active: boolean;
           is_main: boolean;
+          source_system: string | null;
+          source_record_id: string | null;
+          import_batch_id: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -234,6 +247,11 @@ export interface Database {
           timezone?: string;
           is_active?: boolean;
           is_main?: boolean;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -249,6 +267,11 @@ export interface Database {
           timezone?: string;
           is_active?: boolean;
           is_main?: boolean;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -382,6 +405,12 @@ export interface Database {
           notes: string | null;
           is_active: boolean;
           portal_user_id: string | null;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -403,6 +432,12 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -424,6 +459,12 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -731,6 +772,13 @@ export interface Database {
           prescribed_at: string;
           dispensed_at: string | null;
           voided_at: string | null;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          original_professional_name: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -753,6 +801,13 @@ export interface Database {
           prescribed_at?: string;
           dispensed_at?: string | null;
           voided_at?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -775,6 +830,13 @@ export interface Database {
           prescribed_at?: string;
           dispensed_at?: string | null;
           voided_at?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1060,6 +1122,399 @@ export interface Database {
           },
         ];
       };
+      data_import_batches: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string | null;
+          import_type: string;
+          status: string;
+          source_filename: string | null;
+          source_format: string | null;
+          source_system: string | null;
+          date_locale: string | null;
+          conflict_policy: string | null;
+          dry_run: boolean;
+          column_mapping: Json;
+          summary: Json;
+          metadata: Json;
+          storage_path: string | null;
+          created_by: string | null;
+          created_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+          rolled_back_at: string | null;
+          rolled_back_by: string | null;
+          total_records: number;
+          imported_records: number;
+          linked_records: number;
+          skipped_records: number;
+          warning_records: number;
+          failed_records: number;
+          progress_processed: number | null;
+          progress_total: number | null;
+          progress_message: string | null;
+          chunk_size: number | null;
+          queued_at: string | null;
+          worker_locked_at: string | null;
+          worker_lock_token: string | null;
+          error_message: string | null;
+          idempotency_mode: string;
+          cancel_requested_at: string | null;
+          cancelled_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id?: string | null;
+          import_type: string;
+          status?: string;
+          source_filename?: string | null;
+          source_format?: string | null;
+          source_system?: string | null;
+          date_locale?: string | null;
+          conflict_policy?: string | null;
+          dry_run?: boolean;
+          column_mapping?: Json;
+          summary?: Json;
+          metadata?: Json;
+          storage_path?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          rolled_back_at?: string | null;
+          rolled_back_by?: string | null;
+          total_records?: number;
+          imported_records?: number;
+          linked_records?: number;
+          skipped_records?: number;
+          failed_records?: number;
+          warning_records?: number;
+          progress_processed?: number | null;
+          progress_total?: number | null;
+          progress_message?: string | null;
+          chunk_size?: number | null;
+          queued_at?: string | null;
+          worker_locked_at?: string | null;
+          worker_lock_token?: string | null;
+          error_message?: string | null;
+          idempotency_mode?: string;
+          cancel_requested_at?: string | null;
+          cancelled_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string | null;
+          import_type?: string;
+          status?: string;
+          source_filename?: string | null;
+          source_format?: string | null;
+          source_system?: string | null;
+          date_locale?: string | null;
+          conflict_policy?: string | null;
+          dry_run?: boolean;
+          column_mapping?: Json;
+          summary?: Json;
+          metadata?: Json;
+          storage_path?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          rolled_back_at?: string | null;
+          rolled_back_by?: string | null;
+          total_records?: number;
+          imported_records?: number;
+          linked_records?: number;
+          skipped_records?: number;
+          failed_records?: number;
+          warning_records?: number;
+          progress_processed?: number | null;
+          progress_total?: number | null;
+          progress_message?: string | null;
+          chunk_size?: number | null;
+          queued_at?: string | null;
+          worker_locked_at?: string | null;
+          worker_lock_token?: string | null;
+          error_message?: string | null;
+          idempotency_mode?: string;
+          cancel_requested_at?: string | null;
+          cancelled_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'data_import_batches_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      data_import_batch_errors: {
+        Row: {
+          id: string;
+          batch_id: string;
+          organization_id: string;
+          row_number: number | null;
+          entity_type: string | null;
+          error_code: string | null;
+          error_message: string;
+          field_name: string | null;
+          source_reference: string | null;
+          severity: string;
+          recommended_action: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          batch_id: string;
+          organization_id: string;
+          row_number?: number | null;
+          entity_type?: string | null;
+          error_code?: string | null;
+          error_message: string;
+          field_name?: string | null;
+          source_reference?: string | null;
+          severity?: string;
+          recommended_action?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          batch_id?: string;
+          organization_id?: string;
+          row_number?: number | null;
+          entity_type?: string | null;
+          error_code?: string | null;
+          error_message?: string;
+          field_name?: string | null;
+          source_reference?: string | null;
+          severity?: string;
+          recommended_action?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'data_import_batch_errors_batch_id_fkey';
+            columns: ['batch_id'];
+            isOneToOne: false;
+            referencedRelation: 'data_import_batches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      data_import_created_rows: {
+        Row: {
+          id: string;
+          batch_id: string;
+          organization_id: string;
+          entity_type: string;
+          entity_id: string;
+          external_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          batch_id: string;
+          organization_id: string;
+          entity_type: string;
+          entity_id: string;
+          external_id?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          batch_id?: string;
+          organization_id?: string;
+          entity_type?: string;
+          entity_id?: string;
+          external_id?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'data_import_created_rows_batch_id_fkey';
+            columns: ['batch_id'];
+            isOneToOne: false;
+            referencedRelation: 'data_import_batches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      data_import_id_map: {
+        Row: {
+          id: string;
+          batch_id: string;
+          organization_id: string;
+          entity_type: string;
+          external_id: string;
+          internal_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          batch_id: string;
+          organization_id: string;
+          entity_type: string;
+          external_id: string;
+          internal_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          batch_id?: string;
+          organization_id?: string;
+          entity_type?: string;
+          external_id?: string;
+          internal_id?: string;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'data_import_id_map_batch_id_fkey';
+            columns: ['batch_id'];
+            isOneToOne: false;
+            referencedRelation: 'data_import_batches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      data_import_row_decisions: {
+        Row: {
+          id: string;
+          batch_id: string;
+          organization_id: string;
+          entity_type: string;
+          row_number: number;
+          external_id: string | null;
+          decision: string;
+          link_internal_id: string | null;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          batch_id: string;
+          organization_id: string;
+          entity_type: string;
+          row_number: number;
+          external_id?: string | null;
+          decision: string;
+          link_internal_id?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          batch_id?: string;
+          organization_id?: string;
+          entity_type?: string;
+          row_number?: number;
+          external_id?: string | null;
+          decision?: string;
+          link_internal_id?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'data_import_row_decisions_batch_id_fkey';
+            columns: ['batch_id'];
+            isOneToOne: false;
+            referencedRelation: 'data_import_batches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      data_export_jobs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          export_type: string;
+          format: string;
+          status: string;
+          created_by: string | null;
+          created_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+          expires_at: string | null;
+          patient_id: string | null;
+          record_counts: Json;
+          storage_path: string | null;
+          download_filename: string | null;
+          error_message: string | null;
+          metadata: Json;
+          date_from: string | null;
+          date_to: string | null;
+          progress_message: string | null;
+          queued_at: string | null;
+          worker_locked_at: string | null;
+          worker_lock_token: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          export_type: string;
+          format: string;
+          status?: string;
+          created_by?: string | null;
+          created_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          expires_at?: string | null;
+          patient_id?: string | null;
+          record_counts?: Json;
+          storage_path?: string | null;
+          download_filename?: string | null;
+          error_message?: string | null;
+          metadata?: Json;
+          date_from?: string | null;
+          date_to?: string | null;
+          progress_message?: string | null;
+          queued_at?: string | null;
+          worker_locked_at?: string | null;
+          worker_lock_token?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          export_type?: string;
+          format?: string;
+          status?: string;
+          created_by?: string | null;
+          created_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          expires_at?: string | null;
+          patient_id?: string | null;
+          record_counts?: Json;
+          storage_path?: string | null;
+          download_filename?: string | null;
+          error_message?: string | null;
+          metadata?: Json;
+          date_from?: string | null;
+          date_to?: string | null;
+          progress_message?: string | null;
+          queued_at?: string | null;
+          worker_locked_at?: string | null;
+          worker_lock_token?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'data_export_jobs_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       notifications: {
         Row: {
           id: string;
@@ -1158,6 +1613,12 @@ export interface Database {
           notes: string | null;
           photo_url: string | null;
           is_active: boolean;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1180,6 +1641,12 @@ export interface Database {
           notes?: string | null;
           photo_url?: string | null;
           is_active?: boolean;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1245,6 +1712,11 @@ export interface Database {
           title: string | null;
           notes: string | null;
           cancellation_reason: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          import_batch_id: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1263,6 +1735,11 @@ export interface Database {
           title?: string | null;
           notes?: string | null;
           cancellation_reason?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1281,6 +1758,11 @@ export interface Database {
           title?: string | null;
           notes?: string | null;
           cancellation_reason?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1316,6 +1798,206 @@ export interface Database {
           },
         ];
       };
+      waiting_room_entries: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          appointment_id: string;
+          status: WaitingRoomStatus;
+          checked_in_at: string;
+          called_at: string | null;
+          consultation_started_at: string | null;
+          payment_pending_at: string | null;
+          completed_at: string | null;
+          queue_position: number | null;
+          priority: number;
+          room: string | null;
+          internal_notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          appointment_id: string;
+          status?: WaitingRoomStatus;
+          checked_in_at?: string;
+          called_at?: string | null;
+          consultation_started_at?: string | null;
+          payment_pending_at?: string | null;
+          completed_at?: string | null;
+          queue_position?: number | null;
+          priority?: number;
+          room?: string | null;
+          internal_notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          appointment_id?: string;
+          status?: WaitingRoomStatus;
+          checked_in_at?: string;
+          called_at?: string | null;
+          consultation_started_at?: string | null;
+          payment_pending_at?: string | null;
+          completed_at?: string | null;
+          queue_position?: number | null;
+          priority?: number;
+          room?: string | null;
+          internal_notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'waiting_room_entries_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'waiting_room_entries_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'waiting_room_entries_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      appointment_check_in_tokens: {
+        Row: {
+          id: string;
+          organization_id: string;
+          appointment_id: string;
+          token_hash: string;
+          expires_at: string;
+          redeemed_at: string | null;
+          redeemed_waiting_room_entry_id: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          appointment_id: string;
+          token_hash: string;
+          expires_at: string;
+          redeemed_at?: string | null;
+          redeemed_waiting_room_entry_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          appointment_id?: string;
+          token_hash?: string;
+          expires_at?: string;
+          redeemed_at?: string | null;
+          redeemed_waiting_room_entry_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_check_in_tokens_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_check_in_tokens_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_check_in_tokens_redeemed_waiting_room_entry_id_fkey';
+            columns: ['redeemed_waiting_room_entry_id'];
+            isOneToOne: false;
+            referencedRelation: 'waiting_room_entries';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      owner_portal_alerts: {
+        Row: {
+          id: string;
+          organization_id: string;
+          owner_id: string;
+          portal_user_id: string;
+          title: string;
+          body: string | null;
+          href: string;
+          related_type: string | null;
+          related_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          owner_id: string;
+          portal_user_id: string;
+          title: string;
+          body?: string | null;
+          href?: string;
+          related_type?: string | null;
+          related_id?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          owner_id?: string;
+          portal_user_id?: string;
+          title?: string;
+          body?: string | null;
+          href?: string;
+          related_type?: string | null;
+          related_id?: string | null;
+          read_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'owner_portal_alerts_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'owner_portal_alerts_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'owners';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       clinical_entries: {
         Row: {
           id: string;
@@ -1336,6 +2018,13 @@ export interface Database {
           weight_kg: number | null;
           temperature_c: number | null;
           notes: string | null;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          original_professional_name: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1359,6 +2048,13 @@ export interface Database {
           weight_kg?: number | null;
           temperature_c?: number | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1382,6 +2078,13 @@ export interface Database {
           weight_kg?: number | null;
           temperature_c?: number | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1446,6 +2149,11 @@ export interface Database {
           weight_kg: number | null;
           temperature_c: number | null;
           notes: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          import_batch_id: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1471,6 +2179,11 @@ export interface Database {
           weight_kg?: number | null;
           temperature_c?: number | null;
           notes?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1496,6 +2209,11 @@ export interface Database {
           weight_kg?: number | null;
           temperature_c?: number | null;
           notes?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1564,6 +2282,13 @@ export interface Database {
           treatment_plan: string | null;
           discharge_summary: string | null;
           notes: string | null;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          original_professional_name: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1586,6 +2311,13 @@ export interface Database {
           treatment_plan?: string | null;
           discharge_summary?: string | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1734,6 +2466,13 @@ export interface Database {
           next_due_at: string | null;
           route: VaccinationRoute | null;
           notes: string | null;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          original_professional_name: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1754,6 +2493,13 @@ export interface Database {
           next_due_at?: string | null;
           route?: VaccinationRoute | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1774,6 +2520,13 @@ export interface Database {
           next_due_at?: string | null;
           route?: VaccinationRoute | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1847,6 +2600,13 @@ export interface Database {
           postop_notes: string | null;
           complications: string | null;
           notes: string | null;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          original_professional_name: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -1874,6 +2634,13 @@ export interface Database {
           postop_notes?: string | null;
           complications?: string | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1901,6 +2668,9 @@ export interface Database {
           postop_notes?: string | null;
           complications?: string | null;
           notes?: string | null;
+          source_system?: string | null;
+          external_id?: string | null;
+          import_batch_id?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -1977,6 +2747,13 @@ export interface Database {
           completed_at: string | null;
           interpretation: string | null;
           notes: string | null;
+          import_batch_id: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          original_created_at: string | null;
+          original_professional_name: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -2000,6 +2777,13 @@ export interface Database {
           completed_at?: string | null;
           interpretation?: string | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -2023,6 +2807,13 @@ export interface Database {
           completed_at?: string | null;
           interpretation?: string | null;
           notes?: string | null;
+          import_batch_id?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          original_created_at?: string | null;
+          original_professional_name?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -2151,6 +2942,11 @@ export interface Database {
           manufacturer: string | null;
           notes: string | null;
           is_active: boolean;
+          source_system: string | null;
+          source_record_id: string | null;
+          import_batch_id: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -2170,6 +2966,11 @@ export interface Database {
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -2189,6 +2990,11 @@ export interface Database {
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -2309,6 +3115,11 @@ export interface Database {
           paid_amount: number;
           balance: number;
           notes: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          import_batch_id: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -2335,6 +3146,11 @@ export interface Database {
           paid_amount?: number;
           balance?: number;
           notes?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -2361,6 +3177,11 @@ export interface Database {
           paid_amount?: number;
           balance?: number;
           notes?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -2481,6 +3302,11 @@ export interface Database {
           paid_at: string;
           reference: string | null;
           notes: string | null;
+          source_system: string | null;
+          source_record_id: string | null;
+          import_batch_id: string | null;
+          imported_at: string | null;
+          imported_by: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -2495,6 +3321,11 @@ export interface Database {
           paid_at?: string;
           reference?: string | null;
           notes?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -2509,6 +3340,11 @@ export interface Database {
           paid_at?: string;
           reference?: string | null;
           notes?: string | null;
+          source_system?: string | null;
+          source_record_id?: string | null;
+          import_batch_id?: string | null;
+          imported_at?: string | null;
+          imported_by?: string | null;
           created_at?: string;
           updated_at?: string;
           deleted_at?: string | null;
@@ -3120,6 +3956,313 @@ export interface Database {
         };
         Relationships: [];
       };
+      organization_plan_recommendations: {
+        Row: {
+          organization_id: string;
+          status: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          severity: string;
+          score: number;
+          usage_level: number;
+          reasons: Json;
+          fingerprint: string | null;
+          max_usage_ratio_at_dismiss: number | null;
+          recommended_at: string | null;
+          reviewed_at: string | null;
+          dismissed_at: string | null;
+          accepted_at: string | null;
+          reviewed_by: string | null;
+          dismissed_by: string | null;
+          accepted_by: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+          clinic_dismissed_at: string | null;
+          clinic_dismissed_fingerprint: string | null;
+          clinic_dismissed_by: string | null;
+          commercial_note: string | null;
+          commercial_note_updated_at: string | null;
+          commercial_note_updated_by: string | null;
+          last_refreshed_at: string | null;
+          follow_up_at: string | null;
+          follow_up_by: string | null;
+          follow_up_set_at: string | null;
+          follow_up_set_by: string | null;
+          clinic_snooze_until: string | null;
+          is_frozen: boolean;
+          frozen_at: string | null;
+          frozen_by: string | null;
+          frozen_note: string | null;
+          assigned_to: string | null;
+          assigned_at: string | null;
+          assigned_by: string | null;
+          commercial_outcome: string | null;
+          commercial_outcome_at: string | null;
+          commercial_outcome_by: string | null;
+          commercial_outcome_note: string | null;
+          last_contacted_at: string | null;
+          last_contacted_by: string | null;
+          last_contact_note: string | null;
+          commercial_tags: string[];
+          commercial_snooze_until: string | null;
+          commercial_snooze_note: string | null;
+          commercial_snoozed_at: string | null;
+          commercial_snoozed_by: string | null;
+        };
+        Insert: {
+          organization_id: string;
+          status?: string;
+          current_plan_key?: string | null;
+          recommended_plan_key?: string | null;
+          severity?: string;
+          score?: number;
+          usage_level?: number;
+          reasons?: Json;
+          fingerprint?: string | null;
+          max_usage_ratio_at_dismiss?: number | null;
+          recommended_at?: string | null;
+          reviewed_at?: string | null;
+          dismissed_at?: string | null;
+          accepted_at?: string | null;
+          reviewed_by?: string | null;
+          dismissed_by?: string | null;
+          accepted_by?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+          clinic_dismissed_at?: string | null;
+          clinic_dismissed_fingerprint?: string | null;
+          clinic_dismissed_by?: string | null;
+          commercial_note?: string | null;
+          commercial_note_updated_at?: string | null;
+          commercial_note_updated_by?: string | null;
+          last_refreshed_at?: string | null;
+          follow_up_at?: string | null;
+          follow_up_by?: string | null;
+          follow_up_set_at?: string | null;
+          follow_up_set_by?: string | null;
+          clinic_snooze_until?: string | null;
+          is_frozen?: boolean;
+          frozen_at?: string | null;
+          frozen_by?: string | null;
+          frozen_note?: string | null;
+          assigned_to?: string | null;
+          assigned_at?: string | null;
+          assigned_by?: string | null;
+          commercial_outcome?: string | null;
+          commercial_outcome_at?: string | null;
+          commercial_outcome_by?: string | null;
+          commercial_outcome_note?: string | null;
+          last_contacted_at?: string | null;
+          last_contacted_by?: string | null;
+          last_contact_note?: string | null;
+          commercial_tags?: string[];
+          commercial_snooze_until?: string | null;
+          commercial_snooze_note?: string | null;
+          commercial_snoozed_at?: string | null;
+          commercial_snoozed_by?: string | null;
+        };
+        Update: {
+          organization_id?: string;
+          status?: string;
+          current_plan_key?: string | null;
+          recommended_plan_key?: string | null;
+          severity?: string;
+          score?: number;
+          usage_level?: number;
+          reasons?: Json;
+          fingerprint?: string | null;
+          max_usage_ratio_at_dismiss?: number | null;
+          recommended_at?: string | null;
+          reviewed_at?: string | null;
+          dismissed_at?: string | null;
+          accepted_at?: string | null;
+          reviewed_by?: string | null;
+          dismissed_by?: string | null;
+          accepted_by?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+          clinic_dismissed_at?: string | null;
+          clinic_dismissed_fingerprint?: string | null;
+          clinic_dismissed_by?: string | null;
+          commercial_note?: string | null;
+          commercial_note_updated_at?: string | null;
+          commercial_note_updated_by?: string | null;
+          last_refreshed_at?: string | null;
+          follow_up_at?: string | null;
+          follow_up_by?: string | null;
+          follow_up_set_at?: string | null;
+          follow_up_set_by?: string | null;
+          clinic_snooze_until?: string | null;
+          is_frozen?: boolean;
+          frozen_at?: string | null;
+          frozen_by?: string | null;
+          frozen_note?: string | null;
+          assigned_to?: string | null;
+          assigned_at?: string | null;
+          assigned_by?: string | null;
+          commercial_outcome?: string | null;
+          commercial_outcome_at?: string | null;
+          commercial_outcome_by?: string | null;
+          commercial_outcome_note?: string | null;
+          last_contacted_at?: string | null;
+          last_contacted_by?: string | null;
+          last_contact_note?: string | null;
+          commercial_tags?: string[];
+          commercial_snooze_until?: string | null;
+          commercial_snooze_note?: string | null;
+          commercial_snoozed_at?: string | null;
+          commercial_snoozed_by?: string | null;
+        };
+        Relationships: [];
+      };
+      commercial_recommendation_settings: {
+        Row: {
+          id: number;
+          threshold_info: number;
+          threshold_warning: number;
+          threshold_critical: number;
+          clinic_snooze_days: number;
+          stale_days: number;
+          priority_weights: Json;
+          updated_at: string;
+          updated_by: string | null;
+        };
+        Insert: {
+          id?: number;
+          threshold_info?: number;
+          threshold_warning?: number;
+          threshold_critical?: number;
+          clinic_snooze_days?: number;
+          stale_days?: number;
+          priority_weights?: Json;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          id?: number;
+          threshold_info?: number;
+          threshold_warning?: number;
+          threshold_critical?: number;
+          clinic_snooze_days?: number;
+          stale_days?: number;
+          priority_weights?: Json;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
+      commercial_recommendation_saved_views: {
+        Row: {
+          id: string;
+          owner_user_id: string;
+          name: string;
+          name_key: string;
+          query_params: Json;
+          is_shared: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          owner_user_id: string;
+          name: string;
+          query_params?: Json;
+          is_shared?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          owner_user_id?: string;
+          name?: string;
+          query_params?: Json;
+          is_shared?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      organization_plan_recommendation_events: {
+        Row: {
+          id: string;
+          organization_id: string;
+          event_type: string;
+          actor_kind: string;
+          actor_user_id: string | null;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          severity: string | null;
+          score: number | null;
+          usage_level: number | null;
+          reasons: Json;
+          fingerprint: string | null;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          event_type: string;
+          actor_kind?: string;
+          actor_user_id?: string | null;
+          current_plan_key?: string | null;
+          recommended_plan_key?: string | null;
+          severity?: string | null;
+          score?: number | null;
+          usage_level?: number | null;
+          reasons?: Json;
+          fingerprint?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          event_type?: string;
+          actor_kind?: string;
+          actor_user_id?: string | null;
+          current_plan_key?: string | null;
+          recommended_plan_key?: string | null;
+          severity?: string | null;
+          score?: number | null;
+          usage_level?: number | null;
+          reasons?: Json;
+          fingerprint?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      commercial_feature_signals: {
+        Row: {
+          id: string;
+          organization_id: string;
+          feature_key: string;
+          event_type: string;
+          created_at: string;
+          metadata: Json;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          feature_key: string;
+          event_type?: string;
+          created_at?: string;
+          metadata?: Json;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          feature_key?: string;
+          event_type?: string;
+          created_at?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
       billing_customers: {
         Row: {
           organization_id: string;
@@ -3183,6 +4326,30 @@ export interface Database {
         };
         Relationships: [];
       };
+      data_migration_worker_heartbeats: {
+        Row: {
+          worker_name: string;
+          last_run_at: string;
+          last_ok: boolean;
+          last_detail: Json;
+          updated_at: string;
+        };
+        Insert: {
+          worker_name: string;
+          last_run_at?: string;
+          last_ok?: boolean;
+          last_detail?: Json;
+          updated_at?: string;
+        };
+        Update: {
+          worker_name?: string;
+          last_run_at?: string;
+          last_ok?: boolean;
+          last_detail?: Json;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       billing_checkout_intents: {
         Row: {
           id: string;
@@ -3232,6 +4399,46 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: string;
       };
+      cleanup_expired_data_export_jobs: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      cleanup_stale_data_import_batches: {
+        Args: { p_max_age_hours?: number };
+        Returns: Json;
+      };
+      superadmin_org_data_migration_stats: {
+        Args: { p_organization_id: string };
+        Returns: Json;
+      };
+      superadmin_data_migration_ops_queue: {
+        Args: { p_limit?: number };
+        Returns: Json;
+      };
+      cancel_own_data_import_batch: {
+        Args: { p_batch_id: string };
+        Returns: Json;
+      };
+      retry_own_data_import_batch: {
+        Args: { p_batch_id: string };
+        Returns: Json;
+      };
+      cancel_own_data_export_job: {
+        Args: { p_job_id: string };
+        Returns: Json;
+      };
+      own_data_migration_integrity: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      superadmin_force_cancel_data_import_batch: {
+        Args: { p_batch_id: string };
+        Returns: Json;
+      };
+      superadmin_force_cancel_data_export_job: {
+        Args: { p_job_id: string };
+        Returns: Json;
+      };
       has_permission: {
         Args: { required_permission: string };
         Returns: boolean;
@@ -3279,6 +4486,589 @@ export interface Database {
           created_at: string;
           total_count: number;
         }[];
+      };
+      superadmin_list_orgs_recommendation_inputs: {
+        Args: {
+          p_search?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+          p_plan_key?: string | null;
+          p_status?: string | null;
+          p_recommended_plan?: string | null;
+          p_upgrade_filter?: string | null;
+          p_sort?: string | null;
+          p_organization_id?: string | null;
+        };
+        Returns: {
+          id: string;
+          name: string;
+          slug: string;
+          plan_key: string | null;
+          plan_name: string | null;
+          status: SubscriptionStatus | null;
+          trial_ends_at: string | null;
+          starts_at: string | null;
+          created_at: string;
+          owner_name: string | null;
+          users_used: number;
+          branches_used: number;
+          professionals_used: number;
+          patients_used: number;
+          ai_used: number;
+          whatsapp_used: number;
+          storage_used: number;
+          has_hospitalization: boolean;
+          has_surgery: boolean;
+          has_laboratory: boolean;
+          has_inventory: boolean;
+          has_pharmacy: boolean;
+          has_billing: boolean;
+          has_cash: boolean;
+          has_portal: boolean;
+          has_reports: boolean;
+          has_ai: boolean;
+          has_whatsapp: boolean;
+          has_images: boolean;
+          has_advanced_reports: boolean;
+          access_attempt_features: string[] | null;
+          rec_status: string | null;
+          rec_recommended_plan_key: string | null;
+          rec_fingerprint: string | null;
+          rec_dismissed_at: string | null;
+          rec_max_usage_ratio_at_dismiss: number | null;
+          total_count: number;
+        }[];
+      };
+      superadmin_plan_catalog_matrix: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_upsert_plan_recommendation: {
+        Args: {
+          p_organization_id: string;
+          p_status: string;
+          p_current_plan_key?: string | null;
+          p_recommended_plan_key?: string | null;
+          p_severity?: string;
+          p_score?: number;
+          p_usage_level?: number;
+          p_reasons?: Json;
+          p_fingerprint?: string | null;
+          p_max_usage_ratio_at_dismiss?: number | null;
+        };
+        Returns: Json;
+      };
+      record_commercial_feature_signal: {
+        Args: {
+          p_feature_key: string;
+          p_event_type?: string;
+        };
+        Returns: string;
+      };
+      list_own_plan_recommendation_notice: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      dismiss_own_plan_recommendation_notice: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_recommendation_summary: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_list_plan_recommendation_events: {
+        Args: {
+          p_organization_id: string;
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          event_type: string;
+          actor_kind: string;
+          actor_user_id: string | null;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          severity: string | null;
+          score: number | null;
+          usage_level: number | null;
+          reasons: Json;
+          fingerprint: string | null;
+          note: string | null;
+          created_at: string;
+        }[];
+      };
+      superadmin_list_recent_recommendation_events: {
+        Args: {
+          p_limit?: number;
+          p_mine_only?: boolean;
+        };
+        Returns: {
+          id: string;
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          event_type: string;
+          actor_kind: string;
+          actor_user_id: string | null;
+          actor_email: string | null;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          severity: string | null;
+          score: number | null;
+          note: string | null;
+          created_at: string;
+        }[];
+      };
+      superadmin_clear_idle_plan_recommendation: {
+        Args: { p_organization_id: string };
+        Returns: Json;
+      };
+      superadmin_set_plan_recommendation_note: {
+        Args: {
+          p_organization_id: string;
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_get_plan_recommendation_note: {
+        Args: { p_organization_id: string };
+        Returns: Json;
+      };
+      superadmin_touch_plan_recommendation_refresh: {
+        Args: { p_organization_id: string };
+        Returns: Json;
+      };
+      superadmin_set_plan_recommendation_follow_up: {
+        Args: {
+          p_organization_id: string;
+          p_follow_up_at?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_list_recommendation_follow_ups: {
+        Args: {
+          p_limit?: number;
+          p_assigned_to?: string | null;
+          p_unassigned_only?: boolean;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string;
+          usage_level: number;
+          follow_up_at: string;
+          commercial_note: string | null;
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_outcome: string | null;
+        }[];
+      };
+      superadmin_list_recommendation_outcomes: {
+        Args: {
+          p_limit?: number;
+          p_outcome?: string | null;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string;
+          usage_level: number;
+          commercial_outcome: string;
+          commercial_outcome_at: string | null;
+          commercial_outcome_note: string | null;
+          assigned_to: string | null;
+          assigned_email: string | null;
+        }[];
+      };
+      superadmin_set_plan_recommendation_outcome: {
+        Args: {
+          p_organization_id: string;
+          p_outcome?: string | null;
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_list_recommendation_stale: {
+        Args: { p_limit?: number };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string;
+          usage_level: number;
+          last_touch_at: string | null;
+          stale_days: number;
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_outcome: string | null;
+          last_contacted_at: string | null;
+        }[];
+      };
+      superadmin_recommendation_digest: {
+        Args: {
+          p_limit?: number;
+          p_mine_only?: boolean;
+        };
+        Returns: Json;
+      };
+      superadmin_touch_plan_recommendation_contact: {
+        Args: {
+          p_organization_id: string;
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_recommendation_funnel: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_recommendation_assignee_scorecard: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_recommendation_aging: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_recommendation_tag_scorecard: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_recommendation_trends: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_recommendation_assignee_workload: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      sanitize_commercial_saved_view_params: {
+        Args: {
+          p_params: Json;
+        };
+        Returns: Json;
+      };
+      superadmin_list_recommendation_saved_views: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          name: string;
+          query_params: Json;
+          is_shared: boolean;
+          owner_user_id: string;
+          owner_email: string | null;
+          is_mine: boolean;
+          created_at: string;
+          updated_at: string;
+        }[];
+      };
+      superadmin_upsert_recommendation_saved_view: {
+        Args: {
+          p_name: string;
+          p_query_params?: Json;
+          p_is_shared?: boolean;
+          p_id?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_delete_recommendation_saved_view: {
+        Args: {
+          p_id: string;
+        };
+        Returns: Json;
+      };
+      superadmin_list_recommendation_aging: {
+        Args: {
+          p_bucket: string;
+          p_limit?: number;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string | null;
+          age_days: number | null;
+          last_touch_at: string | null;
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_tags: string[];
+          commercial_outcome: string | null;
+        }[];
+      };
+      superadmin_bulk_set_plan_recommendation_assignee: {
+        Args: {
+          p_organization_ids: string[];
+          p_assigned_to?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_bulk_touch_plan_recommendation_contact: {
+        Args: {
+          p_organization_ids: string[];
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_bulk_set_plan_recommendation_follow_up: {
+        Args: {
+          p_organization_ids: string[];
+          p_follow_up_at?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_bulk_set_plan_recommendation_outcome: {
+        Args: {
+          p_organization_ids: string[];
+          p_outcome?: string | null;
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_bulk_set_plan_recommendation_freeze: {
+        Args: {
+          p_organization_ids: string[];
+          p_frozen?: boolean;
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_bulk_set_plan_recommendation_note: {
+        Args: {
+          p_organization_ids: string[];
+          p_note?: string | null;
+          p_mode?: string;
+        };
+        Returns: Json;
+      };
+      superadmin_set_plan_recommendation_tags: {
+        Args: {
+          p_organization_id: string;
+          p_tags?: string[];
+          p_mode?: string;
+        };
+        Returns: Json;
+      };
+      superadmin_bulk_set_plan_recommendation_tags: {
+        Args: {
+          p_organization_ids: string[];
+          p_tags?: string[];
+          p_mode?: string;
+        };
+        Returns: Json;
+      };
+      superadmin_list_recommendation_tag_catalog: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          tag: string;
+          org_count: number;
+        }[];
+      };
+      superadmin_list_recommendation_by_tag: {
+        Args: {
+          p_tag: string;
+          p_limit?: number;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string | null;
+          commercial_tags: string[];
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_outcome: string | null;
+        }[];
+      };
+      superadmin_search_recommendation_notes: {
+        Args: {
+          p_query: string;
+          p_limit?: number;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string | null;
+          commercial_note: string | null;
+          commercial_outcome_note: string | null;
+          last_contact_note: string | null;
+          frozen_note: string | null;
+          commercial_tags: string[];
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_outcome: string | null;
+          matched_in: string[];
+        }[];
+      };
+      superadmin_list_open_recommendation_pipeline: {
+        Args: {
+          p_limit?: number;
+          p_mine_only?: boolean;
+          p_sort?: string;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string | null;
+          score: number | null;
+          usage_level: number | null;
+          age_days: number | null;
+          last_touch_at: string | null;
+          last_contacted_at: string | null;
+          follow_up_at: string | null;
+          is_frozen: boolean;
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_outcome: string | null;
+          commercial_tags: string[];
+          commercial_note: string | null;
+          recommended_at: string | null;
+        }[];
+      };
+      superadmin_list_recommendation_priority_queue: {
+        Args: {
+          p_limit?: number;
+          p_mine_only?: boolean;
+          p_include_frozen?: boolean;
+          p_include_snoozed?: boolean;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string | null;
+          score: number | null;
+          usage_level: number | null;
+          age_days: number | null;
+          priority: number;
+          priority_reasons: string[];
+          last_touch_at: string | null;
+          last_contacted_at: string | null;
+          follow_up_at: string | null;
+          is_frozen: boolean;
+          commercial_snooze_until: string | null;
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_outcome: string | null;
+          commercial_tags: string[];
+          commercial_note: string | null;
+        }[];
+      };
+      superadmin_set_plan_recommendation_commercial_snooze: {
+        Args: {
+          p_organization_id: string;
+          p_days?: number | null;
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_bulk_set_plan_recommendation_commercial_snooze: {
+        Args: {
+          p_organization_ids: string[];
+          p_days?: number | null;
+          p_note?: string | null;
+        };
+        Returns: Json;
+      };
+      superadmin_list_recommendation_commercial_snoozed: {
+        Args: {
+          p_limit?: number;
+          p_mine_only?: boolean;
+        };
+        Returns: {
+          organization_id: string;
+          organization_name: string;
+          organization_slug: string;
+          current_plan_key: string | null;
+          recommended_plan_key: string | null;
+          status: string;
+          severity: string | null;
+          commercial_snooze_until: string | null;
+          commercial_snooze_note: string | null;
+          commercial_snoozed_at: string | null;
+          snoozed_by: string | null;
+          snoozed_by_email: string | null;
+          assigned_to: string | null;
+          assigned_email: string | null;
+          commercial_tags: string[];
+          is_frozen: boolean;
+        }[];
+      };
+      recommendation_is_commercially_snoozed: {
+        Args: {
+          p_snooze_until: string | null;
+          p_now?: string;
+        };
+        Returns: boolean;
+      };
+      superadmin_list_recommendation_assignees: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          user_id: string;
+          email: string;
+        }[];
+      };
+      superadmin_set_plan_recommendation_assignee: {
+        Args: {
+          p_organization_id: string;
+          p_assigned_to?: string | null;
+        };
+        Returns: Json;
+      };
+      get_recommendation_thresholds: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_get_recommendation_settings: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      superadmin_set_recommendation_settings: {
+        Args: {
+          p_threshold_info?: number | null;
+          p_threshold_warning?: number | null;
+          p_threshold_critical?: number | null;
+          p_clinic_snooze_days?: number | null;
+          p_stale_days?: number | null;
+          p_priority_weights?: Json | null;
+        };
+        Returns: Json;
+      };
+      superadmin_set_plan_recommendation_freeze: {
+        Args: {
+          p_organization_id: string;
+          p_frozen?: boolean;
+          p_note?: string | null;
+        };
+        Returns: Json;
       };
       superadmin_get_org_commercial: {
         Args: { p_organization_id: string };
@@ -3865,6 +5655,36 @@ export interface Database {
         };
         Returns: Json;
       };
+      get_waiting_room_report: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_branch_id?: string | null;
+        };
+        Returns: Json;
+      };
+      list_waiting_room_report_entries: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_branch_id?: string | null;
+        };
+        Returns: {
+          entry_id: string;
+          checked_in_at: string;
+          patient_name: string;
+          owner_full_name: string;
+          assigned_user_name: string | null;
+          appointment_starts_at: string;
+          status: string;
+          room: string | null;
+          called_at: string | null;
+          completed_at: string | null;
+          removed: boolean;
+          minutes_to_call: number | null;
+          minutes_dwell: number | null;
+        }[];
+      };
       is_clinic_staff: {
         Args: Record<string, never>;
         Returns: boolean;
@@ -4310,6 +6130,71 @@ export interface Database {
           total_count: number;
         }[];
       };
+      emit_notification: {
+        Args: {
+          p_organization_id: string;
+          p_branch_id: string | null;
+          p_kind: NotificationKind;
+          p_title: string;
+          p_body: string | null;
+          p_href: string;
+          p_related_type: string | null;
+          p_related_id: string | null;
+          p_dedupe_hours?: number | null;
+        };
+        Returns: string;
+      };
+      touch_data_migration_worker_heartbeat: {
+        Args: {
+          p_worker_name: string;
+          p_ok?: boolean;
+          p_detail?: Json;
+        };
+        Returns: undefined;
+      };
+      superadmin_data_migration_worker_status: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      own_data_import_id_map: {
+        Args: { p_batch_id: string };
+        Returns: {
+          entity_type: string;
+          external_id: string;
+          internal_id: string;
+          created_at: string;
+        }[];
+      };
+      own_data_migration_id_map_export: {
+        Args: { p_limit?: number };
+        Returns: {
+          batch_id: string;
+          entity_type: string;
+          external_id: string;
+          internal_id: string;
+          created_at: string;
+        }[];
+      };
+      superadmin_force_retry_data_import_batch: {
+        Args: { p_batch_id: string };
+        Returns: Json;
+      };
+      own_release_stale_migration_locks: {
+        Args: { p_stale_minutes?: number };
+        Returns: Json;
+      };
+      own_prune_orphan_migration_maps: {
+        Args: { p_dry_run?: boolean };
+        Returns: Json;
+      };
+      own_data_migration_checklist: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
+      own_data_migration_billing_reconcile: {
+        Args: Record<string, never>;
+        Returns: Json;
+      };
       count_unread_notifications: {
         Args: Record<string, never>;
         Returns: number;
@@ -4390,6 +6275,188 @@ export interface Database {
           created_at: string;
           updated_at: string;
         }[];
+      };
+      check_in_appointment: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: Json;
+      };
+      list_waiting_room: {
+        Args: {
+          p_branch_id?: string | null;
+          p_date?: string | null;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          patient_id: string;
+          patient_name: string;
+          patient_species: PatientSpecies;
+          owner_id: string;
+          owner_full_name: string;
+          assigned_user_id: string | null;
+          assigned_user_name: string | null;
+          appointment_type: AppointmentType;
+          appointment_starts_at: string;
+          waiting_room_status: WaitingRoomStatus;
+          checked_in_at: string;
+          called_at: string | null;
+          consultation_started_at: string | null;
+          payment_pending_at: string | null;
+          completed_at: string | null;
+          queue_position: number | null;
+          priority: number;
+          room: string | null;
+          internal_notes: string | null;
+        }[];
+      };
+      list_patient_waiting_room_history: {
+        Args: {
+          p_patient_id: string;
+          p_limit?: number;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          checked_in_at: string;
+          waiting_room_status: string;
+          called_at: string | null;
+          completed_at: string | null;
+          removed: boolean;
+          room: string | null;
+          appointment_starts_at: string;
+          minutes_to_call: number | null;
+          minutes_dwell: number | null;
+        }[];
+      };
+      list_owner_waiting_room_history: {
+        Args: {
+          p_owner_id: string;
+          p_limit?: number;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          patient_id: string;
+          patient_name: string;
+          checked_in_at: string;
+          waiting_room_status: string;
+          called_at: string | null;
+          completed_at: string | null;
+          removed: boolean;
+          room: string | null;
+          appointment_starts_at: string;
+          minutes_to_call: number | null;
+          minutes_dwell: number | null;
+        }[];
+      };
+      update_waiting_room_status: {
+        Args: {
+          p_entry_id: string;
+          p_new_status: WaitingRoomStatus;
+          p_room?: string | null;
+        };
+        Returns: Json;
+      };
+      update_waiting_room_notes: {
+        Args: {
+          p_entry_id: string;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      reorder_waiting_room: {
+        Args: {
+          p_entry_id: string;
+          p_queue_position?: number | null;
+          p_priority?: number | null;
+        };
+        Returns: Json;
+      };
+      reorder_waiting_room_queue: {
+        Args: {
+          p_ordered_entry_ids: string[];
+        };
+        Returns: Json;
+      };
+      remove_waiting_room_entry: {
+        Args: {
+          p_entry_id: string;
+          p_mark_ausente?: boolean;
+        };
+        Returns: Json;
+      };
+      list_owner_portal_waiting_room: {
+        Args: {
+          p_date?: string | null;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          patient_id: string;
+          patient_name: string;
+          patient_species: PatientSpecies;
+          appointment_type: AppointmentType;
+          appointment_starts_at: string;
+          waiting_room_status: WaitingRoomStatus;
+          checked_in_at: string;
+          called_at: string | null;
+          consultation_started_at: string | null;
+          payment_pending_at: string | null;
+          completed_at: string | null;
+          queue_position: number | null;
+          priority: number;
+          room: string | null;
+          ahead_count: number;
+          minutes_per_patient: number;
+        }[];
+      };
+      create_appointment_check_in_token: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: Json;
+      };
+      get_public_check_in_status: {
+        Args: {
+          p_token: string;
+        };
+        Returns: Json;
+      };
+      preview_appointment_check_in: {
+        Args: {
+          p_token: string;
+        };
+        Returns: Json;
+      };
+      redeem_appointment_check_in: {
+        Args: {
+          p_token: string;
+        };
+        Returns: Json;
+      };
+      list_owner_portal_alerts: {
+        Args: {
+          p_unread_only?: boolean;
+          p_limit?: number;
+        };
+        Returns: {
+          id: string;
+          title: string;
+          body: string | null;
+          href: string;
+          related_type: string | null;
+          related_id: string | null;
+          read_at: string | null;
+          created_at: string;
+        }[];
+      };
+      mark_owner_portal_alerts_read: {
+        Args: {
+          p_ids?: string[] | null;
+        };
+        Returns: number;
       };
       search_clinical_entries: {
         Args: {
@@ -5017,6 +7084,7 @@ export interface Database {
       patient_sex: PatientSex;
       appointment_status: AppointmentStatus;
       appointment_type: AppointmentType;
+      waiting_room_status: WaitingRoomStatus;
       clinical_entry_type: ClinicalEntryType;
       consultation_status: ConsultationStatus;
       hospitalization_status: HospitalizationStatus;

@@ -26,9 +26,9 @@ test.describe('@smoke Auth flow', () => {
   });
 });
 
-test.describe('@smoke Command palette', () => {
-  test('propietarios redirects unauthenticated users', async ({ page }) => {
-    await page.goto('/propietarios');
+test.describe('@smoke Settings import/export', () => {
+  test('configuracion redirects unauthenticated users', async ({ page }) => {
+    await page.goto('/configuracion?tab=import-export');
     await expect(page).toHaveURL(/\/login/);
   });
 });

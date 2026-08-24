@@ -36,6 +36,7 @@ import {
 import type { Json } from '@sincvete/db';
 import { PermissionError, requireSuperadmin } from '@/lib/permissions';
 import { createServerClient } from '@/lib/supabase/server';
+import { getSessionContext } from '@/lib/session';
 import { replayClaimedBillingEvent } from '@/lib/billing/dispatch';
 import { fetchMercadoPagoPayment } from '@/lib/billing/mercadopago';
 
@@ -537,6 +538,17 @@ export async function changeOrganizationPlan(formData: FormData): Promise<Action
     });
     if (error) return { success: false, error: error.message };
     await clearOrgCheckoutIntents(organizationId);
+    try {
+      const { getPlanRecommendationForOrganization, persistPlanRecommendation } = await import(
+        '@/lib/plan-recommendations'
+      );
+      const { recommendation } = await getPlanRecommendationForOrganization(organizationId);
+      if (recommendation.recommendedPlan === planKey) {
+        await persistPlanRecommendation(recommendation, 'accepted');
+      }
+    } catch {
+      // Recommendation persistence is best-effort; plan change already succeeded.
+    }
     revalidateOrg(organizationId);
     return { success: true };
   } catch (error) {
@@ -761,7 +773,13 @@ export async function getSuperadminCommercialSummary(): Promise<SuperadminCommer
 }
 
 export async function runSuperadminCommercialLifecycle(): Promise<
-  ActionResult<{ expired: number; notices: number }>
+  ActionResult<{
+    expired: number;
+    notices: number;
+    recommendationsScanned?: number;
+    recommendationsActive?: number;
+    recommendationsCleared?: number;
+  }>
 > {
   try {
     await requireSuperadmin();
@@ -772,12 +790,29 @@ export async function runSuperadminCommercialLifecycle(): Promise<
     });
     if (error) return { success: false, error: error.message };
     const row = asObject(data);
+
+    let recommendationsScanned: number | undefined;
+    let recommendationsActive: number | undefined;
+    let recommendationsCleared: number | undefined;
+    try {
+      const { refreshAllPlanRecommendations } = await import('@/lib/plan-recommendations');
+      const refresh = await refreshAllPlanRecommendations();
+      recommendationsScanned = refresh.scanned;
+      recommendationsActive = refresh.recommended;
+      recommendationsCleared = refresh.cleared;
+    } catch {
+      // Phase 31+ optional; lifecycle still succeeds.
+    }
+
     revalidatePath('/superadmin');
     return {
       success: true,
       data: {
         expired: asNumber(row?.expired) ?? 0,
         notices: asNumber(row?.notices) ?? 0,
+        recommendationsScanned,
+        recommendationsActive,
+        recommendationsCleared,
       },
     };
   } catch (error) {
@@ -1122,5 +1157,1068 @@ export async function reverseSuperadminPaidGrant(formData: FormData): Promise<Ac
     return { success: true };
   } catch (error) {
     return actionError(error);
+  }
+}
+
+export async function listSuperadminOrganizationsRecommended(params: {
+  search?: string;
+  page?: number;
+  pageSize?: number;
+  planKey?: string;
+  status?: string;
+  recommendedPlan?: string;
+  upgradeFilter?: string;
+  sort?: string;
+}) {
+  const { listSuperadminOrganizationsWithRecommendations } = await import(
+    '@/lib/plan-recommendations'
+  );
+  return listSuperadminOrganizationsWithRecommendations(params);
+}
+
+export async function refreshSuperadminPlanRecommendations(): Promise<
+  ActionResult<{ scanned: number; recommended: number; cleared: number; pages: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { refreshAllPlanRecommendations } = await import('@/lib/plan-recommendations');
+    const data = await refreshAllPlanRecommendations();
+    revalidatePath('/superadmin');
+    return { success: true, data };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function exportSuperadminRecommendationsCsv(formData?: FormData): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { exportRecommendationsCsv } = await import('@/lib/plan-recommendations');
+    const get = (key: string) => {
+      const raw = formData?.get(key);
+      return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+    };
+    const data = await exportRecommendationsCsv({
+      search: get('search'),
+      planKey: get('plan'),
+      status: get('status'),
+      recommendedPlan: get('recommended'),
+      upgradeFilter: get('upgrade'),
+      sort: get('sort'),
+    });
+    return { success: true, data };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function dismissOrganizationPlanRecommendation(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const { getPlanRecommendationForOrganization, persistPlanRecommendation } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const { recommendation } = await getPlanRecommendationForOrganization(organizationId);
+    await persistPlanRecommendation(recommendation, 'dismissed');
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function reviewOrganizationPlanRecommendation(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const { getPlanRecommendationForOrganization, persistPlanRecommendation } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const { recommendation } = await getPlanRecommendationForOrganization(organizationId);
+    await persistPlanRecommendation(recommendation, 'reviewed');
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationNote(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const noteRaw = String(formData.get('note') ?? '');
+    const { setPlanRecommendationCommercialNote } = await import('@/lib/plan-recommendations');
+    await setPlanRecommendationCommercialNote(organizationId, noteRaw.trim() || null);
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationFollowUp(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const raw = String(formData.get('followUpAt') ?? '').trim();
+    let followUpAt: string | null = null;
+    if (raw) {
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) {
+        return { success: false, error: 'Fecha de seguimiento inválida' };
+      }
+      followUpAt = parsed.toISOString();
+    }
+    const { setPlanRecommendationFollowUp } = await import('@/lib/plan-recommendations');
+    await setPlanRecommendationFollowUp(organizationId, followUpAt);
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationFreeze(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const frozen = String(formData.get('frozen') ?? '') === 'true';
+    const note = String(formData.get('note') ?? '').trim() || null;
+    const { setPlanRecommendationFreeze } = await import('@/lib/plan-recommendations');
+    await setPlanRecommendationFreeze(organizationId, frozen, note);
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationCommercialSnooze(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const clear = String(formData.get('clear') ?? '') === '1';
+    const daysRaw = Number(formData.get('days'));
+    const note = String(formData.get('note') ?? '').trim() || null;
+    const days = clear ? null : daysRaw;
+    if (!clear && (!Number.isFinite(daysRaw) || daysRaw < 1 || daysRaw > 90)) {
+      return { success: false, error: 'Snooze debe ser entre 1 y 90 días' };
+    }
+    const { setPlanRecommendationCommercialSnooze } = await import('@/lib/plan-recommendations');
+    await setPlanRecommendationCommercialSnooze(organizationId, days, note);
+    revalidateOrg(organizationId);
+    revalidatePath('/superadmin');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkSnoozeOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const clear = String(formData.get('clear') ?? '') === '1';
+    const daysRaw = Number(formData.get('days'));
+    const note = String(formData.get('note') ?? '').trim() || null;
+    const days = clear ? null : daysRaw;
+    if (!clear && (!Number.isFinite(daysRaw) || daysRaw < 1 || daysRaw > 90)) {
+      return { success: false, error: 'Snooze debe ser entre 1 y 90 días' };
+    }
+    const { bulkSetPlanRecommendationCommercialSnooze } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const result = await bulkSetPlanRecommendationCommercialSnooze(ids, days, note);
+    revalidatePath('/superadmin');
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationAssignee(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const raw = String(formData.get('assignedTo') ?? '').trim();
+    const assignedTo = raw || null;
+    const { setPlanRecommendationAssignee } = await import('@/lib/plan-recommendations');
+    await setPlanRecommendationAssignee(organizationId, assignedTo);
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationOutcome(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const raw = String(formData.get('outcome') ?? '').trim();
+    const note = String(formData.get('outcomeNote') ?? '').trim() || null;
+    const outcome =
+      raw === 'won' || raw === 'lost' || raw === 'deferred' || raw === 'not_a_fit' ? raw : null;
+    if (raw && !outcome) {
+      return { success: false, error: 'Resultado comercial inválido' };
+    }
+    const { setPlanRecommendationOutcome } = await import('@/lib/plan-recommendations');
+    await setPlanRecommendationOutcome(organizationId, outcome, note);
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationContact(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const note = String(formData.get('contactNote') ?? '').trim() || null;
+    const { touchPlanRecommendationContact } = await import('@/lib/plan-recommendations');
+    await touchPlanRecommendationContact(organizationId, note);
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listSuperadminRecommendationAssignees() {
+  const { listRecommendationAssignees } = await import('@/lib/plan-recommendations');
+  return listRecommendationAssignees();
+}
+
+export async function listSuperadminRecommendationOutcomes(
+  limit = 25,
+  outcome?: 'won' | 'lost' | 'deferred' | 'not_a_fit' | null
+) {
+  const { listRecommendationOutcomes } = await import('@/lib/plan-recommendations');
+  return listRecommendationOutcomes(limit, outcome);
+}
+
+export async function listSuperadminRecommendationStale(limit = 25) {
+  const { listRecommendationStale } = await import('@/lib/plan-recommendations');
+  return listRecommendationStale(limit);
+}
+
+export async function getSuperadminRecommendationDigest(mineOnly = false) {
+  const { getRecommendationDigest } = await import('@/lib/plan-recommendations');
+  return getRecommendationDigest({ limit: 12, mineOnly });
+}
+
+export async function getSuperadminRecommendationFunnel() {
+  const { getRecommendationFunnel } = await import('@/lib/plan-recommendations');
+  return getRecommendationFunnel();
+}
+
+export async function exportSuperadminRecommendationFunnelCsv(): Promise<
+  ActionResult<{ csv: string }>
+> {
+  try {
+    await requireSuperadmin();
+    const { getRecommendationFunnel, formatRecommendationFunnelCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const funnel = await getRecommendationFunnel();
+    return { success: true, data: { csv: formatRecommendationFunnelCsv(funnel) } };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getSuperadminRecommendationTrends() {
+  const { getRecommendationTrends } = await import('@/lib/plan-recommendations');
+  return getRecommendationTrends();
+}
+
+export async function exportSuperadminRecommendationTrendsCsv(): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { getRecommendationTrends, formatRecommendationTrendsCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const trends = await getRecommendationTrends();
+    return {
+      success: true,
+      data: { csv: formatRecommendationTrendsCsv(trends), rowCount: 3 },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getSuperadminRecommendationAssigneeScorecard() {
+  const { getRecommendationAssigneeScorecard } = await import('@/lib/plan-recommendations');
+  return getRecommendationAssigneeScorecard();
+}
+
+export async function exportSuperadminRecommendationAssigneeScorecardCsv(): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const {
+      getRecommendationAssigneeScorecard,
+      formatRecommendationAssigneeScorecardCsv,
+    } = await import('@/lib/plan-recommendations');
+    const scorecard = await getRecommendationAssigneeScorecard();
+    const rowCount = scorecard.assignees.length + (scorecard.unassigned ? 1 : 0);
+    return {
+      success: true,
+      data: {
+        csv: formatRecommendationAssigneeScorecardCsv(scorecard),
+        rowCount,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getSuperadminRecommendationAssigneeWorkload() {
+  const { getRecommendationAssigneeWorkload } = await import('@/lib/plan-recommendations');
+  return getRecommendationAssigneeWorkload();
+}
+
+export async function listSuperadminRecommendationSavedViews() {
+  const { listRecommendationSavedViews } = await import('@/lib/plan-recommendations');
+  return listRecommendationSavedViews();
+}
+
+export async function upsertSuperadminRecommendationSavedView(
+  formData: FormData
+): Promise<ActionResult<{ id: string; name: string }>> {
+  try {
+    await requireSuperadmin();
+    const name = String(formData.get('name') ?? '');
+    const isShared = String(formData.get('isShared') ?? '') === '1';
+    const idRaw = String(formData.get('id') ?? '').trim();
+    const paramsJson = String(formData.get('queryParams') ?? '{}');
+    let queryParams: Record<string, string> = {};
+    try {
+      const parsed = JSON.parse(paramsJson) as unknown;
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        queryParams = Object.fromEntries(
+          Object.entries(parsed as Record<string, unknown>)
+            .filter(([, v]) => typeof v === 'string')
+            .map(([k, v]) => [k, v as string])
+        );
+      }
+    } catch {
+      return { success: false, error: 'Filtros inválidos' };
+    }
+    const { upsertRecommendationSavedView } = await import('@/lib/plan-recommendations');
+    const row = await upsertRecommendationSavedView({
+      name,
+      queryParams,
+      isShared,
+      id: idRaw || null,
+    });
+    revalidatePath('/superadmin');
+    return { success: true, data: { id: row.id, name: row.name } };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deleteSuperadminRecommendationSavedView(
+  formData: FormData
+): Promise<ActionResult<{ id: string }>> {
+  try {
+    await requireSuperadmin();
+    const id = String(formData.get('id') ?? '').trim();
+    if (!id) return { success: false, error: 'Vista inválida' };
+    const { deleteRecommendationSavedView } = await import('@/lib/plan-recommendations');
+    await deleteRecommendationSavedView(id);
+    revalidatePath('/superadmin');
+    return { success: true, data: { id } };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function exportSuperadminRecommendationAssigneeWorkloadCsv(): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const {
+      getRecommendationAssigneeWorkload,
+      formatRecommendationAssigneeWorkloadCsv,
+    } = await import('@/lib/plan-recommendations');
+    const workload = await getRecommendationAssigneeWorkload();
+    const rowCount = workload.assignees.length + (workload.unassigned ? 1 : 0);
+    return {
+      success: true,
+      data: {
+        csv: formatRecommendationAssigneeWorkloadCsv(workload),
+        rowCount,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listSuperadminRecommendationActivity(mineOnly = false) {
+  const { listRecentRecommendationActivity } = await import('@/lib/plan-recommendations');
+  return listRecentRecommendationActivity({ limit: 40, mineOnly });
+}
+
+export async function exportSuperadminRecommendationActivityCsv(formData?: FormData): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { listRecentRecommendationActivity, formatRecommendationActivityCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const mineOnly = String(formData?.get('mineOnly') ?? '') === 'true';
+    const events = await listRecentRecommendationActivity({ limit: 100, mineOnly });
+    return {
+      success: true,
+      data: {
+        csv: formatRecommendationActivityCsv(events),
+        rowCount: events.length,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkAssignOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; skipped: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const raw = String(formData.get('assignedTo') ?? '').trim();
+    const assignedTo = raw || null;
+    const { bulkSetPlanRecommendationAssignee } = await import('@/lib/plan-recommendations');
+    const result = await bulkSetPlanRecommendationAssignee(ids, assignedTo);
+    revalidatePath('/superadmin');
+    for (const id of ids.slice(0, 50)) {
+      revalidatePath(`/superadmin/organizaciones/${id}`);
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkContactOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; skipped: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const note = String(formData.get('contactNote') ?? '').trim() || null;
+    const { bulkTouchPlanRecommendationContact } = await import('@/lib/plan-recommendations');
+    const result = await bulkTouchPlanRecommendationContact(ids, note);
+    revalidatePath('/superadmin');
+    for (const id of ids.slice(0, 50)) {
+      revalidatePath(`/superadmin/organizaciones/${id}`);
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkFollowUpOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; skipped: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const raw = String(formData.get('followUpAt') ?? '').trim();
+    let followUpAt: string | null = null;
+    if (raw) {
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) {
+        return { success: false, error: 'Fecha de seguimiento inválida' };
+      }
+      followUpAt = parsed.toISOString();
+    }
+    const { bulkSetPlanRecommendationFollowUp } = await import('@/lib/plan-recommendations');
+    const result = await bulkSetPlanRecommendationFollowUp(ids, followUpAt);
+    revalidatePath('/superadmin');
+    for (const id of ids.slice(0, 50)) {
+      revalidatePath(`/superadmin/organizaciones/${id}`);
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkOutcomeOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; skipped: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const raw = String(formData.get('outcome') ?? '').trim();
+    const note = String(formData.get('outcomeNote') ?? '').trim() || null;
+    const outcome =
+      raw === 'won' || raw === 'lost' || raw === 'deferred' || raw === 'not_a_fit' ? raw : null;
+    if (raw && !outcome) {
+      return { success: false, error: 'Resultado comercial inválido' };
+    }
+    const { bulkSetPlanRecommendationOutcome } = await import('@/lib/plan-recommendations');
+    const result = await bulkSetPlanRecommendationOutcome(ids, outcome, note);
+    revalidatePath('/superadmin');
+    for (const id of ids.slice(0, 50)) {
+      revalidatePath(`/superadmin/organizaciones/${id}`);
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkFreezeOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; skipped: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const frozen = String(formData.get('frozen') ?? '') === 'true';
+    const note = String(formData.get('freezeNote') ?? '').trim() || null;
+    const { bulkSetPlanRecommendationFreeze } = await import('@/lib/plan-recommendations');
+    const result = await bulkSetPlanRecommendationFreeze(ids, frozen, note);
+    revalidatePath('/superadmin');
+    for (const id of ids.slice(0, 50)) {
+      revalidatePath(`/superadmin/organizaciones/${id}`);
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkNoteOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; skipped: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const rawMode = String(formData.get('noteMode') ?? 'replace').trim();
+    const mode =
+      rawMode === 'append' || rawMode === 'clear' || rawMode === 'replace' ? rawMode : 'replace';
+    const note = String(formData.get('commercialNote') ?? '').trim() || null;
+    if (mode !== 'clear' && !note) {
+      return { success: false, error: 'Escribí una nota comercial' };
+    }
+    const { bulkSetPlanRecommendationNote } = await import('@/lib/plan-recommendations');
+    const result = await bulkSetPlanRecommendationNote(ids, note, mode);
+    revalidatePath('/superadmin');
+    for (const id of ids.slice(0, 50)) {
+      revalidatePath(`/superadmin/organizaciones/${id}`);
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function saveOrganizationPlanRecommendationTags(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const organizationId = String(formData.get('organizationId') ?? '');
+    if (!organizationId) return { success: false, error: 'Organización inválida' };
+    const rawMode = String(formData.get('tagMode') ?? 'replace').trim();
+    const mode =
+      rawMode === 'add' || rawMode === 'remove' || rawMode === 'replace' ? rawMode : 'replace';
+    const { parseCommercialTagsInput, setPlanRecommendationTags } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const tags = parseCommercialTagsInput(String(formData.get('tags') ?? ''));
+    await setPlanRecommendationTags(organizationId, tags, mode);
+    revalidateOrg(organizationId);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function bulkTagOrganizationPlanRecommendations(
+  formData: FormData
+): Promise<ActionResult<{ requested: number; updated: number; skipped: number; errors: number }>> {
+  try {
+    await requireSuperadmin();
+    const ids = String(formData.get('organizationIds') ?? '')
+      .split(',')
+      .map((id) => id.trim())
+      .filter(Boolean);
+    const rawMode = String(formData.get('tagMode') ?? 'add').trim();
+    const mode =
+      rawMode === 'add' || rawMode === 'remove' || rawMode === 'replace' ? rawMode : 'add';
+    const { parseCommercialTagsInput, bulkSetPlanRecommendationTags } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const tags = parseCommercialTagsInput(String(formData.get('tags') ?? ''));
+    if (mode !== 'replace' && tags.length === 0) {
+      return { success: false, error: 'Escribí al menos una etiqueta' };
+    }
+    const result = await bulkSetPlanRecommendationTags(ids, tags, mode);
+    revalidatePath('/superadmin');
+    for (const id of ids.slice(0, 50)) {
+      revalidatePath(`/superadmin/organizaciones/${id}`);
+    }
+    return { success: true, data: result };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listSuperadminRecommendationTagCatalog() {
+  const { listRecommendationTagCatalog } = await import('@/lib/plan-recommendations');
+  return listRecommendationTagCatalog();
+}
+
+export async function listSuperadminRecommendationByTag(tag: string) {
+  const { listRecommendationByTag } = await import('@/lib/plan-recommendations');
+  return listRecommendationByTag(tag, 40);
+}
+
+export async function searchSuperadminRecommendationNotes(query: string) {
+  const { searchRecommendationNotes } = await import('@/lib/plan-recommendations');
+  return searchRecommendationNotes(query, 40);
+}
+
+export async function exportSuperadminRecommendationNoteSearchCsv(
+  formData: FormData
+): Promise<ActionResult<{ csv: string; rowCount: number }>> {
+  try {
+    await requireSuperadmin();
+    const query = String(formData.get('query') ?? '').trim();
+    if (query.length < 2) {
+      return { success: false, error: 'Escribí al menos 2 caracteres' };
+    }
+    const { searchRecommendationNotes, formatRecommendationNoteSearchCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const rows = await searchRecommendationNotes(query, 100);
+    return {
+      success: true,
+      data: { csv: formatRecommendationNoteSearchCsv(rows), rowCount: rows.length },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listSuperadminOpenRecommendationPipeline(options?: {
+  mineOnly?: boolean;
+  sort?: string;
+}) {
+  const { listOpenRecommendationPipeline } = await import('@/lib/plan-recommendations');
+  const sortRaw = options?.sort ?? 'age_desc';
+  const sort =
+    sortRaw === 'age_asc' ||
+    sortRaw === 'severity' ||
+    sortRaw === 'name' ||
+    sortRaw === 'follow_up' ||
+    sortRaw === 'age_desc'
+      ? sortRaw
+      : 'age_desc';
+  return listOpenRecommendationPipeline({
+    limit: 100,
+    mineOnly: options?.mineOnly ?? false,
+    sort,
+  });
+}
+
+export async function exportSuperadminOpenRecommendationPipelineCsv(
+  formData?: FormData
+): Promise<ActionResult<{ csv: string; rowCount: number }>> {
+  try {
+    await requireSuperadmin();
+    const { listOpenRecommendationPipeline, formatOpenRecommendationPipelineCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const mineOnly = String(formData?.get('mineOnly') ?? '') === 'true';
+    const sortRaw = String(formData?.get('sort') ?? 'age_desc').trim();
+    const sort =
+      sortRaw === 'age_asc' ||
+      sortRaw === 'severity' ||
+      sortRaw === 'name' ||
+      sortRaw === 'follow_up' ||
+      sortRaw === 'age_desc'
+        ? sortRaw
+        : 'age_desc';
+    const rows = await listOpenRecommendationPipeline({ limit: 300, mineOnly, sort });
+    return {
+      success: true,
+      data: { csv: formatOpenRecommendationPipelineCsv(rows), rowCount: rows.length },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listSuperadminRecommendationPriorityQueue(options?: {
+  mineOnly?: boolean;
+  includeFrozen?: boolean;
+  includeSnoozed?: boolean;
+}) {
+  const { listRecommendationPriorityQueue } = await import('@/lib/plan-recommendations');
+  return listRecommendationPriorityQueue({
+    limit: 25,
+    mineOnly: options?.mineOnly ?? false,
+    includeFrozen: options?.includeFrozen ?? false,
+    includeSnoozed: options?.includeSnoozed ?? false,
+  });
+}
+
+export async function listSuperadminRecommendationCommercialSnoozed(mineOnly = false) {
+  const { listRecommendationCommercialSnoozed } = await import('@/lib/plan-recommendations');
+  return listRecommendationCommercialSnoozed({ limit: 40, mineOnly });
+}
+
+export async function exportSuperadminRecommendationPriorityQueueCsv(
+  formData?: FormData
+): Promise<ActionResult<{ csv: string; rowCount: number }>> {
+  try {
+    await requireSuperadmin();
+    const { listRecommendationPriorityQueue, formatRecommendationPriorityQueueCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const mineOnly = String(formData?.get('mineOnly') ?? '') === 'true';
+    const includeFrozen = String(formData?.get('includeFrozen') ?? '') === 'true';
+    const includeSnoozed = String(formData?.get('includeSnoozed') ?? '') === 'true';
+    const rows = await listRecommendationPriorityQueue({
+      limit: 100,
+      mineOnly,
+      includeFrozen,
+      includeSnoozed,
+    });
+    return {
+      success: true,
+      data: { csv: formatRecommendationPriorityQueueCsv(rows), rowCount: rows.length },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getSuperadminRecommendationAging() {
+  const { getRecommendationAging } = await import('@/lib/plan-recommendations');
+  return getRecommendationAging();
+}
+
+export async function listSuperadminRecommendationAging(bucket: string) {
+  const { listRecommendationAging } = await import('@/lib/plan-recommendations');
+  const valid =
+    bucket === '0-7' ||
+    bucket === '8-14' ||
+    bucket === '15-30' ||
+    bucket === '31-plus' ||
+    bucket === 'unknown'
+      ? bucket
+      : null;
+  if (!valid) return [];
+  return listRecommendationAging(valid, 40);
+}
+
+export async function exportSuperadminRecommendationAgingCsv(formData?: FormData): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const {
+      getRecommendationAging,
+      listRecommendationAging,
+      formatRecommendationAgingCsv,
+      formatRecommendationAgingRowsCsv,
+    } = await import('@/lib/plan-recommendations');
+    const bucket = String(formData?.get('bucket') ?? '').trim();
+    if (
+      bucket === '0-7' ||
+      bucket === '8-14' ||
+      bucket === '15-30' ||
+      bucket === '31-plus' ||
+      bucket === 'unknown'
+    ) {
+      const rows = await listRecommendationAging(bucket, 100);
+      return {
+        success: true,
+        data: { csv: formatRecommendationAgingRowsCsv(rows), rowCount: rows.length },
+      };
+    }
+    const aging = await getRecommendationAging();
+    return {
+      success: true,
+      data: { csv: formatRecommendationAgingCsv(aging), rowCount: 1 },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getSuperadminRecommendationTagScorecard() {
+  const { getRecommendationTagScorecard } = await import('@/lib/plan-recommendations');
+  return getRecommendationTagScorecard();
+}
+
+export async function exportSuperadminRecommendationTagScorecardCsv(): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { getRecommendationTagScorecard, formatRecommendationTagScorecardCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const scorecard = await getRecommendationTagScorecard();
+    const rowCount = scorecard.tags.length + (scorecard.untagged ? 1 : 0);
+    return {
+      success: true,
+      data: {
+        csv: formatRecommendationTagScorecardCsv(scorecard),
+        rowCount,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function exportSuperadminRecommendationDigestCsv(formData?: FormData): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { getRecommendationDigest, formatRecommendationDigestCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const mineOnly = String(formData?.get('mineOnly') ?? '') === 'true';
+    const digest = await getRecommendationDigest({ limit: 50, mineOnly });
+    const csv = formatRecommendationDigestCsv(digest);
+    const rowCount =
+      digest.overdueFollowUps.length +
+      digest.dueToday.length +
+      digest.staleUnassigned.length +
+      digest.criticalUnassigned.length +
+      digest.recentOutcomes.length +
+      digest.neverContacted.length;
+    return { success: true, data: { csv, rowCount } };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function exportSuperadminOutcomesCsv(formData?: FormData): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { listRecommendationOutcomes, formatOutcomesCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const raw = String(formData?.get('outcomeFilter') ?? '').trim();
+    const outcome =
+      raw === 'won' || raw === 'lost' || raw === 'deferred' || raw === 'not_a_fit' ? raw : null;
+    const rows = await listRecommendationOutcomes(100, outcome);
+    return { success: true, data: { csv: formatOutcomesCsv(rows), rowCount: rows.length } };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listSuperadminUpgradeQueue(limit = 12) {
+  const { listSuperadminOrganizationsWithRecommendations } = await import(
+    '@/lib/plan-recommendations'
+  );
+  return listSuperadminOrganizationsWithRecommendations({
+    page: 1,
+    pageSize: Math.min(25, Math.max(1, limit)),
+    upgradeFilter: 'upgrade_recommended',
+    sort: 'usage_desc',
+    persistRecommendations: false,
+  });
+}
+
+export async function listSuperadminRecommendationFollowUps(
+  limit = 25,
+  filter?: { assignedTo?: string | null; unassignedOnly?: boolean }
+) {
+  const { listRecommendationFollowUps } = await import('@/lib/plan-recommendations');
+  return listRecommendationFollowUps(limit, filter);
+}
+
+export async function exportSuperadminFollowUpsCsv(formData?: FormData): Promise<
+  ActionResult<{ csv: string; rowCount: number }>
+> {
+  try {
+    await requireSuperadmin();
+    const { listRecommendationFollowUps, formatFollowUpsCsv } = await import(
+      '@/lib/plan-recommendations'
+    );
+    const assigneeFilter = String(formData?.get('assigneeFilter') ?? '').trim();
+    let filter: { assignedTo?: string | null; unassignedOnly?: boolean } = {};
+    if (assigneeFilter === 'unassigned') {
+      filter = { unassignedOnly: true };
+    } else if (assigneeFilter === 'me') {
+      const session = await getSessionContext();
+      if (session?.userId) filter = { assignedTo: session.userId };
+    } else if (assigneeFilter) {
+      filter = { assignedTo: assigneeFilter };
+    }
+    const rows = await listRecommendationFollowUps(100, filter);
+    return { success: true, data: { csv: formatFollowUpsCsv(rows), rowCount: rows.length } };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getSuperadminRecommendationSettings() {
+  const { getRecommendationSettings } = await import('@/lib/plan-recommendations');
+  return getRecommendationSettings();
+}
+
+export async function saveSuperadminRecommendationSettings(
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    await requireSuperadmin();
+    const thresholdInfo = Number(formData.get('thresholdInfo'));
+    const thresholdWarning = Number(formData.get('thresholdWarning'));
+    const thresholdCritical = Number(formData.get('thresholdCritical'));
+    const clinicSnoozeDays = Number(formData.get('clinicSnoozeDays'));
+    const staleDays = Number(formData.get('staleDays'));
+    if (
+      ![thresholdInfo, thresholdWarning, thresholdCritical, clinicSnoozeDays, staleDays].every((n) =>
+        Number.isFinite(n)
+      )
+    ) {
+      return { success: false, error: 'Valores inválidos' };
+    }
+    if (!(thresholdInfo < thresholdWarning && thresholdWarning <= thresholdCritical)) {
+      return { success: false, error: 'Los umbrales deben ser info < warning ≤ critical' };
+    }
+    if (clinicSnoozeDays < 1 || clinicSnoozeDays > 90) {
+      return { success: false, error: 'El snooze debe ser entre 1 y 90 días' };
+    }
+    if (staleDays < 1 || staleDays > 180) {
+      return { success: false, error: 'Stale debe ser entre 1 y 180 días' };
+    }
+
+    const {
+      DEFAULT_RECOMMENDATION_PRIORITY_WEIGHTS,
+      setRecommendationSettings,
+    } = await import('@/lib/plan-recommendations');
+    const weightKeys = [
+      'critical',
+      'warning',
+      'info',
+      'usage100',
+      'usage90',
+      'usage80',
+      'age31',
+      'age15',
+      'age8',
+      'neverContacted',
+      'overdueFollowUp',
+      'unassigned',
+      'frozenPenalty',
+    ] as const;
+    const priorityWeights = { ...DEFAULT_RECOMMENDATION_PRIORITY_WEIGHTS };
+    for (const key of weightKeys) {
+      const raw = formData.get(`pw_${key}`);
+      if (raw == null || String(raw).trim() === '') continue;
+      const value = Number(raw);
+      if (!Number.isFinite(value) || value < 0 || value > 200) {
+        return { success: false, error: `Peso inválido: ${key}` };
+      }
+      priorityWeights[key] = Math.round(value);
+    }
+
+    await setRecommendationSettings({
+      thresholdInfo,
+      thresholdWarning,
+      thresholdCritical,
+      clinicSnoozeDays: Math.round(clinicSnoozeDays),
+      staleDays: Math.round(staleDays),
+      priorityWeights,
+    });
+    revalidatePath('/superadmin');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function recordCommercialFeatureSignal(featureKey: string): Promise<void> {
+  try {
+    if (!featureKey) return;
+    const supabase = await createServerClient();
+    await supabase.rpc('record_commercial_feature_signal', {
+      p_feature_key: featureKey,
+      p_event_type: 'feature_denied',
+    });
+  } catch {
+    // Best-effort commercial signal; never block clinic UX.
   }
 }

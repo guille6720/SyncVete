@@ -1,11 +1,13 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { listAppointments, getAssignableStaff } from '@/actions/appointments';
+import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import { AppointmentsAgenda } from '@/components/appointments/appointments-agenda';
 import { getSessionContext } from '@/lib/session';
 import {
   APPOINTMENT_STATUSES,
   getWeekStartDate,
+  mapWaitingRoomByAppointmentId,
   parseDateParam,
   type AppointmentStatus,
 } from '@sincvete/shared';
@@ -30,14 +32,20 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     ? (statusParam as AppointmentStatus)
     : undefined;
 
-  const [appointments, staff] = await Promise.all([
+  const [appointments, staff, canReadWr] = await Promise.all([
     listAppointments({
       weekStart,
       status,
       assignedUserId: params.assigned,
     }),
     getAssignableStaff(),
+    canReadWaitingRoom(),
   ]);
+
+  const waitingRoomByAppointment =
+    canReadWr && selectedDate
+      ? mapWaitingRoomByAppointmentId(await listWaitingRoom({ date: selectedDate }))
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -55,6 +63,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
           staff={staff}
           initialStatus={status ?? ''}
           initialAssignedUserId={params.assigned ?? ''}
+          waitingRoomByAppointment={waitingRoomByAppointment}
         />
       </Suspense>
     </div>

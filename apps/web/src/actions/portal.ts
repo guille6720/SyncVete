@@ -9,12 +9,16 @@ import {
   parseOwnerPortalStatus,
   parsePortalInviteCreated,
   parsePortalInvitePreview,
+  parsePortalWaitingRoomRows,
+  parseOwnerPortalAlerts,
   type ActionResult,
+  type OwnerPortalAlert,
   type OwnerPortalHome,
   type OwnerPortalPatient,
   type OwnerPortalStatus,
   type PortalInviteCreated,
   type PortalInvitePreview,
+  type PortalWaitingRoomRow,
 } from '@sincvete/shared';
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { PermissionError, requirePermission, requirePortalSession } from '@/lib/permissions';
@@ -139,6 +143,71 @@ export async function getOwnerPortalPatient(patientId: string): Promise<OwnerPor
   });
   if (error) return null;
   return parseOwnerPortalPatient(data);
+}
+
+export async function getOwnerPortalWaitingRoom(date?: string): Promise<PortalWaitingRoomRow[]> {
+  const session = await requirePortalSession();
+  const [portalAllowed, waitingRoomAllowed] = await Promise.all([
+    canUseFeature({
+      organizationId: session.organizationId,
+      featureKey: FEATURES.OWNER_PORTAL,
+    }),
+    canUseFeature({
+      organizationId: session.organizationId,
+      featureKey: FEATURES.WAITING_ROOM,
+    }),
+  ]);
+  if (!portalAllowed || !waitingRoomAllowed) return [];
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc('list_owner_portal_waiting_room', {
+    p_date: date ?? null,
+  });
+  if (error) {
+    console.error('[portal] list_owner_portal_waiting_room', error.message);
+    return [];
+  }
+  return parsePortalWaitingRoomRows(data);
+}
+
+export async function listOwnerPortalAlerts(
+  unreadOnly = true
+): Promise<OwnerPortalAlert[]> {
+  const session = await requirePortalSession();
+  const portalAllowed = await canUseFeature({
+    organizationId: session.organizationId,
+    featureKey: FEATURES.OWNER_PORTAL,
+  });
+  if (!portalAllowed) return [];
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc('list_owner_portal_alerts', {
+    p_unread_only: unreadOnly,
+    p_limit: 20,
+  });
+  if (error) {
+    console.error('[portal] list_owner_portal_alerts', error.message);
+    return [];
+  }
+  return parseOwnerPortalAlerts(data);
+}
+
+export async function markOwnerPortalAlertsRead(
+  ids?: string[]
+): Promise<ActionResult<{ count: number }>> {
+  try {
+    await requirePortalSession();
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('mark_owner_portal_alerts_read', {
+      p_ids: ids && ids.length > 0 ? ids : null,
+    });
+    if (error) {
+      return { success: false, error: rpcMessage(error) };
+    }
+    return { success: true, data: { count: Number(data ?? 0) } };
+  } catch (error) {
+    return actionError<{ count: number }>(error);
+  }
 }
 
 export async function acceptPortalInviteForm(

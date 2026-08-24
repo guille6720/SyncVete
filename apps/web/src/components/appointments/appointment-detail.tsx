@@ -3,9 +3,11 @@
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MessageCircle, Pencil, Stethoscope, Trash2 } from 'lucide-react';
+import { ArrowLeft, CalendarPlus, MessageCircle, Pencil, Stethoscope, Trash2 } from 'lucide-react';
 import { deleteAppointment, updateAppointmentStatus } from '@/actions/appointments';
 import { startConsultationFromAppointment } from '@/actions/consultations';
+import { checkInAppointment } from '@/actions/waiting-room';
+import { WaitingRoomCheckInQrButton } from '@/components/waiting-room/waiting-room-check-in-qr-button';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,11 +16,14 @@ import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_VARIANT,
   APPOINTMENT_TYPE_LABELS,
+  WAITING_ROOM_STATUS_LABELS,
+  WAITING_ROOM_STATUS_VARIANT,
   formatAppointmentDateTime,
   SPECIES_EMOJI,
   buildWhatsAppComposePath,
   type AppointmentListRow,
   type AppointmentStatus,
+  type WaitingRoomStatus,
 } from '@sincvete/shared';
 
 interface AppointmentDetailProps {
@@ -26,7 +31,9 @@ interface AppointmentDetailProps {
   canWrite: boolean;
   canStartConsultation?: boolean;
   canSendWhatsApp?: boolean;
+  canCheckInWaitingRoom?: boolean;
   consultationId?: string | null;
+  waitingRoomStatus?: WaitingRoomStatus | null;
 }
 
 const STATUS_ACTIONS: Partial<
@@ -49,11 +56,18 @@ export function AppointmentDetail({
   canWrite,
   canStartConsultation = false,
   canSendWhatsApp = false,
+  canCheckInWaitingRoom = false,
   consultationId = null,
+  waitingRoomStatus = null,
 }: AppointmentDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
   const actions = STATUS_ACTIONS[appointment.status] ?? [];
+  const canCheckIn =
+    canCheckInWaitingRoom &&
+    appointment.status !== 'cancelada' &&
+    appointment.status !== 'completada' &&
+    appointment.status !== 'ausente';
 
   const handleStatusChange = (status: AppointmentStatus) => {
     if (status === 'cancelada') {
@@ -79,6 +93,17 @@ export function AppointmentDetail({
       if (result && !result.success) {
         alert(result.error ?? 'No se pudo iniciar la consulta');
       }
+    });
+  };
+
+  const handleCheckIn = () => {
+    void runPending(async () => {
+      const result = await checkInAppointment(appointment.id);
+      if (!result.success) {
+        alert(result.error ?? 'No se pudo hacer check-in');
+        return;
+      }
+      router.push('/sala-espera');
     });
   };
 
@@ -114,6 +139,18 @@ export function AppointmentDetail({
                 WhatsApp
               </Link>
             </Button>
+          )}
+          {canCheckIn && (
+            <>
+              <WaitingRoomCheckInQrButton
+                appointmentId={appointment.id}
+                patientName={appointment.patient_name}
+              />
+              <Button variant="outline" size="sm" isPending={pending} onClick={handleCheckIn}>
+                <CalendarPlus className="h-4 w-4" />
+                {pending ? 'Ingresando...' : 'Check-in'}
+              </Button>
+            </>
           )}
           {consultationId ? (
             <Button variant="outline" size="sm" asChild>
@@ -190,7 +227,20 @@ export function AppointmentDetail({
             <Badge variant={APPOINTMENT_STATUS_VARIANT[appointment.status]}>
               {APPOINTMENT_STATUS_LABELS[appointment.status]}
             </Badge>
+            {waitingRoomStatus && (
+              <Badge variant={WAITING_ROOM_STATUS_VARIANT[waitingRoomStatus]}>
+                {WAITING_ROOM_STATUS_LABELS[waitingRoomStatus]}
+              </Badge>
+            )}
           </div>
+          {waitingRoomStatus && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              En sala de espera ·{' '}
+              <Link href="/sala-espera" className="text-primary hover:underline">
+                Ver cola
+              </Link>
+            </p>
+          )}
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <DetailField

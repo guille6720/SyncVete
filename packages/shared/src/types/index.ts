@@ -35,6 +35,16 @@ export interface OrganizationSettings {
   phone?: string;
   email?: string;
   taxId?: string;
+  /** Room / box presets for waiting-room call flow. */
+  waitingRoomRooms?: string[];
+  /** Clinic override for portal ETA (minutes per patient ahead). */
+  waitingRoomMinutesPerPatient?: number | null;
+  /** When false, tutors do not receive portal alerts on WR lifecycle (default true). */
+  waitingRoomPortalAlertsEnabled?: boolean;
+  /** When true, skip confirm and open WhatsApp compose on call/payment transitions. */
+  waitingRoomWhatsAppAutoEnabled?: boolean;
+  /** Play call/payment chimes on staff board and tablero when Realtime refreshes. */
+  waitingRoomBoardSoundEnabled?: boolean;
 }
 
 export interface Profile {

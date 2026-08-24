@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import { getPatient } from '@/actions/patients';
+import { listPatientWaitingRoomHistory, canReadWaitingRoom } from '@/actions/waiting-room';
 import { getOwner } from '@/actions/owners';
 import { listClinicalEntries } from '@/actions/clinical-entries';
 import { getActiveHospitalizationByPatient } from '@/actions/hospitalizations';
@@ -7,7 +8,7 @@ import { listPatientVaccineStatus } from '@/actions/vaccinations';
 import { getActiveSurgeryByPatient } from '@/actions/surgeries';
 import { PatientDetail } from '@/components/patients/patient-detail';
 import { getSessionContext } from '@/lib/session';
-import { CLINICAL_RECENT_PAGE_SIZE } from '@sincvete/shared';
+import { CLINICAL_RECENT_PAGE_SIZE, isClinicPathEntitled } from '@sincvete/shared';
 import { getClinicCommercialShell } from '@/lib/entitlements';
 
 interface PatientPageProps {
@@ -23,7 +24,7 @@ export default async function PacienteDetailPage({ params }: PatientPageProps) {
 
   const canReadClinical = session.permissions.includes('clinical:read');
 
-  const [owner, recentClinical, activeHospitalization, activeSurgery, vaccineStatus, commercial] =
+  const [owner, recentClinical, activeHospitalization, activeSurgery, vaccineStatus, commercial, canReadWr] =
     await Promise.all([
       getOwner(patient.owner_id),
       canReadClinical
@@ -37,7 +38,13 @@ export default async function PacienteDetailPage({ params }: PatientPageProps) {
       getActiveSurgeryByPatient(id),
       listPatientVaccineStatus(id),
       getClinicCommercialShell(session.organizationId),
+      canReadWaitingRoom(),
     ]);
+
+  const waitingRoomHistory =
+    canReadWr && isClinicPathEntitled('/sala-espera', commercial.entitledHrefs)
+      ? await listPatientWaitingRoomHistory(id)
+      : [];
 
   return (
     <PatientDetail
@@ -53,7 +60,9 @@ export default async function PacienteDetailPage({ params }: PatientPageProps) {
       vaccineStatus={vaccineStatus}
       canWriteBilling={session.permissions.includes('billing:write')}
       canSendWhatsApp={session.permissions.includes('whatsapp:send')}
+      canExportData={session.permissions.includes('data:export')}
       entitledHrefs={commercial.entitledHrefs}
+      waitingRoomHistory={waitingRoomHistory}
     />
   );
 }

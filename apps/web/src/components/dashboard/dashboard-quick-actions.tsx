@@ -21,6 +21,7 @@ import {
   Images,
   Inbox,
   ScrollText,
+  Users,
   Zap,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -44,6 +45,13 @@ const ACTIONS: Array<{
     icon: Calendar,
     requiresWrite: false,
     tone: 'bg-indigo-100 text-indigo-800 ring-indigo-200 hover:bg-indigo-200/80',
+  },
+  {
+    label: 'Sala de espera',
+    href: '/sala-espera',
+    icon: Users,
+    requiresWrite: false,
+    tone: 'bg-teal-100 text-teal-800 ring-teal-200 hover:bg-teal-200/80',
   },
   {
     label: 'Nueva consulta',

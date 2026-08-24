@@ -37,6 +37,7 @@ interface WhatsAppPageProps {
     invoiceId?: string;
     labOrderId?: string;
     vaccinationId?: string;
+    room?: string;
   }>;
 }
 
@@ -81,6 +82,9 @@ export default async function WhatsAppPage({ searchParams }: WhatsAppPageProps) 
       vars.patient = appointment.patient_name;
       vars.date = formatDashboardDate(appointment.starts_at);
       vars.time = formatAppointmentTime(appointment.starts_at);
+      if (params.room?.trim()) {
+        vars.room = params.room.trim();
+      }
       resolvedTemplate = template ?? 'recordatorio_cita';
     }
   } else if (params.invoiceId) {

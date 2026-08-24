@@ -9,6 +9,7 @@ export const FEATURES = {
   OWNERS: 'owners.enabled',
   PATIENTS: 'patients.enabled',
   APPOINTMENTS: 'appointments.enabled',
+  WAITING_ROOM: 'waiting_room.enabled',
 
   CLINICAL_HISTORY: 'clinical.history',
   CONSULTATIONS: 'clinical.consultations',
@@ -37,6 +38,8 @@ export const FEATURES = {
   CLINICAL_IMAGES: 'clinical_images.enabled',
 
   AUDIT: 'audit.enabled',
+
+  DATA_IMPORT_EXPORT: 'data.import_export',
 
   AI: 'ai.enabled',
   AI_PATIENT_SUMMARY: 'ai.patient_summary',
@@ -86,6 +89,7 @@ export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/propietarios': FEATURES.OWNERS,
   '/pacientes': FEATURES.PATIENTS,
   '/agenda': FEATURES.APPOINTMENTS,
+  '/sala-espera': FEATURES.WAITING_ROOM,
   '/historia-clinica': FEATURES.CLINICAL_HISTORY,
   '/consultas': FEATURES.CONSULTATIONS,
   '/internacion': FEATURES.HOSPITALIZATION,
@@ -120,15 +124,11 @@ export type CommercialPlanKey =
   (typeof COMMERCIAL_PLAN_KEYS)[keyof typeof COMMERCIAL_PLAN_KEYS];
 
 /**
- * Product must set this before marketing a timed trial.
- * null = open-ended `trialing` (trial_ends_at NULL) until Superadmin configures duration.
- *
- * Where to define the real duration (do not hardcode a business number here):
- * 1. Superadmin / SQL: UPDATE plans SET metadata = jsonb_set(metadata, '{default_trial_days}', '<n>'::jsonb) WHERE key = 'trial';
- * 2. Keep this constant in sync so the app documents the same policy.
- * Maps to plans.metadata.default_trial_days for the `trial` plan.
+ * Timed free trial for new clinics (days).
+ * Must stay in sync with plans.metadata.default_trial_days for key = 'trial'.
+ * null = open-ended `trialing` (trial_ends_at NULL) until configured.
  */
-export const ONBOARDING_TRIAL_DAYS: number | null = null;
+export const ONBOARDING_TRIAL_DAYS: number | null = 10;
 
 /** Plan assigned to organizations created AFTER the entitlements migration. Never `legacy`. */
 export const ONBOARDING_PLAN_KEY = COMMERCIAL_PLAN_KEYS.TRIAL;

@@ -9,5 +9,15 @@ export function PwaRegister() {
       /* installability is optional */
     });
   }, []);
+
+  useEffect(() => {
+    const standalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
+    if (standalone) {
+      document.documentElement.classList.add('pwa-standalone');
+    }
+  }, []);
+
   return null;
 }

@@ -53,6 +53,14 @@ export interface EntitlementResolutionInput {
   overrides: FeatureOverrideRow[];
   /** When false/missing active subscription, add-ons are ignored; only defaults then deny */
   hasActiveSubscription: boolean;
+  /** App-only: entitlements schema/RPCs missing — fail open in clinic shell. */
+  schemaUnavailable?: boolean;
+  planId?: string | null;
+  subscriptionStatus?: SubscriptionStatus | null;
+  planKey?: string | null;
+  planName?: string | null;
+  trialEndsAt?: string | null;
+  endsAt?: string | null;
 }
 
 function isOverrideActive(row: FeatureOverrideRow, now: Date): boolean {

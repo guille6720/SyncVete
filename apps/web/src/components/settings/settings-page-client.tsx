@@ -9,6 +9,7 @@ import { RolesPanel } from '@/components/settings/roles-panel';
 import { PlanBillingPanel } from '@/components/settings/plan-billing-panel';
 import { SettingsLegalPanel } from '@/components/settings/settings-legal-panel';
 import { SettingsSuperadminManualPanel } from '@/components/settings/settings-superadmin-manual-panel';
+import { DataMigrationPanel } from '@/components/settings/data-migration-panel';
 import type { PlanBillingState } from '@/actions/plan-billing';
 import type {
   Branch,
@@ -22,6 +23,8 @@ import type {
 interface SettingsPageClientProps {
   availableTabs: SettingsTab[];
   defaultTab: SettingsTab;
+  canImportData?: boolean;
+  canExportData?: boolean;
   clinic?: {
     organizationName: string;
     settings: OrganizationSettings;
@@ -40,6 +43,8 @@ interface SettingsPageClientProps {
 export function SettingsPageClient({
   availableTabs,
   defaultTab,
+  canImportData = false,
+  canExportData = false,
   clinic,
   branches,
   team,
@@ -54,7 +59,8 @@ export function SettingsPageClient({
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Configuración</h1>
         <p className="text-muted-foreground">
-          Administrá tu clínica, plan, sucursales, equipo, permisos y documentos legales
+          Administrá tu clínica, plan, sucursales, equipo, permisos, importación/exportación y
+          documentos legales
         </p>
       </div>
 
@@ -83,6 +89,9 @@ export function SettingsPageClient({
       )}
 
       {activeTab === 'roles' && <RolesPanel />}
+      {activeTab === 'import-export' && (canImportData || canExportData) ? (
+        <DataMigrationPanel canImport={canImportData} canExport={canExportData} />
+      ) : null}
       {activeTab === 'legal' && <SettingsLegalPanel />}
       {activeTab === 'guia-superadmin' && availableTabs.includes('guia-superadmin') ? (
         <SettingsSuperadminManualPanel />

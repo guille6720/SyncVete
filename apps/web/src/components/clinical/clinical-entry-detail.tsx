@@ -103,11 +103,27 @@ export function ClinicalEntryDetail({ entry, canWrite }: ClinicalEntryDetailProp
             <Badge variant={CLINICAL_ENTRY_TYPE_VARIANT[entry.entry_type]}>
               {CLINICAL_ENTRY_TYPE_LABELS[entry.entry_type]}
             </Badge>
+            {entry.source_system || entry.imported_at ? (
+              <Badge variant="warning">Importado</Badge>
+            ) : null}
           </div>
           <p className="text-sm text-muted-foreground">
             {formatClinicalEntryDateTime(entry.entry_date)}
             {entry.recorded_by_name ? ` · ${entry.recorded_by_name}` : ''}
           </p>
+          {entry.source_system || entry.original_professional_name ? (
+            <p className="text-xs text-muted-foreground">
+              Procedencia
+              {entry.source_system ? ` · Origen: ${entry.source_system}` : ''}
+              {entry.original_professional_name
+                ? ` · Profesional original: ${entry.original_professional_name}`
+                : ''}
+              {entry.original_created_at
+                ? ` · Fecha original: ${formatClinicalEntryDateTime(entry.original_created_at)}`
+                : ''}
+              {entry.source_record_id ? ` · ID origen: ${entry.source_record_id}` : ''}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">

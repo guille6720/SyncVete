@@ -29,6 +29,7 @@ import {
   Inbox,
   ScrollText,
   Shield,
+  Hourglass,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { signOut } from '@/actions/auth';
@@ -39,6 +40,7 @@ import { APP_NAME, ROLE_LABELS, formatMeteredUsage, isClinicPathEntitled, type R
 import { BrandLogo } from '@/components/brand/syncvete-logo';
 import { ThemeControls } from '@/components/theme/theme-controls';
 import { AppUpdateBanner } from '@/components/layout/app-update-banner';
+import { InstallAppButton } from '@/components/pwa/install-app-button';
 import { CommandPalette, CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import type { ClinicCommercialBanner } from '@/lib/entitlements';
@@ -46,6 +48,7 @@ import type { ClinicCommercialBanner } from '@/lib/entitlements';
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { label: 'Agenda', href: '/agenda', icon: Calendar },
+  { label: 'Sala de espera', href: '/sala-espera', icon: Hourglass },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint },
   { label: 'Propietarios', href: '/propietarios', icon: Users },
   { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList },
@@ -72,6 +75,7 @@ const NAV_ITEMS = [
 const PREFETCH_HREFS = [
   '/dashboard',
   '/agenda',
+  '/sala-espera',
   '/pacientes',
   '/historia-clinica',
   '/consultas',
@@ -130,8 +134,17 @@ export function AppShell({
     }
   }, [router, entitledHrefs]);
 
+  const isWaitingRoomFullscreen =
+    pathname.startsWith('/sala-espera/pantalla') ||
+    pathname.startsWith('/sala-espera/kiosco') ||
+    pathname.startsWith('/sala-espera/tablero');
+
+  if (isWaitingRoomFullscreen) {
+    return <>{children}</>;
+  }
+
   return (
-    <div className="flex min-h-screen" style={{ background: 'var(--shell-bg)' }}>
+    <div className="flex min-h-dvh" style={{ background: 'var(--shell-bg)' }}>
       <AppUpdateBanner />
       <CommandPalette entitledHrefs={entitledHrefs} isPlatformAdmin={isPlatformAdmin} />
 
@@ -291,7 +304,7 @@ export function AppShell({
       {/* Main content */}
       <div className="flex flex-1 flex-col">
         <header
-          className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4 backdrop-blur md:gap-4"
+          className="safe-area-top sticky top-0 z-30 flex h-14 items-center gap-3 border-b px-4 backdrop-blur md:gap-4"
           style={{
             borderColor: 'var(--shell-border)',
             backgroundColor: 'var(--shell-header)',
@@ -306,6 +319,9 @@ export function AppShell({
             <Menu className="h-5 w-5" />
           </Button>
           <CommandPaletteTrigger />
+          <div className="lg:hidden">
+            <InstallAppButton variant="ghost" size="icon" showIosSteps={false} className="shrink-0" />
+          </div>
           <ThemeControls />
           <div className="ml-auto flex items-center gap-2">
             {branches.length > 1 && (
@@ -317,7 +333,7 @@ export function AppShell({
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6">
+        <main className="safe-area-bottom flex-1 overflow-x-auto p-4 md:p-6">
           {billingBanner ? (
             <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-50">
               {billingBanner.kind === 'trial' ? (

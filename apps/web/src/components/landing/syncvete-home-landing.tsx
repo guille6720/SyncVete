@@ -54,7 +54,7 @@ const MODULES = [
 const FAQ = [
   {
     q: '¿Puedo probar antes de suscribirme?',
-    a: 'Sí. Al registrarte tu clínica arranca en trial, sin tarjeta. Después elegís Basic, Pro, Premium o Enterprise desde Configuración.',
+    a: 'Sí. Al registrarte tu clínica tiene 10 días de trial gratis, sin tarjeta. Después elegís Basic, Pro, Premium o Enterprise desde Configuración.',
   },
   {
     q: '¿Qué incluye cada plan?',
@@ -82,7 +82,7 @@ export function SyncVeteHomeLanding({
   addons?: PublicAddonCatalogItem[];
 }) {
   return (
-    <div className="landing-root min-h-screen bg-[var(--land-bg)] text-[var(--land-ink)]">
+    <div className="landing-root min-h-dvh bg-[var(--land-bg)] text-[var(--land-ink)]">
       <MarketingHeader />
 
       {/* HERO — brand first, one CTA group, one dominant visual */}
@@ -106,7 +106,7 @@ export function SyncVeteHomeLanding({
                 asChild
               >
                 <Link href="/register">
-                  Empezar trial gratis
+                  Empezar 10 días gratis
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               </Button>
@@ -120,7 +120,7 @@ export function SyncVeteHomeLanding({
               </Button>
             </div>
             <p className="mt-5 text-sm text-[var(--land-muted)]">
-              Desde $ 29.990 / mes · Cancelá cuando quieras
+              10 días gratis · Desde $ 29.990 / mes · Cancelá cuando quieras
             </p>
           </div>
 

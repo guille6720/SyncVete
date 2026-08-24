@@ -55,6 +55,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
         <a href="#cobros">9. Facturación y caja</a>
         <a href="#ops">10. Reportes, avisos e IA</a>
         <a href="#config">11. Configuración y plan</a>
+        <a href="#import-export">11b. Importar / Exportar</a>
         <a href="#roles">12. Roles y portal del tutor</a>
       </nav>
 
@@ -298,12 +299,195 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
               <li>
                 <strong>Roles:</strong> qué puede hacer cada perfil.
               </li>
+              <li>
+                <strong>Importar / Exportar:</strong> migración de datos (owner/admin, según plan).
+              </li>
             </ul>
             <div className="sv-callout">
               Si ves un aviso amarillo (trial por vencer, pago pendiente, cupo de asientos o de IA), abrí Plan. La
               clínica sigue operativa; el aviso indica qué hay que renovar o ampliar.
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="sv-section" id="import-export">
+        <h2>11b. Importar / Exportar datos</h2>
+        <p>
+          En <strong>Configuración → Importar / Exportar</strong> podés migrar propietarios, pacientes, historias,
+          vacunas, laboratorio, cirugías, recetas, internaciones y adjuntos (ZIP SyncVete).
+        </p>
+        <ul className="sv-steps">
+          <li>
+            <strong>Orden recomendado:</strong> sucursales → propietarios → pacientes → historias → vacunas → especialidades →
+            adjuntos.
+          </li>
+          <li>
+            <strong>Sucursales:</strong> exportá e importá sucursales (CSV con `external_branch_id`, `code`, `name`).
+            Van primero en la migración guiada. Nunca se promueve una sucursal importada a principal (`is_main` queda en
+            false); activá/desactivá con `is_active`.
+          </li>
+          <li>
+            <strong>Dry-run:</strong> validá antes de confirmar. Descargá el reporte CSV si hay avisos o errores.
+          </li>
+          <li>
+            <strong>Conflictos:</strong> no se pisan datos en silencio: elegí crear, vincular, omitir o revisar.
+          </li>
+          <li>
+            <strong>Idempotencia:</strong> podés omitir filas que ya existan por <em>source_record_id</em>.
+          </li>
+          <li>
+            <strong>Cola:</strong> lotes grandes se encolan; cancelá o reintentá desde el historial. Una sola
+            importación activa por clínica.
+          </li>
+          <li>
+            <strong>Avisos:</strong> al terminar (o fallar) import/export recibís una notificación in-app
+            con enlace a esta pantalla.
+          </li>
+          <li>
+            <strong>Límites:</strong> CSV hasta 25 MB; ZIP de adjuntos hasta 80 MB.
+          </li>
+          <li>
+            <strong>Adjuntos (fase 42):</strong> podés incluir un <code>attachments_meta.csv</code> opcional en la raíz
+            del ZIP o bajo <code>data/</code> para asignar sucursal y staff por archivo (`external_patient_id` +
+            <code>filename</code>); sin fila de metadata se usan los valores por defecto del importador.
+          </li>
+          <li>
+            <strong>ZIP de ejemplo:</strong> incluye plantillas de mapa staff/sucursal y notas round-trip para
+            probar migración completa. En la migración guiada, cada paso muestra si admite mapa de sucursal o
+            staff y si ya tenés uno cargado.
+          </li>
+          <li>
+            <strong>Integridad:</strong> el historial muestra huérfanos de id-map / filas creadas y locks
+            trabados; podés descargar el reporte CSV y el id-map de cada lote. También liberar locks
+            stale y podar mapas huérfanos (simulá primero).
+          </li>
+          <li>
+            <strong>Multi-sede:</strong> en propietarios, pacientes, historias clínicas, vacunas, laboratorio,
+            cirugías, recetas, internaciones, agenda, consultas, inventario y facturas podés usar la columna
+            opcional `external_branch_id` para asignar cada fila a una sucursal. Importá sucursales antes; cargá el
+            mapa sucursales (CSV external_branch_id → internal_branch_id) o usá UUID internos del tenant en
+            re-import (round-trip). Si el ID no está mapeado ni es un branch conocido, la fila falla (no se usa la
+            sucursal por defecto en silencio).
+          </li>
+          <li>
+            <strong>Historias clínicas y vacunas:</strong> además de multi-sede con `external_branch_id`,
+            podés asignar profesional con `external_assigned_user_id` (mismo mapa staff que consultas; vacío =
+            usuario importador).
+          </li>
+          <li>
+            <strong>Agenda:</strong> exportá e importá citas (CSV con `starts_at`/`ends_at`). Podés asignar
+            profesional con `external_assigned_user_id`: requiere el mapa staff (CSV
+            external_staff_id → internal_user_id) o un profile id existente del tenant. Exportá{' '}
+            <code>staff_profiles</code> primero para armar el mapa. En la migración guiada van después de
+            internaciones y antes de consultas. El dry-run avisa solapamientos del mismo paciente en el archivo.
+            En citas, si dejás vacío `external_assigned_user_id`, la cita queda sin profesional asignado.
+          </li>
+          <li>
+            <strong>Consultas:</strong> exportá e importá consultas SOAP (CSV con `started_at`/`completed_at`).
+            Podés vincular `external_appointment_id` si importaste citas antes. También podés asignar profesional
+            con `external_assigned_user_id` (mismo mapa staff que agenda; vacío = usuario importador). En la
+            migración guiada van después de agenda y antes de inventario.
+          </li>
+          <li>
+            <strong>Checklist go-live:</strong> en el historial de importación podés correr un
+            checklist (propietarios, pacientes, citas 30d, vacunas, inventario, locks/huérfanos) y
+            descargarlo en CSV.
+          </li>
+          <li>
+            <strong>Id-map org:</strong> descargá el mapa external_id → internal_id de toda la clínica
+            (CSV con meta de organización). También se incluye en el paquete cutover como{' '}
+            <code>id_map.csv</code>.
+          </li>
+          <li>
+            <strong>Paquete cutover:</strong> antes del go-live descargá el ZIP de cutover (integridad,
+            checklist, conciliación de facturación, export_catalog.csv, freeze_recommendations.csv e
+            id_map.csv). Es solo lectura: no modifica datos, planes ni caja.
+          </li>
+          <li>
+            <strong>Inventario:</strong> exportá e importá productos (CSV con SKU/categoría/stock). En
+            la migración guiada van antes de adjuntos. También podés exportar{' '}
+            <code>inventory_movements</code> (movimientos de stock, auditoría). No se importa — el stock se
+            deriva de operaciones reales, no de migración.
+          </li>
+          <li>
+            <strong>Internaciones (fase 44–45):</strong> el ZIP completo (`full_clinic`) y el export JSON
+            incluyen las notas de evolución (<code>hospitalization_notes</code>: tipo, contenido, peso,
+            temperatura, quién la registró). El CSV/XLSX individual de internaciones aplana las notas en
+            filas (como lab/recetas con ítems); el ZIP specialty también trae las notas. Solo lectura — no se
+            importan; se registran en la app durante la estadía, no por migración.
+          </li>
+          <li>
+            <strong>ZIP specialty (fase 47):</strong> al exportar solo laboratorio o recetas en formato ZIP
+            también se incluyen los ítems hijos (<code>lab_order_items</code> /
+            <code>prescription_items</code>). Cirugías specialty incluye el CSV padre además del JSON.
+          </li>
+          <li>
+            <strong>ZIP enfocado (fase 48):</strong> si exportás una sola entidad en ZIP (p. ej. caja,
+            facturas, staff, movimientos de stock), el archivo solo trae esa entidad y sus companions
+            (movimientos de caja, ítems/pagos de factura, membresías). El volcado completo queda para
+            <code>full_clinic</code> / historia de un paciente.
+          </li>
+          <li>
+            <strong>JSON enfocado (fase 49, formato 1.6):</strong> igual que el ZIP: un export JSON de
+            una sola entidad o specialty incluye solo <code>manifest</code>, la entidad y sus hijos
+            (ítems lab/recetas, notas de internación, movimientos de caja, etc.).
+          </li>
+          <li>
+            <strong>Adjuntos round-trip (fase 50):</strong> al exportar <code>full_clinic</code> /
+            historia de un paciente en ZIP, se genera <code>attachments_meta.csv</code> con
+            paciente/archivo/sucursal/uploader de cada binario empaquetado — listo para re-import
+            (fase 42). El ZIP de ejemplo y el cutover pack v4 incluyen la plantilla.
+          </li>
+          <li>
+            <strong>Adjuntos clínicos — metadata (fase 46):</strong> exportá el catálogo de
+            <code>clinical_images</code> (paciente, tipo, nombre, mime, tamaño, ruta, sucursal/uploader).
+            Solo lectura: no recrea filas. Los binarios se exportan/importan aparte vía ZIP de adjuntos
+            (con <code>attachments_meta.csv</code> opcional).
+          </li>
+          <li>
+            <strong>Facturas:</strong> exportá e importá facturas con ítems. Podés asignar quién creó la
+            factura con `external_assigned_user_id` (mismo mapa staff; vacío = usuario importador). Los pagos
+            se importan aparte (histórico, sin caja) y también se pueden exportar solos. Podés asignar quién
+            registró el pago con `external_assigned_user_id` (mismo mapa staff; vacío = usuario importador). Los
+            exports CSV/ZIP incluyen `external_branch_id` y `external_assigned_user_id` con UUID internos
+            para round-trip. El paquete cutover v3 incluye plantillas staff/branch y notas round-trip; el mapa
+            sucursales se puede cargar en la pantalla de importación. Usá la conciliación de facturación para
+            comparar `paid_amount` vs suma de pagos antes del go-live.
+          </li>
+          <li>
+            <strong>Caja:</strong> exportá sesiones de caja históricas con sus movimientos. No se
+            importa caja (no reabre sesiones ni crea movimientos).
+          </li>
+          <li>
+            <strong>Recordatorios:</strong> exportá el historial de <code>reminder_logs</code> (envíos
+            y estados). No se importa — evita reenviar notificaciones o WhatsApp.
+          </li>
+          <li>
+            <strong>WhatsApp:</strong> exportá el historial de <code>whatsapp_messages</code> (mensajes
+            enviados). No se importa — evita reenviar mensajes o recrear efectos secundarios.
+          </li>
+          <li>
+            <strong>Auditoría:</strong> exportá el historial de <code>audit_logs</code> (acciones y
+            cambios). No se importa — no reescribe la pista de auditoría.
+          </li>
+          <li>
+            <strong>Notificaciones:</strong> exportá el historial de <code>notifications</code> (alertas
+            in-app). No se importa — no recrea el inbox ni marca lecturas.
+          </li>
+          <li>
+            <strong>Staff:</strong> exportá <code>staff_profiles</code> (perfiles + membresías por
+            sucursal). No se importa — no crea usuarios en auth ni asigna roles. Usá el export para armar el
+            mapa staff al importar citas, consultas, historias, vacunas, laboratorio, recetas, cirugías e
+            internaciones con <code>external_assigned_user_id</code>.
+          </li>
+          <li>
+            <strong>Rollback:</strong> solo revierte filas creadas por ese lote (no toca datos previos).
+          </li>
+        </ul>
+        <div className="sv-callout">
+          Exportá CSV/JSON/XLSX/ZIP/PDF con rango de fechas. Las recetas y el laboratorio incluyen ítems. Los
+          artefactos vencen y se limpian automáticamente.
         </div>
       </section>
 

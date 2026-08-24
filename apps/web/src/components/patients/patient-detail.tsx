@@ -15,12 +15,15 @@ import {
   Scissors,
   Syringe,
   Sparkles,
+  Hourglass,
   Trash2,
   Images,
 } from 'lucide-react';
 import { deletePatient } from '@/actions/patients';
+import { runClinicExportAction } from '@/actions/data-migration';
 import { PatientVaccineStatus } from '@/components/vaccinations/patient-vaccine-status';
 import { PatientClinicalRecent } from '@/components/patients/patient-clinical-recent';
+import { PatientWaitingRoomHistory } from '@/components/patients/patient-waiting-room-history';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -37,6 +40,7 @@ import {
   type Patient,
   type SurgeryStatus,
   type VaccinationDueRow,
+  type PatientWaitingRoomHistoryRow,
 } from '@sincvete/shared';
 
 interface PatientDetailProps {
@@ -47,12 +51,14 @@ interface PatientDetailProps {
   canWriteClinical?: boolean;
   canWriteBilling?: boolean;
   canSendWhatsApp?: boolean;
+  canExportData?: boolean;
   clinicalEntryCount?: number;
   recentClinicalEntries?: ClinicalEntryListRow[];
   activeHospitalization?: { id: string; status: HospitalizationStatus } | null;
   activeSurgery?: { id: string; status: SurgeryStatus } | null;
   vaccineStatus?: VaccinationDueRow[];
   entitledHrefs?: string[] | null;
+  waitingRoomHistory?: PatientWaitingRoomHistoryRow[];
 }
 
 function formatAge(birthDate: string | null): string | null {
@@ -83,12 +89,14 @@ export function PatientDetail({
   canWriteClinical = false,
   canWriteBilling = false,
   canSendWhatsApp = false,
+  canExportData = false,
   clinicalEntryCount = 0,
   recentClinicalEntries = [],
   activeHospitalization = null,
   activeSurgery = null,
   vaccineStatus = [],
   entitledHrefs = null,
+  waitingRoomHistory = [],
 }: PatientDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -107,6 +115,30 @@ export function PatientDetail({
     });
   };
 
+  const handleExportClinical = (format: 'zip' | 'pdf' | 'json') => {
+    void runPending(async () => {
+      const form = new FormData();
+      form.set('exportType', 'patient_clinical');
+      form.set('format', format);
+      form.set('patientId', patient.id);
+      const result = await runClinicExportAction(form);
+      if (!result.success || !result.data) {
+        window.alert(result.error ?? 'No se pudo exportar');
+        return;
+      }
+      const binary = atob(result.data.base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: result.data.contentType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = result.data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -116,8 +148,28 @@ export function PatientDetail({
             Volver
           </Link>
         </Button>
-        {(canWrite || canReadClinical || canWriteClinical || canSendWhatsApp) && (
+        {(canWrite || canReadClinical || canWriteClinical || canSendWhatsApp || canExportData) && (
           <div className="flex flex-wrap gap-2">
+            {canExportData ? (
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => handleExportClinical('pdf')}
+                >
+                  Exportar HC (PDF)
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => handleExportClinical('zip')}
+                >
+                  Exportar HC (ZIP)
+                </Button>
+              </>
+            ) : null}
             {canReadClinical && entitled('/historia-clinica') && (
               <Button variant="outline" size="sm" asChild>
                 <Link href={`/pacientes/${patient.id}/historia`}>
@@ -235,6 +287,14 @@ export function PatientDetail({
                 >
                   <MessageCircle className="mr-2 h-4 w-4" />
                   WhatsApp
+                </Link>
+              </Button>
+            )}
+            {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/sala-espera">
+                  <Hourglass className="mr-2 h-4 w-4" />
+                  Sala de espera
                 </Link>
               </Button>
             )}
@@ -360,6 +420,10 @@ export function PatientDetail({
           )}
         </CardContent>
       </Card>
+
+      {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
+        <PatientWaitingRoomHistory history={waitingRoomHistory} />
+      )}
 
       {canReadClinical && entitled('/historia-clinica') && (
         <PatientClinicalRecent

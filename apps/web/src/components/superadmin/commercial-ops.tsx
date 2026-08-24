@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  refreshSuperadminPlanRecommendations,
   runSuperadminCommercialLifecycle,
   type SuperadminCommercialSummary,
 } from '@/actions/superadmin';
@@ -20,13 +21,31 @@ export function SuperadminCommercialOps({ summary }: { summary: SuperadminCommer
     const result = await run(() => runSuperadminCommercialLifecycle());
     if (!result) return;
     if (result.success && result.data) {
+      const rec =
+        result.data.recommendationsScanned != null
+          ? ` Recomendaciones: ${result.data.recommendationsScanned} clínicas, ${result.data.recommendationsActive ?? 0} activas, ${result.data.recommendationsCleared ?? 0} limpiadas.`
+          : '';
       setMessage(
-        `Ciclo comercial: ${result.data.expired} vencidas, ${result.data.notices} avisos.`
+        `Ciclo comercial: ${result.data.expired} vencidas, ${result.data.notices} avisos.${rec} Sin cambio automático de plan.`
       );
       router.refresh();
       return;
     }
     setMessage(result.error ?? 'No se pudo ejecutar el ciclo');
+  }
+
+  async function runRecommendationRefresh() {
+    setMessage(null);
+    const result = await run(() => refreshSuperadminPlanRecommendations());
+    if (!result) return;
+    if (result.success && result.data) {
+      setMessage(
+        `Recomendaciones: ${result.data.scanned} clínicas, ${result.data.recommended} activas, ${result.data.cleared} limpiadas. Sin cambio automático de plan.`
+      );
+      router.refresh();
+      return;
+    }
+    setMessage(result.error ?? 'No se pudieron actualizar las recomendaciones');
   }
 
   const cards: Array<{ label: string; value: number; href?: string }> = [
@@ -65,6 +84,15 @@ export function SuperadminCommercialOps({ summary }: { summary: SuperadminCommer
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" size="sm" disabled={pending} onClick={() => void runLifecycle()}>
           Vencer planes/extras y enviar avisos
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={pending}
+          onClick={() => void runRecommendationRefresh()}
+        >
+          Actualizar recomendaciones
         </Button>
         {message ? <p className="text-sm text-muted-foreground">{message}</p> : null}
       </div>

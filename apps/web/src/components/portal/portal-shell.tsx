@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
+import { PortalWaitingRoomAlerts } from '@/components/portal/portal-waiting-room-alerts';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +34,17 @@ export function PortalShell({ children, userName, signOutAction }: PortalShellPr
             >
               Inicio
             </Link>
+            <Link
+              href="/portal/sala-espera"
+              className={cn(
+                'rounded-md px-3 py-1.5 text-sm',
+                pathname.startsWith('/portal/sala-espera')
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent'
+              )}
+            >
+              Sala de espera
+            </Link>
             <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
             <form action={signOutAction}>
               <Button variant="ghost" size="sm" type="submit">
@@ -43,7 +55,10 @@ export function PortalShell({ children, userName, signOutAction }: PortalShellPr
           </nav>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 p-4 md:p-6">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 p-4 md:p-6">
+        <PortalWaitingRoomAlerts />
+        {children}
+      </main>
     </div>
   );
 }

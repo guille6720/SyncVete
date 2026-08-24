@@ -6,6 +6,7 @@ export const NOTIFICATION_KINDS = [
   'factura',
   'receta',
   'plan',
+  'migracion',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -18,6 +19,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   factura: 'Factura',
   receta: 'Receta',
   plan: 'Plan',
+  migracion: 'Importar / Exportar',
 };
 
 export const NOTIFICATION_KIND_VARIANT: Record<
@@ -31,10 +33,12 @@ export const NOTIFICATION_KIND_VARIANT: Record<
   factura: 'warning',
   receta: 'default',
   plan: 'warning',
+  migracion: 'default',
 };
 
 export const NOTIFICATION_RELATED_TYPES = [
   'appointment',
+  'waiting_room_entry',
   'lab_order',
   'inventory_product',
   'hospitalization',
@@ -49,6 +53,8 @@ export const NOTIFICATION_RELATED_TYPES = [
   'addon_expired',
   'plan_refunded',
   'addon_refunded',
+  'data_import_batch',
+  'data_export_job',
 ] as const;
 
 export type NotificationRelatedType = (typeof NOTIFICATION_RELATED_TYPES)[number];

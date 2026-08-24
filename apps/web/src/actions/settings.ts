@@ -9,6 +9,7 @@ import {
   inviteMemberSchema,
   mergeOrganizationSettings,
   organizationSettingsSchema,
+  normalizeWaitingRoomRooms,
   parseOrganizationSettings,
   setActiveBranchSchema,
   teamListSchema,
@@ -97,6 +98,8 @@ export async function getOrganizationSettingsForm(): Promise<
           phone: settings.phone ?? '',
           email: settings.email ?? '',
           taxId: settings.taxId ?? '',
+          waitingRoomRooms: settings.waitingRoomRooms ?? [],
+          waitingRoomMinutesPerPatient: settings.waitingRoomMinutesPerPatient ?? null,
         },
       },
     };
@@ -118,6 +121,11 @@ export async function updateOrganizationSettings(
       phone: formData.get('phone'),
       email: formData.get('email'),
       taxId: formData.get('taxId'),
+      waitingRoomRoomsText: formData.get('waitingRoomRoomsText') ?? '',
+      waitingRoomMinutesPerPatient: formData.get('waitingRoomMinutesPerPatient') ?? '',
+      waitingRoomPortalAlertsEnabled: formData.get('waitingRoomPortalAlertsEnabled') ?? '',
+      waitingRoomWhatsAppAutoEnabled: formData.get('waitingRoomWhatsAppAutoEnabled') ?? '',
+      waitingRoomBoardSoundEnabled: formData.get('waitingRoomBoardSoundEnabled') ?? '',
     });
 
     if (!parsed.success) {
@@ -133,6 +141,22 @@ export async function updateOrganizationSettings(
       return { success: false, error: 'Clínica no encontrada' };
     }
 
+    const waitingRoomRooms = normalizeWaitingRoomRooms(parsed.data.waitingRoomRoomsText);
+    const waitingRoomMinutesPerPatient =
+      parsed.data.waitingRoomMinutesPerPatient === '' ||
+      parsed.data.waitingRoomMinutesPerPatient == null
+        ? null
+        : parsed.data.waitingRoomMinutesPerPatient;
+    const waitingRoomPortalAlertsEnabled =
+      parsed.data.waitingRoomPortalAlertsEnabled === 'on' ||
+      parsed.data.waitingRoomPortalAlertsEnabled === 'true';
+    const waitingRoomWhatsAppAutoEnabled =
+      parsed.data.waitingRoomWhatsAppAutoEnabled === 'on' ||
+      parsed.data.waitingRoomWhatsAppAutoEnabled === 'true';
+    const waitingRoomBoardSoundEnabled =
+      parsed.data.waitingRoomBoardSoundEnabled === 'on' ||
+      parsed.data.waitingRoomBoardSoundEnabled === 'true';
+
     const supabase = await createServerClient();
     const { error } = await supabase
       .from('organizations')
@@ -144,6 +168,11 @@ export async function updateOrganizationSettings(
           phone: parsed.data.phone,
           email: parsed.data.email,
           taxId: parsed.data.taxId,
+          waitingRoomRooms,
+          waitingRoomMinutesPerPatient,
+          waitingRoomPortalAlertsEnabled,
+          waitingRoomWhatsAppAutoEnabled,
+          waitingRoomBoardSoundEnabled,
         }) as Json,
       })
       .eq('id', session.organizationId);
@@ -153,6 +182,8 @@ export async function updateOrganizationSettings(
     }
 
     revalidatePath('/configuracion');
+    revalidatePath('/sala-espera');
+    revalidatePath('/portal/sala-espera');
     return { success: true };
   } catch (error) {
     return actionError(error);

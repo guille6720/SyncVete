@@ -7,7 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
-import { CURRENCIES, TIMEZONES, type OrganizationSettings } from '@sincvete/shared';
+import {
+  CURRENCIES,
+  TIMEZONES,
+  formatWaitingRoomRoomsText,
+  type OrganizationSettings,
+} from '@sincvete/shared';
 
 interface ClinicSettingsFormProps {
   organizationName: string;
@@ -70,6 +75,120 @@ export function ClinicSettingsForm({ organizationName, settings }: ClinicSetting
           <div className="space-y-2">
             <Label htmlFor="taxId">CUIT / Identificación fiscal</Label>
             <Input id="taxId" name="taxId" defaultValue={settings.taxId ?? ''} />
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-sm font-medium">Sala de espera</p>
+            <p className="text-xs text-muted-foreground">
+              Consultorios, ETA del portal y avisos a tutores.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="waitingRoomRoomsText">Consultorios / boxes</Label>
+            <textarea
+              id="waitingRoomRoomsText"
+              name="waitingRoomRoomsText"
+              rows={3}
+              defaultValue={formatWaitingRoomRoomsText(settings.waitingRoomRooms)}
+              placeholder={'Consultorio 1\nBox A\nQuirófano'}
+              className="flex min-h-[4.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+            <p className="text-xs text-muted-foreground">
+              Uno por línea. Se ofrecen al llamar pacientes desde la cola.
+            </p>
+            {state?.fieldErrors?.waitingRoomRoomsText && (
+              <p className="text-sm text-destructive">
+                {state.fieldErrors.waitingRoomRoomsText[0]}
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="waitingRoomMinutesPerPatient">
+              Minutos por paciente (ETA portal)
+            </Label>
+            <Input
+              id="waitingRoomMinutesPerPatient"
+              name="waitingRoomMinutesPerPatient"
+              type="number"
+              min={1}
+              max={120}
+              inputMode="numeric"
+              defaultValue={
+                settings.waitingRoomMinutesPerPatient != null
+                  ? String(settings.waitingRoomMinutesPerPatient)
+                  : ''
+              }
+              placeholder="15"
+            />
+            <p className="text-xs text-muted-foreground">
+              Opcional. Si está vacío, el portal usa el promedio del día o 15 min por defecto.
+            </p>
+            {state?.fieldErrors?.waitingRoomMinutesPerPatient && (
+              <p className="text-sm text-destructive">
+                {state.fieldErrors.waitingRoomMinutesPerPatient[0]}
+              </p>
+            )}
+          </div>
+
+          <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+            <input
+              id="waitingRoomPortalAlertsEnabled"
+              name="waitingRoomPortalAlertsEnabled"
+              type="checkbox"
+              value="on"
+              defaultChecked={settings.waitingRoomPortalAlertsEnabled !== false}
+              className="mt-1 h-4 w-4 rounded border-input"
+            />
+            <div className="space-y-1">
+              <Label htmlFor="waitingRoomPortalAlertsEnabled" className="cursor-pointer">
+                Avisos en portal del tutor
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Notifica al tutor cuando lo llaman, entra en consulta, debe pasar por recepción o
+                completa la visita.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+            <input
+              id="waitingRoomWhatsAppAutoEnabled"
+              name="waitingRoomWhatsAppAutoEnabled"
+              type="checkbox"
+              value="on"
+              defaultChecked={settings.waitingRoomWhatsAppAutoEnabled === true}
+              className="mt-1 h-4 w-4 rounded border-input"
+            />
+            <div className="space-y-1">
+              <Label htmlFor="waitingRoomWhatsAppAutoEnabled" className="cursor-pointer">
+                WhatsApp automático al llamar / pago
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Abre WhatsApp al confirmar llamado o pago pendiente, sin pedir confirmación extra.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3 rounded-lg border bg-muted/30 p-3">
+            <input
+              id="waitingRoomBoardSoundEnabled"
+              name="waitingRoomBoardSoundEnabled"
+              type="checkbox"
+              value="on"
+              defaultChecked={settings.waitingRoomBoardSoundEnabled === true}
+              className="mt-1 h-4 w-4 rounded border-input"
+            />
+            <div className="space-y-1">
+              <Label htmlFor="waitingRoomBoardSoundEnabled" className="cursor-pointer">
+                Sonido en recepción y tablero
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                Reproduce un tono en la cola de recepción y el tablero operativo cuando un paciente
+                es llamado o pasa a pago pendiente (cada usuario puede silenciarlo localmente).
+              </p>
+            </div>
           </div>
 
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}

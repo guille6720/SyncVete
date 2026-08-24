@@ -68,6 +68,12 @@ export function LoginForm({ redirectTo, errorCode }: LoginFormProps) {
           </div>
 
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+          {errorCode === 'auth_callback' && (
+            <p className="text-sm text-destructive">
+              El enlace de acceso expiró o no es válido. Probá iniciar sesión de nuevo o recuperá tu
+              contraseña.
+            </p>
+          )}
           {errorCode === 'portal_denied' && (
             <p className="text-sm text-destructive">Esta cuenta no tiene acceso a {APP_NAME}.</p>
           )}

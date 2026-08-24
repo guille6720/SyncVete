@@ -2,7 +2,15 @@
 
 import { cn } from '@/lib/utils';
 
-export type SettingsTab = 'clinica' | 'sucursales' | 'equipo' | 'roles' | 'plan' | 'legal' | 'guia-superadmin';
+export type SettingsTab =
+  | 'clinica'
+  | 'sucursales'
+  | 'equipo'
+  | 'roles'
+  | 'plan'
+  | 'legal'
+  | 'import-export'
+  | 'guia-superadmin';
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'clinica', label: 'Clínica' },
@@ -10,6 +18,7 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'sucursales', label: 'Sucursales' },
   { id: 'equipo', label: 'Equipo' },
   { id: 'roles', label: 'Roles' },
+  { id: 'import-export', label: 'Importar / Exportar' },
   { id: 'legal', label: 'Legal' },
   { id: 'guia-superadmin', label: 'Guía Superadmin' },
 ];

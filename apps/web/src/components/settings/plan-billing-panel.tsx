@@ -11,6 +11,7 @@ import {
   startPlanCheckout,
   type PlanBillingState,
 } from '@/actions/plan-billing';
+import { ClinicUpgradeRecommendationNotice } from '@/components/settings/clinic-upgrade-notice';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -174,6 +175,10 @@ export function PlanBillingPanel({
         </div>
       ) : null}
       {message ? <p className="rounded-md border bg-muted/40 px-3 py-2 text-sm">{message}</p> : null}
+
+      {state.upgradeNotice ? (
+        <ClinicUpgradeRecommendationNotice notice={state.upgradeNotice} />
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -360,17 +365,33 @@ export function PlanBillingPanel({
         </p>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div id="planes-disponibles" className="grid gap-4 md:grid-cols-2">
         {state.plans.map((plan) => {
           const current = state.current.planKey === plan.key;
+          const usageRecommended = state.upgradeNotice?.recommendedPlan === plan.key;
           const monthly = formatArsAmount(plan.pricing.monthlyAmount);
           const seatBlock = state.seatBlocksByPlan[plan.key];
           return (
-            <Card key={plan.key} className={plan.pricing.recommended ? 'border-primary' : undefined}>
+            <Card
+              key={plan.key}
+              id={usageRecommended ? `plan-recomendado-${plan.key}` : undefined}
+              className={
+                usageRecommended
+                  ? 'border-teal-700/40 ring-1 ring-teal-700/20'
+                  : plan.pricing.recommended
+                    ? 'border-primary'
+                    : undefined
+              }
+            >
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-2">
                   {plan.name}
-                  {current ? <Badge>Actual</Badge> : null}
+                  <span className="flex flex-wrap gap-1">
+                    {current ? <Badge>Actual</Badge> : null}
+                    {usageRecommended ? (
+                      <Badge variant="success">Según tu uso</Badge>
+                    ) : null}
+                  </span>
                 </CardTitle>
                 <CardDescription>{plan.description}</CardDescription>
               </CardHeader>

@@ -2,6 +2,7 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 import type { Database } from '@sincvete/db';
 import { APP_CANONICAL_HOST, APP_LEGACY_HOSTS } from '@sincvete/shared';
+import { recoveryRedirectPath } from '@/lib/auth/recovery-redirect';
 
 const PUBLIC_ROUTES = [
   '/',
@@ -9,7 +10,9 @@ const PUBLIC_ROUTES = [
   '/register',
   '/auth/callback',
   '/portal/activar',
+  '/check-in',
   '/recuperar-contrasena',
+  '/actualizar-contrasena',
   '/manifest.webmanifest',
   '/sw.js',
   '/manual',
@@ -53,6 +56,14 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  const recoveryPath = recoveryRedirectPath(pathname, request.nextUrl.searchParams);
+  if (recoveryPath) {
+    const url = request.nextUrl.clone();
+    url.pathname = recoveryPath;
+    return NextResponse.redirect(url);
+  }
+
   const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
 
   if (!user && !isPublicRoute) {

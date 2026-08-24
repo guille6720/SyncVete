@@ -453,8 +453,8 @@ describe('onboarding / legacy safeguards', () => {
     expect(isAutoAssignableOnboardingPlan(COMMERCIAL_PLAN_KEYS.BASIC)).toBe(false);
   });
 
-  it('trial duration remains unset until product configures it', () => {
-    expect(ONBOARDING_TRIAL_DAYS).toBeNull();
+  it('trial duration is 10 days for new clinics', () => {
+    expect(ONBOARDING_TRIAL_DAYS).toBe(10);
   });
 
   it('legacy and trial are excluded from public pricing selectors', () => {

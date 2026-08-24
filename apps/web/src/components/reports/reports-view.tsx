@@ -2,6 +2,7 @@ import {
   BedDouble,
   Calendar,
   FlaskConical,
+  Hourglass,
   Package,
   PawPrint,
   Receipt,
@@ -14,14 +15,19 @@ import { ReportsPeriodFilter } from '@/components/reports/reports-period-filter'
 import { ReportsStatGrid } from '@/components/reports/reports-stat-grid';
 import { ReportsBreakdownList } from '@/components/reports/reports-breakdown-list';
 import { ReportsDailyTable } from '@/components/reports/reports-daily-table';
+import { WaitingRoomReportExportButton } from '@/components/reports/waiting-room-report-export-button';
 import {
   APPOINTMENT_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
   SPECIES_EMOJI,
+  WAITING_ROOM_STATUS_LABELS,
   formatMoney,
+  formatWaitMinutes,
+  isWaitingRoomStatus,
   type AppointmentStatus,
   type ClinicReport,
   type PaymentMethod,
+  type WaitingRoomStatus,
 } from '@sincvete/shared';
 
 interface ReportsViewProps {
@@ -33,6 +39,7 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
   const operations = report.operations;
   const billing = report.billing;
   const inventory = report.inventory;
+  const waitingRoom = report.waitingRoom;
 
   return (
     <div className="space-y-8">
@@ -125,6 +132,62 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
         </>
       )}
 
+      {waitingRoom && (
+        <>
+          <ReportsStatGrid
+            title="Sala de espera"
+            description="Check-ins y tiempos del período"
+            action={<WaitingRoomReportExportButton report={report} />}
+            stats={[
+              {
+                label: 'Check-ins',
+                value: String(waitingRoom.checkIns),
+                description: `${waitingRoom.called} llamados · ${waitingRoom.removed} quitados`,
+                icon: Hourglass,
+              },
+              {
+                label: 'Completados',
+                value: String(waitingRoom.completed),
+                description: 'Salieron de la cola',
+                icon: Hourglass,
+              },
+              {
+                label: 'Hasta llamado',
+                value:
+                  waitingRoom.avgMinutesToCall != null
+                    ? formatWaitMinutes(waitingRoom.avgMinutesToCall)
+                    : '—',
+                description: 'Promedio check-in → llamado',
+                icon: Hourglass,
+              },
+              {
+                label: 'Hasta completar',
+                value:
+                  waitingRoom.avgMinutesToComplete != null
+                    ? formatWaitMinutes(waitingRoom.avgMinutesToComplete)
+                    : '—',
+                description: 'Promedio check-in → completado',
+                icon: Hourglass,
+              },
+            ]}
+          />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ReportsBreakdownList
+              title="Cola por estado (activos del período)"
+              items={waitingRoom.byStatus.map((item) => ({
+                label: isWaitingRoomStatus(item.status)
+                  ? WAITING_ROOM_STATUS_LABELS[item.status as WaitingRoomStatus]
+                  : item.status,
+                value: String(item.count),
+                count: item.count,
+              }))}
+              emptyLabel="No hay entradas activas de sala de espera en el período."
+            />
+            <ReportsDailyWaitingRoomTable rows={waitingRoom.daily} />
+          </div>
+        </>
+      )}
+
       {billing && (
         <>
           <ReportsStatGrid
@@ -204,6 +267,49 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
         showPayments={Boolean(billing)}
         currency={currency}
       />
+    </div>
+  );
+}
+
+function ReportsDailyWaitingRoomTable({
+  rows,
+}: {
+  rows: NonNullable<ClinicReport['waitingRoom']>['daily'];
+}) {
+  const activeDays = rows.filter((row) => row.checkIns > 0 || row.completed > 0);
+
+  return (
+    <div className="rounded-lg border">
+      <div className="border-b px-4 py-3">
+        <h3 className="font-medium">Sala de espera por día</h3>
+        <p className="text-sm text-muted-foreground">Check-ins y completados</p>
+      </div>
+      <div className="px-4 py-3">
+        {activeDays.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sin actividad de sala en el período.</p>
+        ) : (
+          <div className="max-h-64 overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b text-left text-muted-foreground">
+                  <th className="py-2 pr-4 font-medium">Día</th>
+                  <th className="py-2 pr-4 font-medium">Check-ins</th>
+                  <th className="py-2 font-medium">Completados</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activeDays.map((row) => (
+                  <tr key={row.day} className="border-b last:border-0">
+                    <td className="py-2 pr-4">{row.day}</td>
+                    <td className="py-2 pr-4">{row.checkIns}</td>
+                    <td className="py-2">{row.completed}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

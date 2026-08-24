@@ -10,6 +10,8 @@ import {
   APPOINTMENT_STATUSES,
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_VARIANT,
+  WAITING_ROOM_STATUS_LABELS,
+  WAITING_ROOM_STATUS_VARIANT,
   APPOINTMENT_TYPE_LABELS,
   formatAppointmentTime,
   formatDayLabel,
@@ -17,6 +19,7 @@ import {
   SPECIES_EMOJI,
   type AppointmentListRow,
   type AssignableStaffMember,
+  type WaitingRoomStatus,
 } from '@sincvete/shared';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
@@ -28,6 +31,7 @@ interface AppointmentsAgendaProps {
   staff: AssignableStaffMember[];
   initialStatus?: string;
   initialAssignedUserId?: string;
+  waitingRoomByAppointment?: Record<string, WaitingRoomStatus>;
 }
 
 function getDayKey(isoDate: string): string {
@@ -42,6 +46,7 @@ export function AppointmentsAgenda({
   staff,
   initialStatus = '',
   initialAssignedUserId = '',
+  waitingRoomByAppointment,
 }: AppointmentsAgendaProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -139,6 +144,15 @@ export function AppointmentsAgenda({
                       <Badge variant={APPOINTMENT_STATUS_VARIANT[appointment.status]}>
                         {APPOINTMENT_STATUS_LABELS[appointment.status]}
                       </Badge>
+                      {waitingRoomByAppointment?.[appointment.id] && (
+                        <Badge
+                          variant={
+                            WAITING_ROOM_STATUS_VARIANT[waitingRoomByAppointment[appointment.id]]
+                          }
+                        >
+                          {WAITING_ROOM_STATUS_LABELS[waitingRoomByAppointment[appointment.id]]}
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {APPOINTMENT_TYPE_LABELS[appointment.appointment_type]}

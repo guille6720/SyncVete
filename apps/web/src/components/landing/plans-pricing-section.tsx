@@ -120,7 +120,7 @@ export function PlansPricingSection({
                   asChild
                 >
                   <Link href="/register">
-                    {plan.pricing.cta === 'contact' ? 'Hablar con ventas' : 'Empezar trial'}
+                    {plan.pricing.cta === 'contact' ? 'Hablar con ventas' : 'Empezar 10 días gratis'}
                   </Link>
                 </Button>
               </div>

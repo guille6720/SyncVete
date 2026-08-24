@@ -11,6 +11,8 @@ import { getSeatUsageMeters } from '@/lib/entitlements';
 import { SettingsPageClient } from '@/components/settings/settings-page-client';
 import type { SettingsTab } from '@/components/settings/settings-tabs';
 import { hasPermission } from '@sincvete/shared';
+import { canPermissionAndFeature } from '@/lib/permissions';
+import { FEATURES } from '@/lib/entitlements';
 import type { Branch, SeatUsageMeter } from '@sincvete/shared';
 
 interface PageProps {
@@ -27,6 +29,11 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
   if (hasPermission(session.permissions, 'org:manage')) availableTabs.unshift('clinica', 'plan');
   if (hasPermission(session.permissions, 'branch:manage')) availableTabs.push('sucursales');
   if (hasPermission(session.permissions, 'users:manage')) availableTabs.push('equipo');
+  const [canImportData, canExportData] = await Promise.all([
+    canPermissionAndFeature('data:import', FEATURES.DATA_IMPORT_EXPORT),
+    canPermissionAndFeature('data:export', FEATURES.DATA_IMPORT_EXPORT),
+  ]);
+  if (canImportData || canExportData) availableTabs.push('import-export');
 
   const requested = params.tab;
   const defaultTab: SettingsTab =
@@ -93,6 +100,8 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
     <SettingsPageClient
       availableTabs={availableTabs}
       defaultTab={defaultTab}
+      canImportData={canImportData}
+      canExportData={canExportData}
       clinic={clinicData}
       branches={branchesData}
       team={teamData}

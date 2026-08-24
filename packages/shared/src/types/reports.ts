@@ -58,11 +58,50 @@ export interface ReportInventory {
   movementsDescarte: number;
 }
 
+export interface ReportWaitingRoomStatusCount {
+  status: string;
+  count: number;
+}
+
+export interface ReportWaitingRoomDailyRow {
+  day: string;
+  checkIns: number;
+  completed: number;
+}
+
+export interface ReportWaitingRoom {
+  checkIns: number;
+  completed: number;
+  removed: number;
+  called: number;
+  avgMinutesToCall: number | null;
+  avgMinutesToComplete: number | null;
+  byStatus: ReportWaitingRoomStatusCount[];
+  daily: ReportWaitingRoomDailyRow[];
+}
+
+export interface ReportWaitingRoomEntry {
+  entryId: string;
+  checkedInAt: string;
+  patientName: string;
+  ownerFullName: string;
+  assignedUserName: string | null;
+  appointmentStartsAt: string;
+  status: string;
+  room: string | null;
+  calledAt: string | null;
+  completedAt: string | null;
+  removed: boolean;
+  minutesToCall: number | null;
+  minutesDwell: number | null;
+}
+
 export interface ClinicReport {
   from: string;
   to: string;
   operations: ReportOperations | null;
   billing: ReportBilling | null;
   inventory: ReportInventory | null;
+  waitingRoom: ReportWaitingRoom | null;
   daily: ReportDailyRow[];
 }
