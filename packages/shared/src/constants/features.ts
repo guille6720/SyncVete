@@ -41,6 +41,8 @@ export const FEATURES = {
 
   DATA_IMPORT_EXPORT: 'data.import_export',
 
+  PROFESSIONALS_SETTLEMENTS: 'professionals.settlements',
+
   AI: 'ai.enabled',
   AI_PATIENT_SUMMARY: 'ai.patient_summary',
   AI_SOAP_ASSISTANT: 'ai.soap_assistant',
@@ -108,6 +110,9 @@ export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/imagenes': FEATURES.CLINICAL_IMAGES,
   '/auditoria': FEATURES.AUDIT,
   '/ia-clinica': FEATURES.AI,
+  '/profesionales': FEATURES.PROFESSIONALS_SETTLEMENTS,
+  '/liquidaciones': FEATURES.PROFESSIONALS_SETTLEMENTS,
+  '/liquidaciones/mis-liquidaciones': FEATURES.PROFESSIONALS_SETTLEMENTS,
 };
 
 /** Commercial plan keys in DB (not the legacy organizations.plan enum). */

@@ -4,6 +4,10 @@ import { getAppointment, canReadAppointments, canManageAppointments } from '@/ac
 import { canManageConsultations, getConsultationByAppointment } from '@/actions/consultations';
 import { canSendWhatsApp } from '@/actions/whatsapp';
 import { canManageWaitingRoom, canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
+import {
+  canReadProfessionalSettlements,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
 import { AppointmentDetail } from '@/components/appointments/appointment-detail';
 
 interface CitaPageProps {
@@ -15,7 +19,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp, canCheckIn, canReadWr] =
+  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp, canCheckIn, canReadWr, canReadSettlements] =
     await Promise.all([
       getAppointment(id),
       canManageAppointments(),
@@ -24,9 +28,15 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       canSendWhatsApp(),
       canManageWaitingRoom(),
       canReadWaitingRoom(),
+      canReadProfessionalSettlements(),
     ]);
 
   if (!appointment) notFound();
+
+  const settlementClaim =
+    canReadSettlements && appointment.status === 'completada'
+      ? await getSettlementClaimForSource('appointment', appointment.id)
+      : null;
 
   let waitingRoomStatus = null;
   if (canReadWr) {
@@ -45,6 +55,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       canCheckInWaitingRoom={canCheckIn}
       consultationId={existingConsultation?.id ?? null}
       waitingRoomStatus={waitingRoomStatus}
+      settlementClaim={settlementClaim}
     />
   );
 }

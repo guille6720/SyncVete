@@ -12,9 +12,10 @@ import {
   type ReportWaitingRoom,
   type ReportWaitingRoomEntry,
 } from '@sincvete/shared';
-import { createServerClient } from '@/lib/supabase/server';
+import { getProfessionalSettlementsReport } from '@/actions/professional-settlements';
 import { getSessionContext } from '@/actions/auth';
 import { FEATURES, canUseFeature, requireFeature } from '@/lib/entitlements';
+import { createServerClient } from '@/lib/supabase/server';
 
 function num(value: unknown): number {
   return Number(value ?? 0);
@@ -232,6 +233,7 @@ export async function getClinicReport(input?: {
     billing: null,
     inventory: null,
     waitingRoom: null,
+    professionalsSettlements: null,
     daily: [],
   };
 
@@ -252,7 +254,7 @@ export async function getClinicReport(input?: {
   ]);
 
   const supabase = await createServerClient();
-  const [{ data, error }, waitingRoomResult] = await Promise.all([
+  const [{ data, error }, waitingRoomResult, professionalsSettlements] = await Promise.all([
     supabase.rpc('get_clinic_report', {
       p_from: range.from,
       p_to: range.to,
@@ -265,6 +267,7 @@ export async function getClinicReport(input?: {
           p_branch_id: session.branchId ?? null,
         })
       : Promise.resolve({ data: null, error: null }),
+    getProfessionalSettlementsReport(range.from, range.to),
   ]);
 
   if (error) throw error;
@@ -297,6 +300,7 @@ export async function getClinicReport(input?: {
     billing: includeAdvanced ? parseBilling(raw.billing) : null,
     inventory: includeAdvanced ? parseInventory(raw.inventory) : null,
     waitingRoom,
+    professionalsSettlements,
     daily: parseDaily(raw.daily),
   };
 }

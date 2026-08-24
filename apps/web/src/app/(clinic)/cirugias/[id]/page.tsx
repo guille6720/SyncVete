@@ -1,5 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { getSurgery, canReadSurgeries, canManageSurgeries } from '@/actions/surgeries';
+import {
+  canReadProfessionalSettlements,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
 import { SurgeryStay } from '@/components/surgeries/surgery-stay';
 
 interface CirugiaDetailPageProps {
@@ -11,9 +15,18 @@ export default async function CirugiaDetailPage({ params }: CirugiaDetailPagePro
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [surgery, canWrite] = await Promise.all([getSurgery(id), canManageSurgeries()]);
+  const [surgery, canWrite, canReadSettlements] = await Promise.all([
+    getSurgery(id),
+    canManageSurgeries(),
+    canReadProfessionalSettlements(),
+  ]);
 
   if (!surgery) notFound();
 
-  return <SurgeryStay surgery={surgery} canWrite={canWrite} />;
+  const settlementClaim =
+    canReadSettlements && surgery.status === 'completada'
+      ? await getSettlementClaimForSource('surgery', surgery.id)
+      : null;
+
+  return <SurgeryStay surgery={surgery} canWrite={canWrite} settlementClaim={settlementClaim} />;
 }

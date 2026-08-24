@@ -23,8 +23,10 @@ import {
   buildWhatsAppComposePath,
   type AppointmentListRow,
   type AppointmentStatus,
+  type SettlementSourceClaimInfo,
   type WaitingRoomStatus,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface AppointmentDetailProps {
   appointment: AppointmentListRow;
@@ -34,6 +36,7 @@ interface AppointmentDetailProps {
   canCheckInWaitingRoom?: boolean;
   consultationId?: string | null;
   waitingRoomStatus?: WaitingRoomStatus | null;
+  settlementClaim?: SettlementSourceClaimInfo | null;
 }
 
 const STATUS_ACTIONS: Partial<
@@ -59,6 +62,7 @@ export function AppointmentDetail({
   canCheckInWaitingRoom = false,
   consultationId = null,
   waitingRoomStatus = null,
+  settlementClaim = null,
 }: AppointmentDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -219,6 +223,8 @@ export function AppointmentDetail({
           )}
         </div>
       </div>
+
+      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
 
       <Card>
         <CardHeader>

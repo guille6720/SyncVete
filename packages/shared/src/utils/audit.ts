@@ -98,6 +98,22 @@ export function buildAuditEntityHref(
       return related('cash_session_id') ? `/caja/${related('cash_session_id')}` : '/caja';
     case 'clinical_images':
       return entityId ? `/imagenes/${entityId}` : '/imagenes';
+    case 'professionals':
+      return entityId ? `/profesionales/${entityId}` : '/profesionales';
+    case 'professional_settlements':
+      return entityId ? `/liquidaciones/${entityId}` : '/liquidaciones';
+    case 'professional_payments':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
+    case 'professional_compensation_schemes':
+      return related('professional_id')
+        ? `/profesionales/${related('professional_id')}`
+        : '/profesionales';
+    case 'professional_compensation_rules':
+      return '/profesionales';
+    case 'professional_settlement_items':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
+    case 'professional_settlement_adjustments':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
     case 'whatsapp_messages':
       return '/whatsapp';
     case 'reminder_logs':

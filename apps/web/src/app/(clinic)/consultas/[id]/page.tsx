@@ -12,6 +12,10 @@ import { ClinicalAiSoapPanel } from '@/components/clinical-ai/clinical-ai-soap-p
 import { Button } from '@/components/ui/button';
 import { canManageBilling } from '@/actions/billing';
 import { getClinicalAiStatus } from '@/actions/clinical-ai';
+import {
+  canReadProfessionalSettlements,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
 
 interface ConsultaPageProps {
   params: Promise<{ id: string }>;
@@ -22,14 +26,20 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
   if (!canRead) redirect('/consultas');
 
   const { id } = await params;
-  const [consultation, canWrite, canWriteBilling, aiStatus] = await Promise.all([
+  const [consultation, canWrite, canWriteBilling, aiStatus, canReadSettlements] = await Promise.all([
     getConsultation(id),
     canManageConsultations(),
     canManageBilling(),
     getClinicalAiStatus(),
+    canReadProfessionalSettlements(),
   ]);
 
   if (!consultation) notFound();
+
+  const settlementClaim =
+    canReadSettlements && consultation.status === 'completada'
+      ? await getSettlementClaimForSource('consultation', consultation.id)
+      : null;
 
   const isOpen = consultation.status === 'en_curso' || consultation.status === 'en_espera';
 
@@ -59,6 +69,7 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
       consultation={consultation}
       canWrite={canWrite}
       canWriteBilling={canWriteBilling}
+      settlementClaim={settlementClaim}
     />
   );
 }

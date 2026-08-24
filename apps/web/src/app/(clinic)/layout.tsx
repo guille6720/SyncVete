@@ -5,6 +5,7 @@ import { getUserBranches } from '@/actions/settings';
 import { AppShell } from '@/components/layout/app-shell';
 import { EntitlementRouteGate } from '@/components/entitlements/entitlement-route-gate';
 import { getClinicCommercialShell } from '@/lib/entitlements';
+import { hasLinkedProfessionalProfile } from '@/actions/professionals';
 
 export default async function ClinicLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionContext();
@@ -19,10 +20,11 @@ export default async function ClinicLayout({ children }: { children: React.React
   }
 
   // Session, branches, notifications and entitlements are React.cache'd per request.
-  const [branches, unreadNotifications, commercial] = await Promise.all([
+  const [branches, unreadNotifications, commercial, showMySettlementsNav] = await Promise.all([
     getUserBranches(),
     countUnreadNotifications(),
     getClinicCommercialShell(session.organizationId),
+    hasLinkedProfessionalProfile(),
   ]);
 
   const branchName =
@@ -41,6 +43,7 @@ export default async function ClinicLayout({ children }: { children: React.React
       isPlatformAdmin={session.isPlatformAdmin}
       entitledHrefs={commercial.entitledHrefs}
       billingBanner={commercial.banner}
+      showMySettlementsNav={showMySettlementsNav}
     >
       <EntitlementRouteGate entitledHrefs={commercial.entitledHrefs}>{children}</EntitlementRouteGate>
     </AppShell>

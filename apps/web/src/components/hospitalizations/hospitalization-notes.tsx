@@ -15,13 +15,16 @@ import {
   formatClinicalEntryDateTime,
   type ActionResult,
   type HospitalizationNote,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface HospitalizationNotesProps {
   hospitalizationId: string;
   notes: HospitalizationNote[];
   canWrite: boolean;
   isActive: boolean;
+  settlementClaimsByNoteId?: Record<string, SettlementSourceClaimInfo>;
 }
 
 export function HospitalizationNotes({
@@ -29,6 +32,7 @@ export function HospitalizationNotes({
   notes,
   canWrite,
   isActive,
+  settlementClaimsByNoteId = {},
 }: HospitalizationNotesProps) {
   return (
     <div className="space-y-4">
@@ -57,6 +61,12 @@ export function HospitalizationNotes({
                     : ''}
                 </p>
               )}
+              {settlementClaimsByNoteId[note.id] ? (
+                <SettlementSourceBadge
+                  claim={settlementClaimsByNoteId[note.id]}
+                  compact
+                />
+              ) : null}
             </div>
           ))}
         </div>

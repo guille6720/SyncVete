@@ -82,6 +82,7 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
   }
 
   let teamData;
+  let showProfessionalsLink = false;
   if (hasPermission(session.permissions, 'users:manage')) {
     const [members, invitations, branches] = await Promise.all([
       listTeamMembers({ page: 1, pageSize: 50 }),
@@ -96,6 +97,11 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
     };
   }
 
+  showProfessionalsLink = await canPermissionAndFeature(
+    'professionals:read',
+    FEATURES.PROFESSIONALS_SETTLEMENTS
+  );
+
   return (
     <SettingsPageClient
       availableTabs={availableTabs}
@@ -106,6 +112,7 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
       branches={branchesData}
       team={teamData}
       seats={seats}
+      showProfessionalsLink={showProfessionalsLink}
       planBilling={planBilling}
       checkoutBanner={params.checkout ?? null}
     />

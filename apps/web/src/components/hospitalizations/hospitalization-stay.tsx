@@ -17,15 +17,22 @@ import {
   formatHospitalizationStayDays,
   type HospitalizationListRow,
   type HospitalizationNote,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
 
 interface HospitalizationStayProps {
   stay: HospitalizationListRow;
   notes: HospitalizationNote[];
   canWrite: boolean;
+  settlementClaimsByNoteId?: Record<string, SettlementSourceClaimInfo>;
 }
 
-export function HospitalizationStay({ stay, notes, canWrite }: HospitalizationStayProps) {
+export function HospitalizationStay({
+  stay,
+  notes,
+  canWrite,
+  settlementClaimsByNoteId = {},
+}: HospitalizationStayProps) {
   const isActive = stay.status === 'internado' || stay.status === 'observacion';
 
   return (
@@ -135,6 +142,7 @@ export function HospitalizationStay({ stay, notes, canWrite }: HospitalizationSt
             notes={notes}
             canWrite={canWrite}
             isActive={isActive}
+            settlementClaimsByNoteId={settlementClaimsByNoteId}
           />
         </CardContent>
       </Card>

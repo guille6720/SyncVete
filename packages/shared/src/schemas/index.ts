@@ -1233,3 +1233,5 @@ export type WaitingRoomCheckInRedeemInput = z.infer<typeof waitingRoomCheckInRed
 export type WaitingRoomReorderQueueInput = z.infer<typeof waitingRoomReorderQueueSchema>;
 export type WaitingRoomRemoveInput = z.infer<typeof waitingRoomRemoveSchema>;
 export type WaitingRoomNotesInput = z.infer<typeof waitingRoomNotesSchema>;
+
+export * from './professionals';

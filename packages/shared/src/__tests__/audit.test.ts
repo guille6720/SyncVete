@@ -42,6 +42,10 @@ describe('audit helpers', () => {
     expect(buildAuditEntityHref('payments', 'pay1', { invoice_id: 'inv1' })).toBe(
       '/facturacion/inv1'
     );
+    expect(buildAuditEntityHref('professional_settlements', 'set1')).toBe('/liquidaciones/set1');
+    expect(buildAuditEntityHref('professional_payments', 'pay1', { settlement_id: 'set1' })).toBe(
+      '/liquidaciones/set1'
+    );
     expect(buildAuditEntityHref('whatsapp_messages', 'm1')).toBe('/whatsapp');
   });
 

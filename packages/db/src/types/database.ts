@@ -130,6 +130,42 @@ export type PaymentMethod =
   | 'mercadopago'
   | 'otro';
 
+export type ProfessionalRelationshipType = 'employee' | 'independent' | 'partner' | 'other';
+
+export type CompensationRuleType = 'fixed' | 'activity' | 'percentage';
+
+export type CompensationFrequency =
+  | 'monthly'
+  | 'biweekly'
+  | 'weekly'
+  | 'daily'
+  | 'hourly'
+  | 'per_consultation'
+  | 'per_procedure'
+  | 'per_surgery'
+  | 'per_shift'
+  | 'percentage'
+  | 'mixed';
+
+export type SettlementStatus =
+  | 'draft'
+  | 'review'
+  | 'approved'
+  | 'partially_paid'
+  | 'paid'
+  | 'cancelled';
+
+export type SettlementItemSourceType =
+  | 'appointment'
+  | 'consultation'
+  | 'surgery'
+  | 'procedure'
+  | 'shift'
+  | 'manual_adjustment'
+  | 'fixed_compensation';
+
+export type SettlementAdjustmentType = 'bonus' | 'deduction' | 'correction' | 'other';
+
 export type WhatsAppRelatedType =
   | 'none'
   | 'appointment'
@@ -177,7 +213,8 @@ export type NotificationKind =
   | 'factura'
   | 'receta'
   | 'plan'
-  | 'migracion';
+  | 'migracion'
+  | 'liquidacion';
 
 export interface Database {
   public: {
@@ -752,6 +789,465 @@ export interface Database {
             referencedColumns: ['id'];
           },
         ];
+      };
+      professionals: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string | null;
+          profile_id: string | null;
+          first_name: string;
+          last_name: string;
+          document_number: string | null;
+          tax_id: string | null;
+          professional_license: string | null;
+          professional_license_jurisdiction: string | null;
+          specialty: string | null;
+          relationship_type: ProfessionalRelationshipType;
+          start_date: string | null;
+          end_date: string | null;
+          is_active: boolean;
+          invoice_required: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id?: string | null;
+          profile_id?: string | null;
+          first_name: string;
+          last_name: string;
+          document_number?: string | null;
+          tax_id?: string | null;
+          professional_license?: string | null;
+          professional_license_jurisdiction?: string | null;
+          specialty?: string | null;
+          relationship_type: ProfessionalRelationshipType;
+          start_date?: string | null;
+          end_date?: string | null;
+          is_active?: boolean;
+          invoice_required?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          user_id?: string | null;
+          profile_id?: string | null;
+          first_name?: string;
+          last_name?: string;
+          document_number?: string | null;
+          tax_id?: string | null;
+          professional_license?: string | null;
+          professional_license_jurisdiction?: string | null;
+          specialty?: string | null;
+          relationship_type?: ProfessionalRelationshipType;
+          start_date?: string | null;
+          end_date?: string | null;
+          is_active?: boolean;
+          invoice_required?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_branches: {
+        Row: {
+          id: string;
+          organization_id: string;
+          professional_id: string;
+          branch_id: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          professional_id: string;
+          branch_id: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          professional_id?: string;
+          branch_id?: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_compensation_schemes: {
+        Row: {
+          id: string;
+          organization_id: string;
+          professional_id: string;
+          name: string;
+          valid_from: string;
+          valid_to: string | null;
+          currency: string;
+          is_active: boolean;
+          conditions: Json;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          professional_id: string;
+          name: string;
+          valid_from: string;
+          valid_to?: string | null;
+          currency?: string;
+          is_active?: boolean;
+          conditions?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          professional_id?: string;
+          name?: string;
+          valid_from?: string;
+          valid_to?: string | null;
+          currency?: string;
+          is_active?: boolean;
+          conditions?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_compensation_rules: {
+        Row: {
+          id: string;
+          organization_id: string;
+          compensation_scheme_id: string;
+          rule_type: CompensationRuleType;
+          frequency: CompensationFrequency;
+          amount: number | null;
+          percentage: number | null;
+          activity_type: string | null;
+          minimum_amount: number | null;
+          maximum_amount: number | null;
+          conditions: Json;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          compensation_scheme_id: string;
+          rule_type: CompensationRuleType;
+          frequency: CompensationFrequency;
+          amount?: number | null;
+          percentage?: number | null;
+          activity_type?: string | null;
+          minimum_amount?: number | null;
+          maximum_amount?: number | null;
+          conditions?: Json;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          compensation_scheme_id?: string;
+          rule_type?: CompensationRuleType;
+          frequency?: CompensationFrequency;
+          amount?: number | null;
+          percentage?: number | null;
+          activity_type?: string | null;
+          minimum_amount?: number | null;
+          maximum_amount?: number | null;
+          conditions?: Json;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_settlements: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string | null;
+          professional_id: string;
+          compensation_scheme_id: string;
+          period_start: string;
+          period_end: string;
+          status: SettlementStatus;
+          gross_amount: number;
+          adjustments_amount: number;
+          deductions_amount: number;
+          total_amount: number;
+          total_paid: number;
+          balance_due: number;
+          currency: string;
+          notes: string | null;
+          calculated_at: string;
+          approved_at: string | null;
+          approved_by: string | null;
+          paid_at: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          cancellation_reason: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id?: string | null;
+          professional_id: string;
+          compensation_scheme_id: string;
+          period_start: string;
+          period_end: string;
+          status?: SettlementStatus;
+          gross_amount?: number;
+          adjustments_amount?: number;
+          deductions_amount?: number;
+          total_amount?: number;
+          total_paid?: number;
+          balance_due?: number;
+          currency?: string;
+          notes?: string | null;
+          calculated_at?: string;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          paid_at?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string | null;
+          professional_id?: string;
+          compensation_scheme_id?: string;
+          period_start?: string;
+          period_end?: string;
+          status?: SettlementStatus;
+          gross_amount?: number;
+          adjustments_amount?: number;
+          deductions_amount?: number;
+          total_amount?: number;
+          total_paid?: number;
+          balance_due?: number;
+          currency?: string;
+          notes?: string | null;
+          calculated_at?: string;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          paid_at?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_settlement_items: {
+        Row: {
+          id: string;
+          settlement_id: string;
+          organization_id: string;
+          rule_id: string | null;
+          source_type: SettlementItemSourceType;
+          source_id: string | null;
+          description: string;
+          quantity: number;
+          unit_amount: number | null;
+          percentage: number | null;
+          base_amount: number | null;
+          calculated_amount: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          settlement_id: string;
+          organization_id: string;
+          rule_id?: string | null;
+          source_type: SettlementItemSourceType;
+          source_id?: string | null;
+          description: string;
+          quantity?: number;
+          unit_amount?: number | null;
+          percentage?: number | null;
+          base_amount?: number | null;
+          calculated_amount: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          settlement_id?: string;
+          organization_id?: string;
+          rule_id?: string | null;
+          source_type?: SettlementItemSourceType;
+          source_id?: string | null;
+          description?: string;
+          quantity?: number;
+          unit_amount?: number | null;
+          percentage?: number | null;
+          base_amount?: number | null;
+          calculated_amount?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      professional_settlement_adjustments: {
+        Row: {
+          id: string;
+          settlement_id: string;
+          organization_id: string;
+          adjustment_type: SettlementAdjustmentType;
+          amount: number;
+          reason: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          settlement_id: string;
+          organization_id: string;
+          adjustment_type: SettlementAdjustmentType;
+          amount: number;
+          reason: string;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          settlement_id?: string;
+          organization_id?: string;
+          adjustment_type?: SettlementAdjustmentType;
+          amount?: number;
+          reason?: string;
+          created_by?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      professional_settlement_source_claims: {
+        Row: {
+          id: string;
+          organization_id: string;
+          source_type: SettlementItemSourceType;
+          source_id: string;
+          settlement_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          source_type: SettlementItemSourceType;
+          source_id: string;
+          settlement_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          source_type?: SettlementItemSourceType;
+          source_id?: string;
+          settlement_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      professional_payments: {
+        Row: {
+          id: string;
+          organization_id: string;
+          professional_id: string;
+          settlement_id: string;
+          amount: number;
+          currency: string;
+          method: PaymentMethod;
+          paid_at: string;
+          reference: string | null;
+          notes: string | null;
+          invoice_number: string | null;
+          invoice_date: string | null;
+          invoice_amount: number | null;
+          invoice_attachment_url: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          professional_id: string;
+          settlement_id: string;
+          amount: number;
+          currency?: string;
+          method?: PaymentMethod;
+          paid_at?: string;
+          reference?: string | null;
+          notes?: string | null;
+          invoice_number?: string | null;
+          invoice_date?: string | null;
+          invoice_amount?: number | null;
+          invoice_attachment_url?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          professional_id?: string;
+          settlement_id?: string;
+          amount?: number;
+          currency?: string;
+          method?: PaymentMethod;
+          paid_at?: string;
+          reference?: string | null;
+          notes?: string | null;
+          invoice_number?: string | null;
+          invoice_date?: string | null;
+          invoice_amount?: number | null;
+          invoice_attachment_url?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
       };
       prescriptions: {
         Row: {
@@ -7076,6 +7572,84 @@ export interface Database {
         };
         Returns: undefined;
       };
+      calculate_professional_settlement: {
+        Args: {
+          p_professional_id: string;
+          p_period_start: string;
+          p_period_end: string;
+          p_branch_id?: string | null;
+        };
+        Returns: string;
+      };
+      approve_professional_settlement: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: Json;
+      };
+      submit_professional_settlement_for_review: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: Json;
+      };
+      cancel_professional_settlement: {
+        Args: {
+          p_settlement_id: string;
+          p_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      add_professional_settlement_adjustment: {
+        Args: {
+          p_settlement_id: string;
+          p_type: SettlementAdjustmentType;
+          p_amount: number;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      register_professional_payment: {
+        Args: {
+          p_settlement_id: string;
+          p_amount: number;
+          p_method?: PaymentMethod;
+          p_paid_at?: string | null;
+          p_reference?: string | null;
+          p_notes?: string | null;
+          p_invoice_number?: string | null;
+          p_invoice_date?: string | null;
+          p_invoice_amount?: number | null;
+          p_invoice_attachment_url?: string | null;
+        };
+        Returns: Json;
+      };
+      get_professional_settlement: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: Json;
+      };
+      list_professional_settlements: {
+        Args: {
+          p_professional_id?: string | null;
+          p_status?: SettlementStatus | null;
+          p_period_start?: string | null;
+          p_period_end?: string | null;
+          p_branch_id?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: Json;
+      };
+      list_my_professional_settlements: {
+        Args: {
+          p_status?: SettlementStatus | null;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;
@@ -7102,6 +7676,12 @@ export interface Database {
       inventory_movement_type: InventoryMovementType;
       invoice_status: InvoiceStatus;
       payment_method: PaymentMethod;
+      professional_relationship_type: ProfessionalRelationshipType;
+      compensation_rule_type: CompensationRuleType;
+      compensation_frequency: CompensationFrequency;
+      settlement_status: SettlementStatus;
+      settlement_item_source_type: SettlementItemSourceType;
+      settlement_adjustment_type: SettlementAdjustmentType;
       whatsapp_related_type: WhatsAppRelatedType;
       reminder_type: ReminderType;
       reminder_status: ReminderStatus;

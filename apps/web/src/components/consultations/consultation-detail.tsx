@@ -16,18 +16,22 @@ import {
   SPECIES_EMOJI,
   formatClinicalEntryDateTime,
   type ConsultationListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface ConsultationDetailProps {
   consultation: ConsultationListRow;
   canWrite: boolean;
   canWriteBilling?: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
 }
 
 export function ConsultationDetail({
   consultation,
   canWrite,
   canWriteBilling = false,
+  settlementClaim = null,
 }: ConsultationDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -139,6 +143,8 @@ export function ConsultationDetail({
           )}
         </div>
       </div>
+
+      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
 
       <Card>
         <CardHeader>

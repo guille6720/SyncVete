@@ -1,5 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { getClinicalImage, canReadImages, canManageImages } from '@/actions/images';
+import {
+  canReadProfessionalSettlements,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
 import { ClinicalImageDetail } from '@/components/images/clinical-image-detail';
 
 interface ImagenDetailPageProps {
@@ -11,9 +15,21 @@ export default async function ImagenDetailPage({ params }: ImagenDetailPageProps
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [image, canWrite] = await Promise.all([getClinicalImage(id), canManageImages()]);
+  const [image, canWrite, canReadSettlements] = await Promise.all([
+    getClinicalImage(id),
+    canManageImages(),
+    canReadProfessionalSettlements(),
+  ]);
 
   if (!image) notFound();
 
-  return <ClinicalImageDetail image={image} canWrite={canWrite} />;
+  const procedureKinds = new Set(['radiografia', 'ecografia', 'laboratorio']);
+  const settlementClaim =
+    canReadSettlements && procedureKinds.has(image.kind)
+      ? await getSettlementClaimForSource('procedure', image.id)
+      : null;
+
+  return (
+    <ClinicalImageDetail image={image} canWrite={canWrite} settlementClaim={settlementClaim} />
+  );
 }

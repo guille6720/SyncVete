@@ -7,6 +7,7 @@ export const NOTIFICATION_KINDS = [
   'receta',
   'plan',
   'migracion',
+  'liquidacion',
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
@@ -20,6 +21,7 @@ export const NOTIFICATION_KIND_LABELS: Record<NotificationKind, string> = {
   receta: 'Receta',
   plan: 'Plan',
   migracion: 'Importar / Exportar',
+  liquidacion: 'Liquidación',
 };
 
 export const NOTIFICATION_KIND_VARIANT: Record<
@@ -34,6 +36,7 @@ export const NOTIFICATION_KIND_VARIANT: Record<
   receta: 'default',
   plan: 'warning',
   migracion: 'default',
+  liquidacion: 'success',
 };
 
 export const NOTIFICATION_RELATED_TYPES = [
@@ -55,6 +58,7 @@ export const NOTIFICATION_RELATED_TYPES = [
   'addon_refunded',
   'data_import_batch',
   'data_export_job',
+  'professional_settlement',
 ] as const;
 
 export type NotificationRelatedType = (typeof NOTIFICATION_RELATED_TYPES)[number];

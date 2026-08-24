@@ -36,6 +36,7 @@ interface SettingsPageClientProps {
     branches: Branch[];
   };
   seats?: SeatUsageMeter[];
+  showProfessionalsLink?: boolean;
   planBilling?: PlanBillingState;
   checkoutBanner?: string | null;
 }
@@ -49,6 +50,7 @@ export function SettingsPageClient({
   branches,
   team,
   seats = [],
+  showProfessionalsLink = false,
   planBilling,
   checkoutBanner,
 }: SettingsPageClientProps) {
@@ -85,6 +87,7 @@ export function SettingsPageClient({
           seatMeters={seats.filter(
             (meter) => meter.featureKey === 'users.max' || meter.featureKey === 'professionals.max'
           )}
+          showProfessionalsLink={showProfessionalsLink}
         />
       )}
 

@@ -16,14 +16,21 @@ import {
   formatFileSize,
   isClinicalImagePreviewable,
   type ClinicalImageListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface ClinicalImageDetailProps {
   image: ClinicalImageListRow;
   canWrite: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
 }
 
-export function ClinicalImageDetail({ image, canWrite }: ClinicalImageDetailProps) {
+export function ClinicalImageDetail({
+  image,
+  canWrite,
+  settlementClaim = null,
+}: ClinicalImageDetailProps) {
   const router = useRouter();
 
   const handleDelete = async () => {
@@ -60,6 +67,8 @@ export function ClinicalImageDetail({ image, canWrite }: ClinicalImageDetailProp
           )}
         </div>
       </div>
+
+      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
 
       <Card>
         <CardHeader>

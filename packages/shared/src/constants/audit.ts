@@ -47,6 +47,13 @@ export const AUDIT_ENTITY_TYPES = [
   'branch_members',
   'organization_invitations',
   'owner_portal_invites',
+  'professionals',
+  'professional_compensation_schemes',
+  'professional_compensation_rules',
+  'professional_settlements',
+  'professional_settlement_items',
+  'professional_settlement_adjustments',
+  'professional_payments',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
@@ -81,6 +88,13 @@ export const AUDIT_ENTITY_LABELS: Record<AuditEntityType, string> = {
   branch_members: 'Equipo',
   organization_invitations: 'Invitaciones',
   owner_portal_invites: 'Portal',
+  professionals: 'Profesionales',
+  professional_compensation_schemes: 'Esquemas de compensación',
+  professional_compensation_rules: 'Reglas de compensación',
+  professional_settlements: 'Liquidaciones',
+  professional_settlement_items: 'Ítems de liquidación',
+  professional_settlement_adjustments: 'Ajustes de liquidación',
+  professional_payments: 'Pagos a profesionales',
 };
 
 export const AUDIT_DEFAULT_RANGE_DAYS = 7;

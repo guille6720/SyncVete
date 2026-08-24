@@ -30,6 +30,8 @@ import {
   ScrollText,
   Shield,
   Hourglass,
+  Briefcase,
+  Wallet,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { signOut } from '@/actions/auth';
@@ -62,6 +64,9 @@ const NAV_ITEMS = [
   { label: 'Farmacia', href: '/farmacia', icon: Pill },
   { label: 'Facturación', href: '/facturacion', icon: Receipt },
   { label: 'Caja', href: '/caja', icon: Banknote },
+  { label: 'Profesionales', href: '/profesionales', icon: Briefcase },
+  { label: 'Liquidaciones', href: '/liquidaciones', icon: Wallet },
+  { label: 'Mis liquidaciones', href: '/liquidaciones/mis-liquidaciones', icon: Wallet },
   { label: 'Reportes', href: '/reportes', icon: BarChart3 },
   { label: 'Auditoría', href: '/auditoria', icon: ScrollText },
   { label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
@@ -103,6 +108,7 @@ interface AppShellProps {
   isPlatformAdmin?: boolean;
   entitledHrefs?: string[] | null;
   billingBanner?: ClinicCommercialBanner | null;
+  showMySettlementsNav?: boolean;
 }
 
 export function AppShell({
@@ -116,6 +122,7 @@ export function AppShell({
   isPlatformAdmin = false,
   entitledHrefs = null,
   billingBanner = null,
+  showMySettlementsNav = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -231,7 +238,12 @@ export function AppShell({
         )}
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {NAV_ITEMS.filter((item) => isClinicPathEntitled(item.href, entitledHrefs)).map((item) => {
+          {NAV_ITEMS.filter((item) => {
+            if (item.href === '/liquidaciones/mis-liquidaciones' && !showMySettlementsNav) {
+              return false;
+            }
+            return isClinicPathEntitled(item.href, entitledHrefs);
+          }).map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPending = pendingHref === item.href;
             return (

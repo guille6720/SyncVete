@@ -28,6 +28,8 @@ import {
   Inbox,
   ScrollText,
   Hourglass,
+  Briefcase,
+  Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, useTransition } from 'react';
@@ -56,6 +58,24 @@ const NAV_ITEMS = [
   { label: 'Farmacia', href: '/farmacia', icon: Pill, keywords: 'receta recetar medicamento dispensar' },
   { label: 'Facturación', href: '/facturacion', icon: Receipt, keywords: 'factura cobro caja pagos' },
   { label: 'Caja', href: '/caja', icon: Banknote, keywords: 'caja turno efectivo cierre cobros' },
+  {
+    label: 'Profesionales',
+    href: '/profesionales',
+    icon: Briefcase,
+    keywords: 'veterinarios compensacion equipo honorarios',
+  },
+  {
+    label: 'Liquidaciones',
+    href: '/liquidaciones',
+    icon: Wallet,
+    keywords: 'liquidacion pago profesional honorarios quincena',
+  },
+  {
+    label: 'Mis liquidaciones',
+    href: '/liquidaciones/mis-liquidaciones',
+    icon: Wallet,
+    keywords: 'mis liquidaciones honorarios sueldo pago',
+  },
   { label: 'Reportes', href: '/reportes', icon: BarChart3, keywords: 'estadisticas caja operacion' },
   { label: 'Auditoría', href: '/auditoria', icon: ScrollText, keywords: 'logs cambios historial actividad' },
   { label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, keywords: 'mensaje tutor whatsapp wa' },

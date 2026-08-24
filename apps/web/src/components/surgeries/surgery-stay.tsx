@@ -28,14 +28,21 @@ import {
   SURGERY_STATUS_VARIANT,
   formatClinicalEntryDateTime,
   type SurgeryListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface SurgeryStayProps {
   surgery: SurgeryListRow;
   canWrite: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
 }
 
-export function SurgeryStay({ surgery, canWrite }: SurgeryStayProps) {
+export function SurgeryStay({
+  surgery,
+  canWrite,
+  settlementClaim = null,
+}: SurgeryStayProps) {
   const router = useRouter();
   const isOpen =
     surgery.status === 'programada' ||
@@ -94,6 +101,8 @@ export function SurgeryStay({ surgery, canWrite }: SurgeryStayProps) {
           )}
         </div>
       </div>
+
+      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
 
       <Card>
         <CardHeader>
