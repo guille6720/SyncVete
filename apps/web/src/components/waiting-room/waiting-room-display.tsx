@@ -2,8 +2,14 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { listWaitingRoom } from '@/actions/waiting-room';
 import { useWaitingRoomLive } from '@/hooks/use-waiting-room-live';
+import {
+  playWaitingRoomCallChime,
+  readWaitingRoomTvMuted,
+  writeWaitingRoomTvMuted,
+} from '@/lib/waiting-room-chime';
 import {
   APP_NAME,
   SPECIES_EMOJI,
@@ -28,6 +34,11 @@ export function WaitingRoomDisplay({
   const [entries, setEntries] = useState(initialEntries);
   const [clock, setClock] = useState(() => formatClock(new Date()));
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [muted, setMuted] = useState(false);
+
+  useEffect(() => {
+    setMuted(readWaitingRoomTvMuted());
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -44,6 +55,9 @@ export function WaitingRoomDisplay({
         );
         if (newlyCalled) {
           setFlashId(newlyCalled.waiting_room_entry_id);
+          if (!readWaitingRoomTvMuted()) {
+            playWaitingRoomCallChime();
+          }
         }
         return next;
       });
@@ -70,6 +84,12 @@ export function WaitingRoomDisplay({
     const id = window.setTimeout(() => setFlashId(null), 8000);
     return () => window.clearTimeout(id);
   }, [flashId]);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    writeWaitingRoomTvMuted(next);
+  };
 
   const called = useMemo(
     () => entries.filter((row) => row.waiting_room_status === 'called'),
@@ -107,12 +127,24 @@ export function WaitingRoomDisplay({
           <p className="font-display text-4xl font-semibold tabular-nums md:text-6xl">
             {clock}
           </p>
-          <Link
-            href="/sala-espera"
-            className="mt-2 inline-block text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
-          >
-            Volver a recepción
-          </Link>
+          <div className="mt-2 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              onClick={toggleMute}
+              className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white"
+              aria-pressed={muted}
+              aria-label={muted ? 'Activar sonido' : 'Silenciar'}
+            >
+              {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              {muted ? 'Silencio' : 'Sonido'}
+            </button>
+            <Link
+              href="/sala-espera"
+              className="text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
+            >
+              Volver a recepción
+            </Link>
+          </div>
         </div>
       </header>
 

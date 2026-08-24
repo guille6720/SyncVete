@@ -1188,6 +1188,11 @@ export const waitingRoomReorderQueueSchema = z.object({
     .max(200, 'Demasiadas entradas'),
 });
 
+export const waitingRoomRemoveSchema = z.object({
+  entryId: z.string().uuid('Entrada inválida'),
+  markAusente: z.boolean().optional().default(false),
+});
+
 export type WaitingRoomListInput = z.infer<typeof waitingRoomListSchema>;
 export type WaitingRoomCheckInInput = z.infer<typeof waitingRoomCheckInSchema>;
 export type WaitingRoomUpdateStatusInput = z.infer<typeof waitingRoomUpdateStatusSchema>;
@@ -1195,3 +1200,4 @@ export type WaitingRoomReorderInput = z.infer<typeof waitingRoomReorderSchema>;
 export type WaitingRoomCheckInTokenInput = z.infer<typeof waitingRoomCheckInTokenSchema>;
 export type WaitingRoomCheckInRedeemInput = z.infer<typeof waitingRoomCheckInRedeemSchema>;
 export type WaitingRoomReorderQueueInput = z.infer<typeof waitingRoomReorderQueueSchema>;
+export type WaitingRoomRemoveInput = z.infer<typeof waitingRoomRemoveSchema>;

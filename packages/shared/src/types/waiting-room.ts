@@ -146,3 +146,29 @@ export interface WaitingRoomReorderQueueResult {
   updated: number;
   ordered_ids: string[];
 }
+
+export interface WaitingRoomRemoveResult {
+  id: string;
+  appointment_id: string;
+  deleted_at: string;
+  marked_ausente: boolean;
+}
+
+export interface WaitingRoomStatusCount {
+  status: WaitingRoomStatus;
+  count: number;
+}
+
+export interface WaitingRoomDashboardSummary {
+  totalToday: number;
+  activeCount: number;
+  pendingCheckInCount: number;
+  countsByStatus: WaitingRoomStatusCount[];
+  avgWaitMinutes: number | null;
+  avgTimeToCallMinutes: number | null;
+  longestWaitMinutes: number | null;
+  longestWaitPatientName: string | null;
+  completedCount: number;
+  calledCount: number;
+  inFlowCount: number;
+}

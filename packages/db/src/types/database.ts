@@ -6302,6 +6302,13 @@ export interface Database {
         };
         Returns: Json;
       };
+      remove_waiting_room_entry: {
+        Args: {
+          p_entry_id: string;
+          p_mark_ausente?: boolean;
+        };
+        Returns: Json;
+      };
       list_owner_portal_waiting_room: {
         Args: {
           p_date?: string | null;

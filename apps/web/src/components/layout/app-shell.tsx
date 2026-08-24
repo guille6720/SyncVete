@@ -134,9 +134,12 @@ export function AppShell({
     }
   }, [router, entitledHrefs]);
 
-  const isWaitingRoomDisplay = pathname.startsWith('/sala-espera/pantalla');
+  const isWaitingRoomFullscreen =
+    pathname.startsWith('/sala-espera/pantalla') ||
+    pathname.startsWith('/sala-espera/kiosco') ||
+    pathname.startsWith('/sala-espera/tablero');
 
-  if (isWaitingRoomDisplay) {
+  if (isWaitingRoomFullscreen) {
     return <>{children}</>;
   }
 

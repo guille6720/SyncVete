@@ -12,7 +12,9 @@ import {
   SPECIES_EMOJI,
   WAITING_ROOM_STATUS_LABELS,
   WAITING_ROOM_STATUS_VARIANT,
+  estimatePortalWaitingMinutes,
   formatAppointmentTime,
+  formatPortalWaitingEta,
   type PortalWaitingRoomRow,
 } from '@sincvete/shared';
 
@@ -113,6 +115,11 @@ function PortalWaitingRoomCard({
 }) {
   const called = row.waiting_room_status === 'called';
   const message = PORTAL_WAITING_ROOM_STATUS_MESSAGES[row.waiting_room_status];
+  const etaMinutes =
+    row.waiting_room_status === 'waiting'
+      ? estimatePortalWaitingMinutes(row.ahead_count)
+      : null;
+  const etaLabel = formatPortalWaitingEta(etaMinutes);
 
   return (
     <div
@@ -142,10 +149,14 @@ function PortalWaitingRoomCard({
               {row.ahead_count === 1
                 ? 'Hay 1 paciente delante'
                 : `Hay ${row.ahead_count} pacientes delante`}
+              {etaLabel ? ` · ${etaLabel}` : ''}
             </p>
           )}
           {row.waiting_room_status === 'waiting' && row.ahead_count === 0 && (
-            <p className="mt-1 text-sm text-muted-foreground">Sos el próximo en la cola</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Sos el próximo en la cola
+              {etaLabel ? ` · ${etaLabel}` : ''}
+            </p>
           )}
         </div>
         <Badge variant={WAITING_ROOM_STATUS_VARIANT[row.waiting_room_status]}>

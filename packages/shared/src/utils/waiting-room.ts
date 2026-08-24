@@ -3,11 +3,17 @@ import type {
   WaitingRoomCheckInPreview,
   WaitingRoomCheckInRedeemResult,
   WaitingRoomCheckInTokenResult,
+  WaitingRoomDashboardSummary,
   WaitingRoomListRow,
+  WaitingRoomStatusCount,
 } from '../types/waiting-room';
 import type { AppointmentType } from '../constants/appointments';
 import type { PatientSpecies } from '../constants/patients';
-import { isWaitingRoomStatus } from '../constants/waiting-room';
+import {
+  WAITING_ROOM_STATUSES,
+  isWaitingRoomStatus,
+  type WaitingRoomStatus,
+} from '../constants/waiting-room';
 
 /**
  * Default Waiting Room ordering:
@@ -68,6 +74,111 @@ export function applyWaitingRoomQueueOrder<
     queue_position: index + 1,
     priority: 0,
   }));
+}
+
+export function minutesBetween(fromIso: string, to: Date | string): number {
+  const from = new Date(fromIso).getTime();
+  const toMs = typeof to === 'string' ? new Date(to).getTime() : to.getTime();
+  if (!Number.isFinite(from) || !Number.isFinite(toMs)) return 0;
+  return Math.max(0, Math.round((toMs - from) / 60_000));
+}
+
+export function formatWaitMinutes(minutes: number | null | undefined): string {
+  if (minutes == null || !Number.isFinite(minutes)) return '—';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rem = minutes % 60;
+  return rem === 0 ? `${hours} h` : `${hours} h ${rem} min`;
+}
+
+/** Default minutes per patient ahead when clinic has no measured average yet. */
+export const WAITING_ROOM_DEFAULT_MINUTES_PER_PATIENT = 15;
+
+/**
+ * Rough ETA for a portal tutor waiting in queue.
+ * Uses measured avg time-to-call when available; otherwise a conservative default.
+ */
+export function estimatePortalWaitingMinutes(
+  aheadCount: number,
+  options: { minutesPerPatient?: number | null } = {}
+): number | null {
+  if (!Number.isFinite(aheadCount) || aheadCount < 0) return null;
+  const per =
+    options.minutesPerPatient != null &&
+    Number.isFinite(options.minutesPerPatient) &&
+    options.minutesPerPatient > 0
+      ? Math.round(options.minutesPerPatient)
+      : WAITING_ROOM_DEFAULT_MINUTES_PER_PATIENT;
+  if (aheadCount === 0) return Math.min(per, 5);
+  return aheadCount * per;
+}
+
+export function formatPortalWaitingEta(minutes: number | null | undefined): string {
+  if (minutes == null) return '';
+  if (minutes <= 5) return 'Te llamamos en breve';
+  if (minutes < 60) return `Espera estimada ~${minutes} min`;
+  return `Espera estimada ~${formatWaitMinutes(minutes)}`;
+}
+
+function average(values: number[]): number | null {
+  if (values.length === 0) return null;
+  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+}
+
+export function buildWaitingRoomDashboard(
+  entries: WaitingRoomListRow[],
+  options: { pendingCheckInCount?: number; now?: Date } = {}
+): WaitingRoomDashboardSummary {
+  const now = options.now ?? new Date();
+  const counts = Object.fromEntries(
+    WAITING_ROOM_STATUSES.map((status) => [status, 0])
+  ) as Record<WaitingRoomStatus, number>;
+
+  for (const entry of entries) {
+    if (isWaitingRoomStatus(entry.waiting_room_status)) {
+      counts[entry.waiting_room_status] += 1;
+    }
+  }
+
+  const countsByStatus: WaitingRoomStatusCount[] = WAITING_ROOM_STATUSES.map((status) => ({
+    status,
+    count: counts[status],
+  }));
+
+  const waitingRows = entries.filter((row) => row.waiting_room_status === 'waiting');
+  const waitMinutes = waitingRows.map((row) => minutesBetween(row.checked_in_at, now));
+  const timeToCall = entries
+    .filter((row) => row.called_at)
+    .map((row) => minutesBetween(row.checked_in_at, row.called_at as string));
+
+  let longestWaitMinutes: number | null = null;
+  let longestWaitPatientName: string | null = null;
+  for (const row of waitingRows) {
+    const minutes = minutesBetween(row.checked_in_at, now);
+    if (longestWaitMinutes == null || minutes > longestWaitMinutes) {
+      longestWaitMinutes = minutes;
+      longestWaitPatientName = row.patient_name;
+    }
+  }
+
+  const completedCount = counts.completed;
+  const calledCount = counts.called;
+  const inFlowCount =
+    counts.waiting + counts.called + counts.in_consultation + counts.payment_pending;
+
+  return {
+    totalToday: entries.length,
+    activeCount: inFlowCount,
+    pendingCheckInCount: Math.max(0, options.pendingCheckInCount ?? 0),
+    countsByStatus,
+    avgWaitMinutes: average(waitMinutes),
+    avgTimeToCallMinutes: average(timeToCall),
+    longestWaitMinutes,
+    longestWaitPatientName,
+    completedCount,
+    calledCount,
+    inFlowCount,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

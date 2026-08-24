@@ -9,6 +9,7 @@ import {
   waitingRoomCheckInTokenSchema,
   waitingRoomListSchema,
   waitingRoomReorderQueueSchema,
+  waitingRoomRemoveSchema,
   waitingRoomReorderSchema,
   waitingRoomUpdateStatusSchema,
   type ActionResult,
@@ -18,6 +19,7 @@ import {
   type WaitingRoomCheckInTokenResult,
   type WaitingRoomListRow,
   type WaitingRoomMutationResult,
+  type WaitingRoomRemoveResult,
   type WaitingRoomReorderQueueResult,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
@@ -219,6 +221,51 @@ export async function reorderWaitingRoomQueue(
     };
   } catch (error) {
     return actionError<WaitingRoomReorderQueueResult>(error);
+  }
+}
+
+export async function removeWaitingRoomEntry(input: {
+  entryId: string;
+  markAusente?: boolean;
+}): Promise<ActionResult<WaitingRoomRemoveResult>> {
+  try {
+    await requirePermissionAndFeature('waiting_room:write', FEATURES.WAITING_ROOM);
+    const parsed = waitingRoomRemoveSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('remove_waiting_room_entry', {
+      p_entry_id: parsed.data.entryId,
+      p_mark_ausente: parsed.data.markAusente ?? false,
+    });
+
+    if (error) {
+      return { success: false, error: rpcErrorMessage(error) };
+    }
+
+    const raw = (data ?? {}) as Partial<WaitingRoomRemoveResult>;
+    if (!raw.id || !raw.appointment_id) {
+      return { success: false, error: 'No se pudo quitar la entrada' };
+    }
+
+    revalidateWaitingRoomSurfaces(raw.appointment_id);
+    return {
+      success: true,
+      data: {
+        id: String(raw.id),
+        appointment_id: String(raw.appointment_id),
+        deleted_at: String(raw.deleted_at ?? new Date().toISOString()),
+        marked_ausente: Boolean(raw.marked_ausente),
+      },
+    };
+  } catch (error) {
+    return actionError<WaitingRoomRemoveResult>(error);
   }
 }
 

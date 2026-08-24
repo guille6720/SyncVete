@@ -25,10 +25,12 @@ import { ArrowUp, CalendarPlus, GripVertical, MessageCircle } from 'lucide-react
 import {
   checkInAppointment,
   listWaitingRoom,
+  removeWaitingRoomEntry,
   reorderWaitingRoom,
   reorderWaitingRoomQueue,
   updateWaitingRoomStatus,
 } from '@/actions/waiting-room';
+import { startConsultationFromAppointment } from '@/actions/consultations';
 import { WaitingRoomCheckInQrButton } from '@/components/waiting-room/waiting-room-check-in-qr-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -55,7 +57,10 @@ interface WaitingRoomBoardProps {
   checkInCandidates: AppointmentListRow[];
   canWrite: boolean;
   canSendWhatsApp?: boolean;
+  canStartConsultation?: boolean;
+  /** Selected day (YYYY-MM-DD). Write actions only apply when it is today. */
   todayLabel: string;
+  isToday?: boolean;
 }
 
 export function WaitingRoomBoard({
@@ -63,11 +68,14 @@ export function WaitingRoomBoard({
   checkInCandidates,
   canWrite,
   canSendWhatsApp = false,
+  canStartConsultation = false,
   todayLabel,
+  isToday = true,
 }: WaitingRoomBoardProps) {
   const router = useRouter();
   const [entries, setEntries] = useState(() => sortWaitingRoomQueue(initialEntries));
   const [reordering, setReordering] = useState(false);
+  const canMutate = canWrite && isToday;
 
   useEffect(() => {
     setEntries(sortWaitingRoomQueue(initialEntries));
@@ -108,7 +116,7 @@ export function WaitingRoomBoard({
   );
 
   const onDragEnd = (event: DragEndEvent) => {
-    if (!canWrite) return;
+    if (!canMutate) return;
     const { active: dragActive, over } = event;
     if (!over || dragActive.id === over.id) return;
 
@@ -150,7 +158,8 @@ export function WaitingRoomBoard({
             {completed.length > 0
               ? ` · ${completed.length} completado${completed.length === 1 ? '' : 's'}`
               : ''}
-            {canWrite && active.length > 1 ? ' · arrastrá para reordenar' : ''}
+            {canMutate && active.length > 1 ? ' · arrastrá para reordenar' : ''}
+            {!isToday ? ' · solo lectura (día pasado o futuro)' : ''}
             {reordering ? ' · guardando…' : ''}
           </p>
         </div>
@@ -158,13 +167,13 @@ export function WaitingRoomBoard({
         {active.length === 0 ? (
           <div className="rounded-lg border border-dashed p-10 text-center">
             <p className="text-muted-foreground">Nadie en sala de espera por ahora.</p>
-            {canWrite && checkInCandidates.length > 0 && (
+            {canMutate && checkInCandidates.length > 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
                 Podés hacer check-in de las citas de hoy más abajo.
               </p>
             )}
           </div>
-        ) : canWrite ? (
+        ) : canMutate ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
@@ -174,6 +183,8 @@ export function WaitingRoomBoard({
                     entry={entry}
                     canWrite={canWrite}
                     canSendWhatsApp={canSendWhatsApp}
+                    canStartConsultation={canStartConsultation}
+                    isToday={isToday}
                     sortable
                   />
                 ))}
@@ -186,15 +197,17 @@ export function WaitingRoomBoard({
               <WaitingRoomRow
                 key={entry.waiting_room_entry_id}
                 entry={entry}
-                canWrite={false}
+                canWrite={canWrite}
                 canSendWhatsApp={canSendWhatsApp}
+                canStartConsultation={false}
+                isToday={isToday}
               />
             ))}
           </div>
         )}
       </section>
 
-      {canWrite && checkInCandidates.length > 0 && (
+      {canMutate && checkInCandidates.length > 0 && (
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Check-in pendiente</h2>
@@ -212,13 +225,17 @@ export function WaitingRoomBoard({
 
       {completed.length > 0 && (
         <section className="space-y-2">
-          <h3 className="text-sm font-medium text-muted-foreground">Completados hoy</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">
+            Completados {isToday ? 'hoy' : 'del día'}
+          </h3>
           {completed.map((entry) => (
             <WaitingRoomRow
               key={entry.waiting_room_entry_id}
               entry={entry}
               canWrite={false}
               canSendWhatsApp={canSendWhatsApp}
+              canStartConsultation={false}
+              isToday={false}
             />
           ))}
         </section>
@@ -241,11 +258,15 @@ function SortableWaitingRoomRow({
   entry,
   canWrite,
   canSendWhatsApp,
+  canStartConsultation,
+  isToday,
   sortable,
 }: {
   entry: WaitingRoomListRow;
   canWrite: boolean;
   canSendWhatsApp: boolean;
+  canStartConsultation: boolean;
+  isToday: boolean;
   sortable: boolean;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -265,6 +286,8 @@ function SortableWaitingRoomRow({
         entry={entry}
         canWrite={canWrite}
         canSendWhatsApp={canSendWhatsApp}
+        canStartConsultation={canStartConsultation}
+        isToday={isToday}
         dragHandle={
           sortable ? (
             <button
@@ -287,15 +310,21 @@ function WaitingRoomRow({
   entry,
   canWrite,
   canSendWhatsApp,
+  canStartConsultation,
+  isToday,
   dragHandle = null,
 }: {
   entry: WaitingRoomListRow;
   canWrite: boolean;
   canSendWhatsApp: boolean;
+  canStartConsultation: boolean;
+  isToday: boolean;
   dragHandle?: ReactNode;
 }) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
+  const [calling, setCalling] = useState(false);
+  const [roomDraft, setRoomDraft] = useState(entry.room ?? '');
   const nextStatus = WAITING_ROOM_TRANSITIONS[entry.waiting_room_status];
   const nextLabel =
     nextStatus && entry.waiting_room_status !== 'completed'
@@ -304,17 +333,10 @@ function WaitingRoomRow({
         ]
       : null;
   const showWhatsApp = canSendWhatsApp && entry.waiting_room_status === 'called';
+  const actionsEnabled = canWrite && isToday && entry.waiting_room_status !== 'completed';
 
-  const advance = () => {
+  const commitAdvance = (room?: string) => {
     if (!nextStatus) return;
-
-    let room: string | undefined;
-    if (nextStatus === 'called') {
-      const input = window.prompt('Consultorio / box (opcional)', entry.room ?? '');
-      if (input === null) return;
-      room = input.trim() || undefined;
-    }
-
     void runPending(async () => {
       const result = await updateWaitingRoomStatus({
         entryId: entry.waiting_room_entry_id,
@@ -326,6 +348,8 @@ function WaitingRoomRow({
         return;
       }
 
+      setCalling(false);
+
       if (nextStatus === 'called' && canSendWhatsApp) {
         const notify = window.confirm('¿Avisar al tutor por WhatsApp?');
         if (notify) {
@@ -334,8 +358,30 @@ function WaitingRoomRow({
         }
       }
 
+      if (nextStatus === 'in_consultation' && canStartConsultation) {
+        const start = window.confirm('¿Abrir la consulta clínica ahora?');
+        if (start) {
+          const consultation = await startConsultationFromAppointment(entry.appointment_id);
+          if (consultation && !consultation.success) {
+            alert(consultation.error ?? 'No se pudo iniciar la consulta');
+            router.refresh();
+          }
+          return;
+        }
+      }
+
       router.refresh();
     });
+  };
+
+  const advance = () => {
+    if (!nextStatus) return;
+    if (nextStatus === 'called') {
+      setRoomDraft(entry.room ?? '');
+      setCalling(true);
+      return;
+    }
+    commitAdvance();
   };
 
   const bumpPriority = () => {
@@ -352,58 +398,127 @@ function WaitingRoomRow({
     });
   };
 
+  const removeFromQueue = (markAusente: boolean) => {
+    const message = markAusente
+      ? '¿Quitar de la cola y marcar la cita como ausente?'
+      : '¿Quitar de la sala de espera sin marcar ausente?';
+    if (!window.confirm(message)) return;
+
+    void runPending(async () => {
+      const result = await removeWaitingRoomEntry({
+        entryId: entry.waiting_room_entry_id,
+        markAusente,
+      });
+      if (!result.success) {
+        alert(result.error ?? 'No se pudo quitar de la cola');
+        return;
+      }
+      router.refresh();
+    });
+  };
+
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg border bg-card p-4">
-      <div className="flex min-w-0 flex-1 gap-2">
-        {dragHandle}
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="font-medium">
-              {entry.queue_position != null ? `#${entry.queue_position} · ` : ''}
-              {formatAppointmentTime(entry.appointment_starts_at)} ·{' '}
-              {SPECIES_EMOJI[entry.patient_species]} {entry.patient_name}
+    <div className="space-y-3 rounded-lg border bg-card p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-1 gap-2">
+          {dragHandle}
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">
+                {entry.queue_position != null ? `#${entry.queue_position} · ` : ''}
+                {formatAppointmentTime(entry.appointment_starts_at)} ·{' '}
+                {SPECIES_EMOJI[entry.patient_species]} {entry.patient_name}
+              </p>
+              <Badge variant={WAITING_ROOM_STATUS_VARIANT[entry.waiting_room_status]}>
+                {WAITING_ROOM_STATUS_LABELS[entry.waiting_room_status]}
+              </Badge>
+              {entry.priority > 0 && <Badge variant="warning">Prioridad {entry.priority}</Badge>}
+              {entry.room ? <Badge>{entry.room}</Badge> : null}
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {APPOINTMENT_TYPE_LABELS[entry.appointment_type]} · {entry.owner_full_name}
+              {entry.assigned_user_name ? ` · ${entry.assigned_user_name}` : ''}
             </p>
-            <Badge variant={WAITING_ROOM_STATUS_VARIANT[entry.waiting_room_status]}>
-              {WAITING_ROOM_STATUS_LABELS[entry.waiting_room_status]}
-            </Badge>
-            {entry.priority > 0 && <Badge variant="warning">Prioridad {entry.priority}</Badge>}
-            {entry.room ? <Badge>{entry.room}</Badge> : null}
+            <p className="text-xs text-muted-foreground">
+              Check-in {formatAppointmentTime(entry.checked_in_at)}
+            </p>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {APPOINTMENT_TYPE_LABELS[entry.appointment_type]} · {entry.owner_full_name}
-            {entry.assigned_user_name ? ` · ${entry.assigned_user_name}` : ''}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            Check-in {formatAppointmentTime(entry.checked_in_at)}
-          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={`/agenda/${entry.appointment_id}`}>Cita</Link>
+          </Button>
+          {showWhatsApp && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={waitingRoomWhatsAppHref(entry)}>
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp
+              </Link>
+            </Button>
+          )}
+          {actionsEnabled && (
+            <>
+              <Button variant="outline" size="sm" isPending={pending} onClick={bumpPriority}>
+                <ArrowUp className="h-4 w-4" />
+                Priorizar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                isPending={pending}
+                onClick={() => removeFromQueue(false)}
+              >
+                Quitar
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                isPending={pending}
+                onClick={() => removeFromQueue(true)}
+              >
+                Ausente
+              </Button>
+              {nextLabel && nextStatus && !calling && (
+                <Button size="sm" isPending={pending} onClick={advance}>
+                  {pending ? 'Guardando...' : nextLabel}
+                </Button>
+              )}
+            </>
+          )}
         </div>
       </div>
-      <div className="flex flex-wrap gap-2">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/agenda/${entry.appointment_id}`}>Cita</Link>
-        </Button>
-        {showWhatsApp && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={waitingRoomWhatsAppHref(entry)}>
-              <MessageCircle className="h-4 w-4" />
-              WhatsApp
-            </Link>
+
+      {calling && actionsEnabled && (
+        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed bg-muted/30 p-3">
+          <label className="min-w-[12rem] flex-1 space-y-1 text-sm">
+            <span className="text-muted-foreground">Consultorio / box (opcional)</span>
+            <input
+              value={roomDraft}
+              onChange={(event) => setRoomDraft(event.target.value)}
+              placeholder="Ej. 1, Box A…"
+              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              autoFocus
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  commitAdvance(roomDraft.trim() || undefined);
+                }
+                if (event.key === 'Escape') setCalling(false);
+              }}
+            />
+          </label>
+          <Button
+            size="sm"
+            isPending={pending}
+            onClick={() => commitAdvance(roomDraft.trim() || undefined)}
+          >
+            {pending ? 'Llamando…' : 'Confirmar llamado'}
           </Button>
-        )}
-        {canWrite && entry.waiting_room_status !== 'completed' && (
-          <>
-            <Button variant="outline" size="sm" isPending={pending} onClick={bumpPriority}>
-              <ArrowUp className="h-4 w-4" />
-              Priorizar
-            </Button>
-            {nextLabel && nextStatus && (
-              <Button size="sm" isPending={pending} onClick={advance}>
-                {pending ? 'Guardando...' : nextLabel}
-              </Button>
-            )}
-          </>
-        )}
-      </div>
+          <Button size="sm" variant="ghost" disabled={pending} onClick={() => setCalling(false)}>
+            Cancelar
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

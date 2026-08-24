@@ -8,6 +8,7 @@ import {
   waitingRoomCheckInSchema,
   waitingRoomListSchema,
   waitingRoomReorderQueueSchema,
+  waitingRoomRemoveSchema,
   waitingRoomReorderSchema,
   waitingRoomUpdateStatusSchema,
   FEATURES,
@@ -19,6 +20,10 @@ import {
   parseOwnerPortalAlerts,
   applyWaitingRoomQueueOrder,
   buildWaitingRoomQueueOrder,
+  buildWaitingRoomDashboard,
+  formatWaitMinutes,
+  estimatePortalWaitingMinutes,
+  formatPortalWaitingEta,
   PORTAL_WAITING_ROOM_STATUS_MESSAGES,
 } from '../index';
 
@@ -120,6 +125,99 @@ describe('waiting room queue ordering', () => {
   });
 });
 
+describe('waiting room ops dashboard metrics', () => {
+  it('computes counts and wait averages', () => {
+    const now = new Date('2026-08-24T12:00:00.000Z');
+    const summary = buildWaitingRoomDashboard(
+      [
+        {
+          waiting_room_entry_id: '1',
+          appointment_id: 'a1',
+          patient_id: 'p1',
+          patient_name: 'Luna',
+          patient_species: 'Canino',
+          owner_id: 'o1',
+          owner_full_name: 'Ana',
+          assigned_user_id: null,
+          assigned_user_name: null,
+          appointment_type: 'consulta',
+          appointment_starts_at: '2026-08-24T11:00:00.000Z',
+          waiting_room_status: 'waiting',
+          checked_in_at: '2026-08-24T11:30:00.000Z',
+          called_at: null,
+          consultation_started_at: null,
+          payment_pending_at: null,
+          completed_at: null,
+          queue_position: 1,
+          priority: 0,
+          room: null,
+        },
+        {
+          waiting_room_entry_id: '2',
+          appointment_id: 'a2',
+          patient_id: 'p2',
+          patient_name: 'Michi',
+          patient_species: 'Felino',
+          owner_id: 'o2',
+          owner_full_name: 'Luis',
+          assigned_user_id: null,
+          assigned_user_name: null,
+          appointment_type: 'control',
+          appointment_starts_at: '2026-08-24T10:00:00.000Z',
+          waiting_room_status: 'called',
+          checked_in_at: '2026-08-24T10:00:00.000Z',
+          called_at: '2026-08-24T10:20:00.000Z',
+          consultation_started_at: null,
+          payment_pending_at: null,
+          completed_at: null,
+          queue_position: 2,
+          priority: 0,
+          room: '1',
+        },
+        {
+          waiting_room_entry_id: '3',
+          appointment_id: 'a3',
+          patient_id: 'p3',
+          patient_name: 'Toby',
+          patient_species: 'Canino',
+          owner_id: 'o3',
+          owner_full_name: 'Sol',
+          assigned_user_id: null,
+          assigned_user_name: null,
+          appointment_type: 'consulta',
+          appointment_starts_at: '2026-08-24T09:00:00.000Z',
+          waiting_room_status: 'completed',
+          checked_in_at: '2026-08-24T09:00:00.000Z',
+          called_at: '2026-08-24T09:10:00.000Z',
+          consultation_started_at: '2026-08-24T09:15:00.000Z',
+          payment_pending_at: '2026-08-24T09:40:00.000Z',
+          completed_at: '2026-08-24T09:50:00.000Z',
+          queue_position: 3,
+          priority: 0,
+          room: null,
+        },
+      ],
+      { pendingCheckInCount: 2, now }
+    );
+
+    expect(summary.inFlowCount).toBe(2);
+    expect(summary.completedCount).toBe(1);
+    expect(summary.pendingCheckInCount).toBe(2);
+    expect(summary.avgWaitMinutes).toBe(30);
+    expect(summary.avgTimeToCallMinutes).toBe(15);
+    expect(summary.longestWaitPatientName).toBe('Luna');
+    expect(formatWaitMinutes(30)).toBe('30 min');
+  });
+
+  it('estimates portal waiting ETA from ahead_count', () => {
+    expect(estimatePortalWaitingMinutes(0)).toBe(5);
+    expect(estimatePortalWaitingMinutes(2)).toBe(30);
+    expect(estimatePortalWaitingMinutes(2, { minutesPerPatient: 12 })).toBe(24);
+    expect(formatPortalWaitingEta(5)).toMatch(/breve/i);
+    expect(formatPortalWaitingEta(30)).toContain('30');
+  });
+});
+
 describe('waiting room schemas', () => {
   const entryId = '550e8400-e29b-41d4-a716-446655440010';
   const appointmentId = '550e8400-e29b-41d4-a716-446655440011';
@@ -164,6 +262,13 @@ describe('waiting room schemas', () => {
       }).success
     ).toBe(true);
     expect(waitingRoomReorderQueueSchema.safeParse({ orderedEntryIds: [] }).success).toBe(false);
+  });
+
+  it('validates remove-from-queue payload', () => {
+    expect(
+      waitingRoomRemoveSchema.safeParse({ entryId, markAusente: true }).success
+    ).toBe(true);
+    expect(waitingRoomRemoveSchema.safeParse({ entryId: 'x' }).success).toBe(false);
   });
 });
 
