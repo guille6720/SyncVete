@@ -23,7 +23,7 @@ export interface WaitingRoomEntry {
   deleted_at: string | null;
 }
 
-/** Public list row for clinic Waiting Room UI (no internal_notes). */
+/** Clinic staff waiting-room list row (may include internal_notes; never send to portal). */
 export interface WaitingRoomListRow {
   waiting_room_entry_id: string;
   appointment_id: string;
@@ -45,6 +45,29 @@ export interface WaitingRoomListRow {
   queue_position: number | null;
   priority: number;
   room: string | null;
+  /** Staff-only operational note; omitted/null-safe on older payloads. */
+  internal_notes?: string | null;
+}
+
+/** Historical waiting-room visits for a patient ficha (staff-only). */
+export interface PatientWaitingRoomHistoryRow {
+  waiting_room_entry_id: string;
+  appointment_id: string;
+  checked_in_at: string;
+  waiting_room_status: WaitingRoomStatus | string;
+  called_at: string | null;
+  completed_at: string | null;
+  removed: boolean;
+  room: string | null;
+  appointment_starts_at: string;
+  minutes_to_call: number | null;
+  minutes_dwell: number | null;
+}
+
+/** Historical waiting-room visits for an owner ficha (staff-only). */
+export interface OwnerWaitingRoomHistoryRow extends PatientWaitingRoomHistoryRow {
+  patient_id: string;
+  patient_name: string;
 }
 
 export interface WaitingRoomCheckInResult {
@@ -98,6 +121,8 @@ export interface PortalWaitingRoomRow {
   priority: number;
   room: string | null;
   ahead_count: number;
+  /** Minutes per patient ahead used for ETA (clinic override or measured avg). */
+  minutes_per_patient: number | null;
 }
 
 export interface WaitingRoomCheckInTokenResult {
@@ -117,6 +142,21 @@ export interface WaitingRoomCheckInPreview {
   appointment_type?: AppointmentType;
   organization_name?: string;
   expires_at?: string;
+}
+
+/** Live status for public QR check-in page (token-scoped, no PII beyond pet name). */
+export interface PublicCheckInStatus {
+  valid: boolean;
+  reason?: string;
+  patient_name?: string;
+  patient_species?: PatientSpecies;
+  waiting_room_status?: WaitingRoomStatus | string;
+  queue_position?: number | null;
+  room?: string | null;
+  ahead_count?: number;
+  minutes_per_patient?: number | null;
+  checked_in_at?: string;
+  terminal?: boolean;
 }
 
 export interface WaitingRoomCheckInRedeemResult {

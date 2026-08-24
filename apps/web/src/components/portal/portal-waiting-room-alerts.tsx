@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
 import { listOwnerPortalAlerts, markOwnerPortalAlertsRead } from '@/actions/portal';
+import { usePortalWaitingRoomLive } from '@/hooks/use-portal-waiting-room-live';
 import { Button } from '@/components/ui/button';
 import type { OwnerPortalAlert } from '@sincvete/shared';
 
@@ -36,12 +37,12 @@ export function PortalWaitingRoomAlerts() {
     }
   }, []);
 
+  usePortalWaitingRoomLive(() => {
+    void refresh();
+  });
+
   useEffect(() => {
     void refresh();
-    const id = window.setInterval(() => {
-      void refresh();
-    }, 10_000);
-    return () => window.clearInterval(id);
   }, [refresh]);
 
   useEffect(() => {

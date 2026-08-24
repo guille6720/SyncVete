@@ -2,13 +2,14 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, MessageCircle, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Hourglass, MessageCircle, Pencil, Trash2 } from 'lucide-react';
 import { deleteOwner } from '@/actions/owners';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DOCUMENT_TYPE_LABELS, buildWhatsAppComposePath, type Owner, type OwnerPortalStatus } from '@sincvete/shared';
+import { DOCUMENT_TYPE_LABELS, buildWhatsAppComposePath, isClinicPathEntitled, type Owner, type OwnerPortalStatus, type OwnerWaitingRoomHistoryRow } from '@sincvete/shared';
 import { OwnerPortalCard } from '@/components/owners/owner-portal-card';
+import { OwnerWaitingRoomHistory } from '@/components/owners/owner-waiting-room-history';
 
 interface OwnerDetailProps {
   owner: Owner;
@@ -16,6 +17,8 @@ interface OwnerDetailProps {
   canSendWhatsApp?: boolean;
   portalEnabled?: boolean;
   portalStatus: OwnerPortalStatus | null;
+  entitledHrefs?: string[] | null;
+  waitingRoomHistory?: OwnerWaitingRoomHistoryRow[];
 }
 
 export function OwnerDetail({
@@ -24,8 +27,12 @@ export function OwnerDetail({
   canSendWhatsApp = false,
   portalEnabled = true,
   portalStatus,
+  entitledHrefs = null,
+  waitingRoomHistory = [],
 }: OwnerDetailProps) {
   const router = useRouter();
+  const entitled = (href: string) => isClinicPathEntitled(href, entitledHrefs);
+  const queueHref = `/sala-espera?q=${encodeURIComponent(owner.full_name)}`;
 
   const handleDelete = async () => {
     if (!confirm('¿Eliminar este propietario? Esta acción no se puede deshacer.')) return;
@@ -50,6 +57,14 @@ export function OwnerDetail({
               <Link href={buildWhatsAppComposePath({ ownerId: owner.id })}>
                 <MessageCircle className="mr-2 h-4 w-4" />
                 WhatsApp
+              </Link>
+            </Button>
+          )}
+          {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={queueHref}>
+                <Hourglass className="mr-2 h-4 w-4" />
+                Sala de espera
               </Link>
             </Button>
           )}
@@ -102,6 +117,10 @@ export function OwnerDetail({
           )}
         </CardContent>
       </Card>
+
+      {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
+        <OwnerWaitingRoomHistory history={waitingRoomHistory} ownerName={owner.full_name} />
+      )}
 
       <OwnerPortalCard
         ownerId={owner.id}

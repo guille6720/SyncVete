@@ -1,9 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Hourglass } from 'lucide-react';
 import { getOwnerPortalWaitingRoom } from '@/actions/portal';
+import { usePortalWaitingRoomLive } from '@/hooks/use-portal-waiting-room-live';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -15,6 +16,8 @@ import {
   estimatePortalWaitingMinutes,
   formatAppointmentTime,
   formatPortalWaitingEta,
+  formatWaitMinutes,
+  minutesBetween,
   type PortalWaitingRoomRow,
 } from '@sincvete/shared';
 
@@ -30,10 +33,16 @@ export function PortalWaitingRoomBoard({
   compact = false,
 }: PortalWaitingRoomBoardProps) {
   const [entries, setEntries] = useState(initialEntries);
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
     setEntries(initialEntries);
   }, [initialEntries]);
+
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -44,15 +53,23 @@ export function PortalWaitingRoomBoard({
     }
   }, [today]);
 
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      void refresh();
-    }, 12_000);
-    return () => window.clearInterval(id);
-  }, [refresh]);
+  const active = useMemo(
+    () => entries.filter((row) => row.waiting_room_status !== 'completed'),
+    [entries]
+  );
+  const completed = useMemo(
+    () => entries.filter((row) => row.waiting_room_status === 'completed'),
+    [entries]
+  );
+  const hasActiveNonCompleted = active.length > 0;
 
-  const active = entries.filter((row) => row.waiting_room_status !== 'completed');
-  const completed = entries.filter((row) => row.waiting_room_status === 'completed');
+  usePortalWaitingRoomLive(
+    () => {
+      void refresh();
+    },
+    true,
+    compact && hasActiveNonCompleted ? 10_000 : 30_000
+  );
 
   if (compact) {
     if (active.length === 0) return null;
@@ -71,7 +88,7 @@ export function PortalWaitingRoomBoard({
         </CardHeader>
         <CardContent className="space-y-3">
           {active.slice(0, 3).map((row) => (
-            <PortalWaitingRoomCard key={row.waiting_room_entry_id} row={row} />
+            <PortalWaitingRoomCard key={row.waiting_room_entry_id} row={row} now={now} />
           ))}
         </CardContent>
       </Card>
@@ -89,7 +106,7 @@ export function PortalWaitingRoomBoard({
       ) : (
         <div className="space-y-3">
           {active.map((row) => (
-            <PortalWaitingRoomCard key={row.waiting_room_entry_id} row={row} emphasize />
+            <PortalWaitingRoomCard key={row.waiting_room_entry_id} row={row} emphasize now={now} />
           ))}
         </div>
       )}
@@ -98,7 +115,7 @@ export function PortalWaitingRoomBoard({
         <section className="space-y-2">
           <h3 className="text-sm font-medium text-muted-foreground">Completados hoy</h3>
           {completed.map((row) => (
-            <PortalWaitingRoomCard key={row.waiting_room_entry_id} row={row} />
+            <PortalWaitingRoomCard key={row.waiting_room_entry_id} row={row} now={now} />
           ))}
         </section>
       )}
@@ -109,26 +126,38 @@ export function PortalWaitingRoomBoard({
 function PortalWaitingRoomCard({
   row,
   emphasize = false,
+  now,
 }: {
   row: PortalWaitingRoomRow;
   emphasize?: boolean;
+  now: Date;
 }) {
   const called = row.waiting_room_status === 'called';
+  const paymentPending = row.waiting_room_status === 'payment_pending';
+  const inConsultation = row.waiting_room_status === 'in_consultation';
+  const waiting = row.waiting_room_status === 'waiting';
   const message = PORTAL_WAITING_ROOM_STATUS_MESSAGES[row.waiting_room_status];
   const etaMinutes =
-    row.waiting_room_status === 'waiting'
-      ? estimatePortalWaitingMinutes(row.ahead_count)
+    waiting
+      ? estimatePortalWaitingMinutes(row.ahead_count, {
+          minutesPerPatient: row.minutes_per_patient,
+        })
       : null;
   const etaLabel = formatPortalWaitingEta(etaMinutes);
+  const elapsedWait = waiting ? minutesBetween(row.checked_in_at, now) : null;
 
   return (
     <div
       className={`rounded-lg border p-4 ${
         called
           ? 'border-emerald-400 bg-emerald-50 shadow-sm dark:border-emerald-700 dark:bg-emerald-950/40'
-          : emphasize
-            ? 'bg-card'
-            : ''
+          : paymentPending
+            ? 'border-amber-400 bg-amber-50 shadow-sm dark:border-amber-700 dark:bg-amber-950/40'
+            : inConsultation
+              ? 'border-teal-400 bg-teal-50 shadow-sm dark:border-teal-800 dark:bg-teal-950/40'
+              : emphasize
+                ? 'bg-card'
+                : ''
       }`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -140,22 +169,40 @@ function PortalWaitingRoomCard({
             {APPOINTMENT_TYPE_LABELS[row.appointment_type]} · turno{' '}
             {formatAppointmentTime(row.appointment_starts_at)}
           </p>
-          <p className={`mt-2 text-sm ${called ? 'font-semibold text-emerald-800 dark:text-emerald-200' : ''}`}>
+          <p
+            className={`mt-2 text-sm ${
+              called
+                ? 'font-semibold text-emerald-800 dark:text-emerald-200'
+                : paymentPending
+                  ? 'font-semibold text-amber-900 dark:text-amber-100'
+                  : inConsultation
+                    ? 'font-semibold text-teal-900 dark:text-teal-100'
+                    : ''
+            }`}
+          >
             {message}
             {called && row.room ? ` · Consultorio ${row.room}` : ''}
+            {inConsultation && row.room ? ` · ${row.room}` : ''}
           </p>
-          {row.waiting_room_status === 'waiting' && row.ahead_count > 0 && (
+          {waiting && row.ahead_count > 0 && (
             <p className="mt-1 text-sm text-muted-foreground">
               {row.ahead_count === 1
                 ? 'Hay 1 paciente delante'
                 : `Hay ${row.ahead_count} pacientes delante`}
               {etaLabel ? ` · ${etaLabel}` : ''}
+              {elapsedWait != null ? ` · llevas ${formatWaitMinutes(elapsedWait)} en espera` : ''}
             </p>
           )}
-          {row.waiting_room_status === 'waiting' && row.ahead_count === 0 && (
+          {waiting && row.ahead_count === 0 && (
             <p className="mt-1 text-sm text-muted-foreground">
               Sos el próximo en la cola
               {etaLabel ? ` · ${etaLabel}` : ''}
+              {elapsedWait != null ? ` · llevas ${formatWaitMinutes(elapsedWait)} en espera` : ''}
+            </p>
+          )}
+          {paymentPending && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              Acercate a recepción cuando puedas
             </p>
           )}
         </div>

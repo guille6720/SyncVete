@@ -6,6 +6,7 @@ export const WHATSAPP_TEMPLATES = [
   'lab_listo',
   'portal_invite',
   'sala_espera_llamado',
+  'sala_espera_pago',
   'mensaje_libre',
 ] as const;
 
@@ -19,6 +20,7 @@ export const WHATSAPP_TEMPLATE_LABELS: Record<WhatsAppTemplateKey, string> = {
   lab_listo: 'Resultados de laboratorio',
   portal_invite: 'Invitación al portal',
   sala_espera_llamado: 'Sala de espera · llamado',
+  sala_espera_pago: 'Sala de espera · pago en recepción',
   mensaje_libre: 'Mensaje libre',
 };
 
@@ -37,6 +39,8 @@ export const WHATSAPP_TEMPLATE_BODIES: Record<WhatsAppTemplateKey, string> = {
     'Hola {owner}, en {clinic} podés ver turnos, vacunas y facturas de {patient} desde el portal del tutor. Pedinos el enlace de acceso.',
   sala_espera_llamado:
     'Hola {owner}, ¡ya estamos llamando a {patient} en {clinic}{room}! Acercate por favor.',
+  sala_espera_pago:
+    'Hola {owner}, la atención de {patient} en {clinic} ya está lista. Por favor pasá por recepción para el pago. ¡Gracias!',
   mensaje_libre: 'Hola {owner}, te escribimos desde {clinic}.',
 };
 

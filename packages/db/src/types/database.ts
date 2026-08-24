@@ -5655,6 +5655,36 @@ export interface Database {
         };
         Returns: Json;
       };
+      get_waiting_room_report: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_branch_id?: string | null;
+        };
+        Returns: Json;
+      };
+      list_waiting_room_report_entries: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_branch_id?: string | null;
+        };
+        Returns: {
+          entry_id: string;
+          checked_in_at: string;
+          patient_name: string;
+          owner_full_name: string;
+          assigned_user_name: string | null;
+          appointment_starts_at: string;
+          status: string;
+          room: string | null;
+          called_at: string | null;
+          completed_at: string | null;
+          removed: boolean;
+          minutes_to_call: number | null;
+          minutes_dwell: number | null;
+        }[];
+      };
       is_clinic_staff: {
         Args: Record<string, never>;
         Returns: boolean;
@@ -6278,6 +6308,47 @@ export interface Database {
           queue_position: number | null;
           priority: number;
           room: string | null;
+          internal_notes: string | null;
+        }[];
+      };
+      list_patient_waiting_room_history: {
+        Args: {
+          p_patient_id: string;
+          p_limit?: number;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          checked_in_at: string;
+          waiting_room_status: string;
+          called_at: string | null;
+          completed_at: string | null;
+          removed: boolean;
+          room: string | null;
+          appointment_starts_at: string;
+          minutes_to_call: number | null;
+          minutes_dwell: number | null;
+        }[];
+      };
+      list_owner_waiting_room_history: {
+        Args: {
+          p_owner_id: string;
+          p_limit?: number;
+        };
+        Returns: {
+          waiting_room_entry_id: string;
+          appointment_id: string;
+          patient_id: string;
+          patient_name: string;
+          checked_in_at: string;
+          waiting_room_status: string;
+          called_at: string | null;
+          completed_at: string | null;
+          removed: boolean;
+          room: string | null;
+          appointment_starts_at: string;
+          minutes_to_call: number | null;
+          minutes_dwell: number | null;
         }[];
       };
       update_waiting_room_status: {
@@ -6285,6 +6356,13 @@ export interface Database {
           p_entry_id: string;
           p_new_status: WaitingRoomStatus;
           p_room?: string | null;
+        };
+        Returns: Json;
+      };
+      update_waiting_room_notes: {
+        Args: {
+          p_entry_id: string;
+          p_notes?: string | null;
         };
         Returns: Json;
       };
@@ -6331,11 +6409,18 @@ export interface Database {
           priority: number;
           room: string | null;
           ahead_count: number;
+          minutes_per_patient: number;
         }[];
       };
       create_appointment_check_in_token: {
         Args: {
           p_appointment_id: string;
+        };
+        Returns: Json;
+      };
+      get_public_check_in_status: {
+        Args: {
+          p_token: string;
         };
         Returns: Json;
       };

@@ -243,6 +243,11 @@ function parsePortalWaitingRoomRow(raw: unknown): PortalWaitingRoomRow | null {
     priority: num(data.priority),
     room: strOrNull(data.room),
     ahead_count: Math.max(0, num(data.ahead_count)),
+    minutes_per_patient: (() => {
+      const value = numOrNull(data.minutes_per_patient);
+      if (value == null || value <= 0) return null;
+      return Math.min(120, Math.round(value));
+    })(),
   };
 }
 

@@ -11,10 +11,13 @@ import {
 } from '@/actions/waiting-room';
 import { listAppointments } from '@/actions/appointments';
 import { Button } from '@/components/ui/button';
+import { useWaitingRoomLive } from '@/hooks/use-waiting-room-live';
+import { WaitingRoomBranchFilter } from '@/components/waiting-room/waiting-room-branch-filter';
 import {
   APP_NAME,
   APPOINTMENT_TYPE_LABELS,
   SPECIES_EMOJI,
+  filterAppointmentsByWaitingRoomBranch,
   formatAppointmentTime,
   formatDateParam,
   getWeekStartDate,
@@ -26,6 +29,10 @@ interface WaitingRoomKioskProps {
   clinicName: string;
   branchName: string | null;
   today: string;
+  listBranchId?: string | 'all';
+  branchOptions?: Array<{ id: string; name: string }>;
+  sessionBranchId?: string | null;
+  initialBranchFilter?: string | 'all' | null;
 }
 
 type KioskView =
@@ -44,6 +51,10 @@ export function WaitingRoomKiosk({
   clinicName,
   branchName,
   today,
+  listBranchId,
+  branchOptions = [],
+  sessionBranchId = null,
+  initialBranchFilter,
 }: WaitingRoomKioskProps) {
   const [candidates, setCandidates] = useState(initialCandidates);
   const [query, setQuery] = useState('');
@@ -56,11 +67,15 @@ export function WaitingRoomKiosk({
     try {
       const weekStart = getWeekStartDate(today);
       const [entries, weekAppointments] = await Promise.all([
-        listWaitingRoom({ date: today }),
+        listWaitingRoom({ date: today, branchId: listBranchId }),
         listAppointments({ weekStart }),
       ]);
       const checkedInIds = new Set(entries.map((row) => row.appointment_id));
-      const next = weekAppointments.filter((appointment) => {
+      const branchAppointments = filterAppointmentsByWaitingRoomBranch(
+        weekAppointments,
+        listBranchId
+      );
+      const next = branchAppointments.filter((appointment) => {
         if (checkedInIds.has(appointment.id)) return false;
         const day = formatDateParam(new Date(appointment.starts_at));
         if (day !== today) return false;
@@ -74,7 +89,11 @@ export function WaitingRoomKiosk({
     } catch (err) {
       console.error('[waiting-room kiosk] refresh failed', err);
     }
-  }, [today]);
+  }, [listBranchId, today]);
+
+  useWaitingRoomLive(() => {
+    void refresh();
+  });
 
   useEffect(() => {
     setCandidates(initialCandidates);
@@ -190,6 +209,17 @@ export function WaitingRoomKiosk({
           </Link>
         </div>
       </header>
+
+      {branchOptions.length > 1 && (
+        <div className="flex justify-center border-b border-white/10 px-6 py-3 md:px-10">
+          <WaitingRoomBranchFilter
+            branchOptions={branchOptions}
+            sessionBranchId={sessionBranchId}
+            branchFilter={initialBranchFilter}
+            variant="dark"
+          />
+        </div>
+      )}
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 p-6 md:p-10">
         {view.kind === 'success' ? (

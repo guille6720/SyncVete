@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   DndContext,
   closestCenter,
@@ -21,33 +21,47 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowUp, CalendarPlus, GripVertical, MessageCircle } from 'lucide-react';
+import { ArrowUp, CalendarPlus, GripVertical, MessageCircle, Search, StickyNote, X } from 'lucide-react';
 import {
   checkInAppointment,
   listWaitingRoom,
   removeWaitingRoomEntry,
   reorderWaitingRoom,
   reorderWaitingRoomQueue,
+  updateWaitingRoomNotes,
   updateWaitingRoomStatus,
 } from '@/actions/waiting-room';
 import { startConsultationFromAppointment } from '@/actions/consultations';
 import { WaitingRoomCheckInQrButton } from '@/components/waiting-room/waiting-room-check-in-qr-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
 import { useWaitingRoomLive } from '@/hooks/use-waiting-room-live';
+import { WaitingRoomStaffSoundToggle } from '@/components/waiting-room/waiting-room-staff-sound-toggle';
+import { playWaitingRoomStaffChimesOnRefresh } from '@/lib/waiting-room-chime';
 import {
   APPOINTMENT_TYPE_LABELS,
   SPECIES_EMOJI,
   WAITING_ROOM_NEXT_ACTION_LABELS,
   WAITING_ROOM_STATUS_LABELS,
   WAITING_ROOM_STATUS_VARIANT,
+  WAITING_ROOM_STATUSES,
   WAITING_ROOM_TRANSITIONS,
   applyWaitingRoomQueueOrder,
+  appendWaitingRoomBoardFilterParams,
   buildWhatsAppComposePath,
+  collectWaitingRoomAssignedOptions,
+  filterWaitingRoomCheckInCandidates,
+  filterWaitingRoomEntries,
   formatAppointmentTime,
+  formatWaitMinutes,
+  minutesBetween,
   sortWaitingRoomQueue,
   type AppointmentListRow,
+  type WaitingRoomBoardFilters,
+  type WaitingRoomBoardStatusFilter,
   type WaitingRoomListRow,
   type WaitingRoomStatus,
 } from '@sincvete/shared';
@@ -58,9 +72,17 @@ interface WaitingRoomBoardProps {
   canWrite: boolean;
   canSendWhatsApp?: boolean;
   canStartConsultation?: boolean;
+  whatsAppAutoEnabled?: boolean;
+  boardSoundEnabled?: boolean;
   /** Selected day (YYYY-MM-DD). Write actions only apply when it is today. */
   todayLabel: string;
   isToday?: boolean;
+  roomPresets?: string[];
+  initialFilters?: WaitingRoomBoardFilters;
+  syncFiltersToUrl?: boolean;
+  branchOptions?: Array<{ id: string; name: string }>;
+  sessionBranchId?: string | null;
+  listBranchId?: string | 'all';
 }
 
 export function WaitingRoomBoard({
@@ -69,40 +91,114 @@ export function WaitingRoomBoard({
   canWrite,
   canSendWhatsApp = false,
   canStartConsultation = false,
+  whatsAppAutoEnabled = false,
+  boardSoundEnabled = false,
   todayLabel,
   isToday = true,
+  roomPresets = [],
+  initialFilters,
+  syncFiltersToUrl = false,
+  branchOptions = [],
+  sessionBranchId = null,
+  listBranchId,
 }: WaitingRoomBoardProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [entries, setEntries] = useState(() => sortWaitingRoomQueue(initialEntries));
   const [reordering, setReordering] = useState(false);
+  const [now, setNow] = useState(() => new Date());
+  const [filters, setFilters] = useState<WaitingRoomBoardFilters>(
+    initialFilters ?? {
+      query: '',
+      status: 'all',
+      assignedUserId: null,
+    }
+  );
   const canMutate = canWrite && isToday;
 
   useEffect(() => {
     setEntries(sortWaitingRoomQueue(initialEntries));
   }, [initialEntries]);
 
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+
   const refresh = useCallback(async () => {
     try {
-      const next = await listWaitingRoom({ date: todayLabel });
-      setEntries(sortWaitingRoomQueue(next));
+      const next = await listWaitingRoom({
+        date: todayLabel,
+        branchId: listBranchId,
+      });
+      const sorted = sortWaitingRoomQueue(next);
+      setEntries((prev) => {
+        if (isToday) {
+          playWaitingRoomStaffChimesOnRefresh(prev, sorted, { enabled: boardSoundEnabled });
+        }
+        return sorted;
+      });
       router.refresh();
     } catch (error) {
       console.error('[waiting-room board] refresh failed', error);
     }
-  }, [router, todayLabel]);
+  }, [boardSoundEnabled, isToday, listBranchId, router, todayLabel]);
 
   useWaitingRoomLive(() => {
     if (reordering) return;
     void refresh();
   });
 
+  const assignedOptions = useMemo(
+    () => collectWaitingRoomAssignedOptions(entries, checkInCandidates),
+    [checkInCandidates, entries]
+  );
+
+  const filteredEntries = useMemo(
+    () => filterWaitingRoomEntries(entries, filters),
+    [entries, filters]
+  );
+
+  const filteredCheckInCandidates = useMemo(
+    () =>
+      filterWaitingRoomCheckInCandidates(checkInCandidates, {
+        query: filters.query,
+        assignedUserId: filters.assignedUserId,
+      }),
+    [checkInCandidates, filters.assignedUserId, filters.query]
+  );
+
+  const hasActiveFilters =
+    Boolean(filters.query?.trim()) ||
+    (filters.status ?? 'all') !== 'all' ||
+    Boolean(filters.assignedUserId);
+
+  const updateFilters = useCallback(
+    (next: WaitingRoomBoardFilters) => {
+      const branchChanged = next.branchId !== filters.branchId;
+      setFilters(next);
+      if (!syncFiltersToUrl) return;
+      const params = appendWaitingRoomBoardFilterParams(
+        new URLSearchParams(searchParams.toString()),
+        next
+      );
+      const query = params.toString();
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+      if (branchChanged) {
+        router.refresh();
+      }
+    },
+    [filters.branchId, pathname, router, searchParams, syncFiltersToUrl]
+  );
+
   const active = useMemo(
-    () => entries.filter((row) => row.waiting_room_status !== 'completed'),
-    [entries]
+    () => filteredEntries.filter((row) => row.waiting_room_status !== 'completed'),
+    [filteredEntries]
   );
   const completed = useMemo(
-    () => entries.filter((row) => row.waiting_room_status === 'completed'),
-    [entries]
+    () => filteredEntries.filter((row) => row.waiting_room_status === 'completed'),
+    [filteredEntries]
   );
   const sortableIds = useMemo(
     () => active.map((row) => row.waiting_room_entry_id),
@@ -150,15 +246,44 @@ export function WaitingRoomBoard({
 
   return (
     <div className="space-y-8">
+      {boardSoundEnabled && isToday && (
+        <div className="flex justify-end">
+          <WaitingRoomStaffSoundToggle enabled={boardSoundEnabled} />
+        </div>
+      )}
+
+      <WaitingRoomBoardFiltersBar
+        filters={filters}
+        assignedOptions={assignedOptions}
+        branchOptions={branchOptions}
+        sessionBranchId={sessionBranchId}
+        onChange={updateFilters}
+        onClear={() =>
+          updateFilters({
+            query: '',
+            status: 'all',
+            assignedUserId: null,
+            branchId: undefined,
+          })
+        }
+        hasActiveFilters={hasActiveFilters}
+      />
+
       <section className="space-y-4">
         <div>
           <h2 className="text-lg font-semibold">Cola activa</h2>
           <p className="text-sm text-muted-foreground">
             {todayLabel} · {active.length} en sala
+            {hasActiveFilters && entries.length !== filteredEntries.length
+              ? ` · ${filteredEntries.length} coinciden con el filtro`
+              : ''}
             {completed.length > 0
               ? ` · ${completed.length} completado${completed.length === 1 ? '' : 's'}`
               : ''}
-            {canMutate && active.length > 1 ? ' · arrastrá para reordenar' : ''}
+            {canMutate && active.length > 1 && !hasActiveFilters ? ' · arrastrá para reordenar' : ''}
+            {canMutate && active.length > 1 && hasActiveFilters
+              ? ' · limpiá filtros para reordenar'
+              : ''}
             {!isToday ? ' · solo lectura (día pasado o futuro)' : ''}
             {reordering ? ' · guardando…' : ''}
           </p>
@@ -166,14 +291,18 @@ export function WaitingRoomBoard({
 
         {active.length === 0 ? (
           <div className="rounded-lg border border-dashed p-10 text-center">
-            <p className="text-muted-foreground">Nadie en sala de espera por ahora.</p>
-            {canMutate && checkInCandidates.length > 0 && (
+            <p className="text-muted-foreground">
+              {hasActiveFilters
+                ? 'Ningún paciente coincide con los filtros.'
+                : 'Nadie en sala de espera por ahora.'}
+            </p>
+            {canMutate && !hasActiveFilters && checkInCandidates.length > 0 && (
               <p className="mt-2 text-sm text-muted-foreground">
                 Podés hacer check-in de las citas de hoy más abajo.
               </p>
             )}
           </div>
-        ) : canMutate ? (
+        ) : canMutate && !hasActiveFilters ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
             <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
@@ -183,9 +312,12 @@ export function WaitingRoomBoard({
                     entry={entry}
                     canWrite={canWrite}
                     canSendWhatsApp={canSendWhatsApp}
+                    whatsAppAutoEnabled={whatsAppAutoEnabled}
                     canStartConsultation={canStartConsultation}
                     isToday={isToday}
+                    roomPresets={roomPresets}
                     sortable
+                    now={now}
                   />
                 ))}
               </div>
@@ -199,24 +331,30 @@ export function WaitingRoomBoard({
                 entry={entry}
                 canWrite={canWrite}
                 canSendWhatsApp={canSendWhatsApp}
+                whatsAppAutoEnabled={whatsAppAutoEnabled}
                 canStartConsultation={false}
                 isToday={isToday}
+                roomPresets={roomPresets}
+                now={now}
               />
             ))}
           </div>
         )}
       </section>
 
-      {canMutate && checkInCandidates.length > 0 && (
+      {canMutate && filteredCheckInCandidates.length > 0 && (
         <section className="space-y-4">
           <div>
             <h2 className="text-lg font-semibold">Check-in pendiente</h2>
             <p className="text-sm text-muted-foreground">
               Citas de hoy que todavía no ingresaron a la cola
+              {filteredCheckInCandidates.length !== checkInCandidates.length
+                ? ` · ${filteredCheckInCandidates.length} visibles`
+                : ''}
             </p>
           </div>
           <div className="space-y-2">
-            {checkInCandidates.map((appointment) => (
+            {filteredCheckInCandidates.map((appointment) => (
               <CheckInCandidateRow key={appointment.id} appointment={appointment} />
             ))}
           </div>
@@ -236,6 +374,7 @@ export function WaitingRoomBoard({
               canSendWhatsApp={canSendWhatsApp}
               canStartConsultation={false}
               isToday={false}
+              now={now}
             />
           ))}
         </section>
@@ -244,13 +383,16 @@ export function WaitingRoomBoard({
   );
 }
 
-function waitingRoomWhatsAppHref(entry: WaitingRoomListRow, room?: string | null): string {
+function waitingRoomWhatsAppHref(
+  entry: WaitingRoomListRow,
+  options: { room?: string | null; template?: 'sala_espera_llamado' | 'sala_espera_pago' } = {}
+): string {
   return buildWhatsAppComposePath({
     ownerId: entry.owner_id,
     patientId: entry.patient_id,
     appointmentId: entry.appointment_id,
-    template: 'sala_espera_llamado',
-    room: room?.trim() || entry.room || undefined,
+    template: options.template ?? 'sala_espera_llamado',
+    room: options.room?.trim() || entry.room || undefined,
   });
 }
 
@@ -258,16 +400,22 @@ function SortableWaitingRoomRow({
   entry,
   canWrite,
   canSendWhatsApp,
+  whatsAppAutoEnabled,
   canStartConsultation,
   isToday,
+  roomPresets,
   sortable,
+  now,
 }: {
   entry: WaitingRoomListRow;
   canWrite: boolean;
   canSendWhatsApp: boolean;
+  whatsAppAutoEnabled: boolean;
   canStartConsultation: boolean;
   isToday: boolean;
+  roomPresets: string[];
   sortable: boolean;
+  now: Date;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: entry.waiting_room_entry_id,
@@ -286,8 +434,11 @@ function SortableWaitingRoomRow({
         entry={entry}
         canWrite={canWrite}
         canSendWhatsApp={canSendWhatsApp}
+        whatsAppAutoEnabled={whatsAppAutoEnabled}
         canStartConsultation={canStartConsultation}
         isToday={isToday}
+        roomPresets={roomPresets}
+        now={now}
         dragHandle={
           sortable ? (
             <button
@@ -310,21 +461,29 @@ function WaitingRoomRow({
   entry,
   canWrite,
   canSendWhatsApp,
+  whatsAppAutoEnabled = false,
   canStartConsultation,
   isToday,
+  roomPresets = [],
   dragHandle = null,
+  now,
 }: {
   entry: WaitingRoomListRow;
   canWrite: boolean;
   canSendWhatsApp: boolean;
+  whatsAppAutoEnabled?: boolean;
   canStartConsultation: boolean;
   isToday: boolean;
+  roomPresets?: string[];
   dragHandle?: ReactNode;
+  now: Date;
 }) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
   const [calling, setCalling] = useState(false);
+  const [editingNotes, setEditingNotes] = useState(false);
   const [roomDraft, setRoomDraft] = useState(entry.room ?? '');
+  const [notesDraft, setNotesDraft] = useState(entry.internal_notes ?? '');
   const nextStatus = WAITING_ROOM_TRANSITIONS[entry.waiting_room_status];
   const nextLabel =
     nextStatus && entry.waiting_room_status !== 'completed'
@@ -332,8 +491,24 @@ function WaitingRoomRow({
           entry.waiting_room_status as Exclude<WaitingRoomStatus, 'completed'>
         ]
       : null;
-  const showWhatsApp = canSendWhatsApp && entry.waiting_room_status === 'called';
+  const showWhatsApp =
+    canSendWhatsApp &&
+    (entry.waiting_room_status === 'called' || entry.waiting_room_status === 'payment_pending');
+  const whatsappTemplate =
+    entry.waiting_room_status === 'payment_pending' ? 'sala_espera_pago' : 'sala_espera_llamado';
   const actionsEnabled = canWrite && isToday && entry.waiting_room_status !== 'completed';
+  const noteText = entry.internal_notes?.trim() || '';
+  const showLiveWait =
+    isToday &&
+    entry.waiting_room_status !== 'completed' &&
+    Boolean(entry.checked_in_at);
+  const liveWaitMinutes = showLiveWait
+    ? minutesBetween(entry.checked_in_at, now)
+    : null;
+
+  useEffect(() => {
+    setNotesDraft(entry.internal_notes ?? '');
+  }, [entry.internal_notes]);
 
   const commitAdvance = (room?: string) => {
     if (!nextStatus) return;
@@ -351,9 +526,43 @@ function WaitingRoomRow({
       setCalling(false);
 
       if (nextStatus === 'called' && canSendWhatsApp) {
+        if (whatsAppAutoEnabled) {
+          router.push(
+            waitingRoomWhatsAppHref(entry, {
+              room: room ?? result.data?.room,
+              template: 'sala_espera_llamado',
+            })
+          );
+          return;
+        }
         const notify = window.confirm('¿Avisar al tutor por WhatsApp?');
         if (notify) {
-          router.push(waitingRoomWhatsAppHref(entry, room ?? result.data?.room));
+          router.push(
+            waitingRoomWhatsAppHref(entry, {
+              room: room ?? result.data?.room,
+              template: 'sala_espera_llamado',
+            })
+          );
+          return;
+        }
+      }
+
+      if (nextStatus === 'payment_pending' && canSendWhatsApp) {
+        if (whatsAppAutoEnabled) {
+          router.push(
+            waitingRoomWhatsAppHref(entry, {
+              template: 'sala_espera_pago',
+            })
+          );
+          return;
+        }
+        const notify = window.confirm('¿Avisar al tutor por WhatsApp para pasar por recepción?');
+        if (notify) {
+          router.push(
+            waitingRoomWhatsAppHref(entry, {
+              template: 'sala_espera_pago',
+            })
+          );
           return;
         }
       }
@@ -417,6 +626,21 @@ function WaitingRoomRow({
     });
   };
 
+  const saveNotes = () => {
+    void runPending(async () => {
+      const result = await updateWaitingRoomNotes({
+        entryId: entry.waiting_room_entry_id,
+        notes: notesDraft,
+      });
+      if (!result.success) {
+        alert(result.error ?? 'No se pudo guardar la nota');
+        return;
+      }
+      setEditingNotes(false);
+      router.refresh();
+    });
+  };
+
   return (
     <div className="space-y-3 rounded-lg border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -441,7 +665,19 @@ function WaitingRoomRow({
             </p>
             <p className="text-xs text-muted-foreground">
               Check-in {formatAppointmentTime(entry.checked_in_at)}
+              {liveWaitMinutes != null ? (
+                <>
+                  {' '}
+                  · espera {formatWaitMinutes(liveWaitMinutes)}
+                </>
+              ) : null}
             </p>
+            {noteText && !editingNotes && (
+              <p className="mt-2 rounded-md bg-amber-50 px-2 py-1 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                <StickyNote className="mr-1 inline h-3 w-3" />
+                {noteText}
+              </p>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -450,7 +686,7 @@ function WaitingRoomRow({
           </Button>
           {showWhatsApp && (
             <Button variant="outline" size="sm" asChild>
-              <Link href={waitingRoomWhatsAppHref(entry)}>
+              <Link href={waitingRoomWhatsAppHref(entry, { template: whatsappTemplate })}>
                 <MessageCircle className="h-4 w-4" />
                 WhatsApp
               </Link>
@@ -458,6 +694,18 @@ function WaitingRoomRow({
           )}
           {actionsEnabled && (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={pending}
+                onClick={() => {
+                  setEditingNotes((open) => !open);
+                  setCalling(false);
+                }}
+              >
+                <StickyNote className="h-4 w-4" />
+                {noteText ? 'Editar nota' : 'Nota'}
+              </Button>
               <Button variant="outline" size="sm" isPending={pending} onClick={bumpPriority}>
                 <ArrowUp className="h-4 w-4" />
                 Priorizar
@@ -488,35 +736,94 @@ function WaitingRoomRow({
         </div>
       </div>
 
-      {calling && actionsEnabled && (
-        <div className="flex flex-wrap items-end gap-2 rounded-lg border border-dashed bg-muted/30 p-3">
-          <label className="min-w-[12rem] flex-1 space-y-1 text-sm">
-            <span className="text-muted-foreground">Consultorio / box (opcional)</span>
-            <input
-              value={roomDraft}
-              onChange={(event) => setRoomDraft(event.target.value)}
-              placeholder="Ej. 1, Box A…"
-              className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      {editingNotes && actionsEnabled && (
+        <div className="space-y-2 rounded-lg border border-dashed bg-muted/30 p-3">
+          <label className="block space-y-1 text-sm">
+            <span className="text-muted-foreground">Nota interna (solo staff)</span>
+            <textarea
+              value={notesDraft}
+              onChange={(event) => setNotesDraft(event.target.value)}
+              maxLength={500}
+              rows={3}
+              placeholder="Alergia, trae radiografías, preferencia de box…"
+              className="flex min-h-[4.5rem] w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
               autoFocus
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') {
-                  event.preventDefault();
-                  commitAdvance(roomDraft.trim() || undefined);
-                }
-                if (event.key === 'Escape') setCalling(false);
-              }}
             />
           </label>
-          <Button
-            size="sm"
-            isPending={pending}
-            onClick={() => commitAdvance(roomDraft.trim() || undefined)}
-          >
-            {pending ? 'Llamando…' : 'Confirmar llamado'}
-          </Button>
-          <Button size="sm" variant="ghost" disabled={pending} onClick={() => setCalling(false)}>
-            Cancelar
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" isPending={pending} onClick={saveNotes}>
+              {pending ? 'Guardando…' : 'Guardar nota'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                setNotesDraft(entry.internal_notes ?? '');
+                setEditingNotes(false);
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {calling && actionsEnabled && (
+        <div className="space-y-2 rounded-lg border border-dashed bg-muted/30 p-3">
+          {roomPresets.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {roomPresets.map((room) => (
+                <Button
+                  key={room}
+                  type="button"
+                  size="sm"
+                  variant={roomDraft === room ? 'default' : 'outline'}
+                  disabled={pending}
+                  onClick={() => setRoomDraft(room)}
+                >
+                  {room}
+                </Button>
+              ))}
+            </div>
+          )}
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="min-w-[12rem] flex-1 space-y-1 text-sm">
+              <span className="text-muted-foreground">Consultorio / box (opcional)</span>
+              <input
+                value={roomDraft}
+                onChange={(event) => setRoomDraft(event.target.value)}
+                placeholder={roomPresets[0] ? `Ej. ${roomPresets[0]}` : 'Ej. 1, Box A…'}
+                list={`waiting-room-room-presets-${entry.waiting_room_entry_id}`}
+                className="flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                autoFocus
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault();
+                    commitAdvance(roomDraft.trim() || undefined);
+                  }
+                  if (event.key === 'Escape') setCalling(false);
+                }}
+              />
+              {roomPresets.length > 0 && (
+                <datalist id={`waiting-room-room-presets-${entry.waiting_room_entry_id}`}>
+                  {roomPresets.map((room) => (
+                    <option key={room} value={room} />
+                  ))}
+                </datalist>
+              )}
+            </label>
+            <Button
+              size="sm"
+              isPending={pending}
+              onClick={() => commitAdvance(roomDraft.trim() || undefined)}
+            >
+              {pending ? 'Llamando…' : 'Confirmar llamado'}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => setCalling(false)}>
+              Cancelar
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -562,6 +869,129 @@ function CheckInCandidateRow({ appointment }: { appointment: AppointmentListRow 
           {pending ? 'Ingresando...' : 'Check-in'}
         </Button>
       </div>
+    </div>
+  );
+}
+
+function WaitingRoomBoardFiltersBar({
+  filters,
+  assignedOptions,
+  branchOptions,
+  sessionBranchId,
+  onChange,
+  onClear,
+  hasActiveFilters,
+}: {
+  filters: WaitingRoomBoardFilters;
+  assignedOptions: Array<{ userId: string; name: string }>;
+  branchOptions: Array<{ id: string; name: string }>;
+  sessionBranchId: string | null;
+  onChange: (next: WaitingRoomBoardFilters) => void;
+  onClear: () => void;
+  hasActiveFilters: boolean;
+}) {
+  const branchValue =
+    filters.branchId === 'all'
+      ? 'all'
+      : filters.branchId ?? sessionBranchId ?? '';
+
+  return (
+    <div className="flex flex-col gap-3 rounded-xl border bg-card/60 p-4 sm:flex-row sm:flex-wrap sm:items-end">
+      <label className="flex min-w-[12rem] flex-1 flex-col gap-1.5">
+        <span className="text-xs font-medium text-muted-foreground">Buscar</span>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={filters.query ?? ''}
+            onChange={(event) => onChange({ ...filters, query: event.target.value })}
+            placeholder="Paciente o propietario"
+            className="pl-9"
+          />
+        </div>
+      </label>
+
+      <label className="flex w-full flex-col gap-1.5 sm:w-44">
+        <span className="text-xs font-medium text-muted-foreground">Estado</span>
+        <Select
+          value={filters.status ?? 'all'}
+          onChange={(event) =>
+            onChange({
+              ...filters,
+              status: event.target.value as WaitingRoomBoardStatusFilter,
+            })
+          }
+        >
+          <option value="all">Todos</option>
+          <option value="active">En flujo</option>
+          {WAITING_ROOM_STATUSES.map((status) => (
+            <option key={status} value={status}>
+              {WAITING_ROOM_STATUS_LABELS[status]}
+            </option>
+          ))}
+        </Select>
+      </label>
+
+      <label className="flex w-full flex-col gap-1.5 sm:w-48">
+        <span className="text-xs font-medium text-muted-foreground">Profesional</span>
+        <Select
+          value={filters.assignedUserId ?? ''}
+          onChange={(event) =>
+            onChange({
+              ...filters,
+              assignedUserId: event.target.value || null,
+            })
+          }
+        >
+          <option value="">Todos</option>
+          {assignedOptions.map((option) => (
+            <option key={option.userId} value={option.userId}>
+              {option.name}
+            </option>
+          ))}
+        </Select>
+      </label>
+
+      {branchOptions.length > 1 && (
+        <label className="flex w-full flex-col gap-1.5 sm:w-48">
+          <span className="text-xs font-medium text-muted-foreground">Sucursal</span>
+          <Select
+            value={branchValue}
+            onChange={(event) => {
+              const value = event.target.value;
+              onChange({
+                ...filters,
+                branchId:
+                  value === 'all'
+                    ? 'all'
+                    : value === sessionBranchId || value === ''
+                      ? undefined
+                      : value,
+              });
+            }}
+          >
+            {sessionBranchId && (
+              <option value={sessionBranchId}>
+                {branchOptions.find((b) => b.id === sessionBranchId)?.name ?? 'Mi sucursal'}
+              </option>
+            )}
+            <option value="all">Todas las sucursales</option>
+            {branchOptions
+              .filter((branch) => branch.id !== sessionBranchId)
+              .map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+          </Select>
+        </label>
+      )}
+
+      {hasActiveFilters && (
+        <Button type="button" variant="ghost" size="sm" onClick={onClear}>
+          <X className="h-4 w-4" />
+          Limpiar
+        </Button>
+      )}
     </div>
   );
 }

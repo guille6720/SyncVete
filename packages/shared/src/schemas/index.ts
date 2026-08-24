@@ -86,6 +86,26 @@ export const organizationSettingsSchema = z.object({
   phone: z.string().max(30).optional().or(z.literal('')),
   email: z.string().email('Email inválido').optional().or(z.literal('')),
   taxId: z.string().max(30).optional().or(z.literal('')),
+  waitingRoomRoomsText: z.string().max(800).optional().or(z.literal('')),
+  waitingRoomMinutesPerPatient: z
+    .union([
+      z.literal(''),
+      z.coerce
+        .number({ invalid_type_error: 'Minutos inválidos' })
+        .int('Minutos inválidos')
+        .min(1, 'Mínimo 1 minuto')
+        .max(120, 'Máximo 120 minutos'),
+    ])
+    .optional(),
+  waitingRoomPortalAlertsEnabled: z
+    .union([z.literal('on'), z.literal('true'), z.literal(''), z.undefined()])
+    .optional(),
+  waitingRoomWhatsAppAutoEnabled: z
+    .union([z.literal('on'), z.literal('true'), z.literal(''), z.undefined()])
+    .optional(),
+  waitingRoomBoardSoundEnabled: z
+    .union([z.literal('on'), z.literal('true'), z.literal(''), z.undefined()])
+    .optional(),
 });
 
 export const branchSchema = z.object({
@@ -918,6 +938,7 @@ export const whatsappComposeSchema = z.object({
     'lab_listo',
     'portal_invite',
     'sala_espera_llamado',
+    'sala_espera_pago',
     'mensaje_libre',
   ]),
   body: z
@@ -1129,7 +1150,7 @@ export const auditLogListSchema = paginationSchema
 export type AuditLogListInput = z.infer<typeof auditLogListSchema>;
 
 export const waitingRoomListSchema = z.object({
-  branchId: z.string().uuid().optional(),
+  branchId: z.union([z.string().uuid(), z.literal('all')]).optional(),
   date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida')
@@ -1193,6 +1214,16 @@ export const waitingRoomRemoveSchema = z.object({
   markAusente: z.boolean().optional().default(false),
 });
 
+export const waitingRoomNotesSchema = z.object({
+  entryId: z.string().uuid('Entrada inválida'),
+  notes: z
+    .string()
+    .max(500, 'Máximo 500 caracteres')
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v == null || v.trim() === '' ? null : v.trim())),
+});
+
 export type WaitingRoomListInput = z.infer<typeof waitingRoomListSchema>;
 export type WaitingRoomCheckInInput = z.infer<typeof waitingRoomCheckInSchema>;
 export type WaitingRoomUpdateStatusInput = z.infer<typeof waitingRoomUpdateStatusSchema>;
@@ -1201,3 +1232,4 @@ export type WaitingRoomCheckInTokenInput = z.infer<typeof waitingRoomCheckInToke
 export type WaitingRoomCheckInRedeemInput = z.infer<typeof waitingRoomCheckInRedeemSchema>;
 export type WaitingRoomReorderQueueInput = z.infer<typeof waitingRoomReorderQueueSchema>;
 export type WaitingRoomRemoveInput = z.infer<typeof waitingRoomRemoveSchema>;
+export type WaitingRoomNotesInput = z.infer<typeof waitingRoomNotesSchema>;

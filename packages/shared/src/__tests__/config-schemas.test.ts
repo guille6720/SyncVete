@@ -10,6 +10,8 @@ describe('organizationSettingsSchema', () => {
       phone: '',
       email: '',
       taxId: '',
+      waitingRoomRoomsText: 'Consultorio 1\nBox A',
+      waitingRoomMinutesPerPatient: '12',
     });
     expect(result.success).toBe(true);
   });
@@ -19,6 +21,16 @@ describe('organizationSettingsSchema', () => {
       name: 'Clínica',
       timezone: 'America/Argentina/Buenos_Aires',
       currency: 'EUR',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects invalid waiting-room minutes', () => {
+    const result = organizationSettingsSchema.safeParse({
+      name: 'Clínica',
+      timezone: 'America/Argentina/Buenos_Aires',
+      currency: 'ARS',
+      waitingRoomMinutesPerPatient: '999',
     });
     expect(result.success).toBe(false);
   });

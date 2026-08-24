@@ -9,21 +9,37 @@ import {
   waitingRoomListSchema,
   waitingRoomReorderQueueSchema,
   waitingRoomRemoveSchema,
+  waitingRoomNotesSchema,
   waitingRoomReorderSchema,
   waitingRoomUpdateStatusSchema,
   FEATURES,
   getPermissionsForRole,
   isFeatureKey,
   parsePortalWaitingRoomRows,
+  parsePatientWaitingRoomHistoryRows,
+  getPatientWaitingRoomActiveEntry,
+  parseOwnerWaitingRoomHistoryRows,
+  getOwnerWaitingRoomActiveEntries,
   parseWaitingRoomCheckInPreview,
   parseWaitingRoomCheckInTokenResult,
   parseOwnerPortalAlerts,
   applyWaitingRoomQueueOrder,
   buildWaitingRoomQueueOrder,
   buildWaitingRoomDashboard,
+  filterWaitingRoomCheckInCandidates,
+  filterWaitingRoomEntries,
+  parseWaitingRoomBoardFilters,
+  parsePublicCheckInStatus,
+  resolveWaitingRoomListBranchId,
+  appendWaitingRoomBoardFilterParams,
+  buildWaitingRoomSurfaceHref,
+  resolveWaitingRoomBranchLabel,
+  filterAppointmentsByWaitingRoomBranch,
   formatWaitMinutes,
+  mapWaitingRoomByAppointmentId,
   estimatePortalWaitingMinutes,
   formatPortalWaitingEta,
+  resolveWaitingRoomMinutesPerPatient,
   PORTAL_WAITING_ROOM_STATUS_MESSAGES,
 } from '../index';
 
@@ -123,6 +139,120 @@ describe('waiting room queue ordering', () => {
     expect(next.map((r) => r.queue_position)).toEqual([1, 2]);
     expect(next.every((r) => r.priority === 0)).toBe(true);
   });
+
+  it('maps appointment ids to waiting-room status', () => {
+    const map = mapWaitingRoomByAppointmentId([
+      {
+        appointment_id: 'a1',
+        waiting_room_status: 'waiting',
+      },
+      {
+        appointment_id: 'a2',
+        waiting_room_status: 'called',
+      },
+    ] as Parameters<typeof mapWaitingRoomByAppointmentId>[0]);
+    expect(map).toEqual({ a1: 'waiting', a2: 'called' });
+  });
+
+  it('filters board entries by query, status and assigned user', () => {
+    const rows = [
+      {
+        waiting_room_entry_id: '1',
+        appointment_id: 'a1',
+        patient_id: 'p1',
+        patient_name: 'Luna',
+        patient_species: 'Canino' as const,
+        owner_id: 'o1',
+        owner_full_name: 'Ana García',
+        assigned_user_id: 'u1',
+        assigned_user_name: 'Dr. A',
+        appointment_type: 'consulta' as const,
+        appointment_starts_at: '2026-08-24T11:00:00.000Z',
+        waiting_room_status: 'waiting' as const,
+        checked_in_at: '2026-08-24T10:00:00.000Z',
+        called_at: null,
+        consultation_started_at: null,
+        payment_pending_at: null,
+        completed_at: null,
+        queue_position: 1,
+        priority: 0,
+        room: null,
+        internal_notes: null,
+      },
+      {
+        waiting_room_entry_id: '2',
+        appointment_id: 'a2',
+        patient_id: 'p2',
+        patient_name: 'Michi',
+        patient_species: 'Felino' as const,
+        owner_id: 'o2',
+        owner_full_name: 'Bob',
+        assigned_user_id: 'u2',
+        assigned_user_name: 'Dr. B',
+        appointment_type: 'consulta' as const,
+        appointment_starts_at: '2026-08-24T12:00:00.000Z',
+        waiting_room_status: 'completed' as const,
+        checked_in_at: '2026-08-24T09:00:00.000Z',
+        called_at: '2026-08-24T09:05:00.000Z',
+        consultation_started_at: null,
+        payment_pending_at: null,
+        completed_at: '2026-08-24T10:00:00.000Z',
+        queue_position: null,
+        priority: 0,
+        room: null,
+        internal_notes: null,
+      },
+    ];
+
+    expect(filterWaitingRoomEntries(rows, { query: 'garcia' })).toHaveLength(1);
+    expect(filterWaitingRoomEntries(rows, { status: 'active' })).toHaveLength(1);
+    expect(filterWaitingRoomEntries(rows, { assignedUserId: 'u2' })).toHaveLength(1);
+    expect(
+      filterWaitingRoomCheckInCandidates(
+        [
+          {
+            patient_name: 'Rocky',
+            owner_full_name: 'Carlos',
+            assigned_user_id: 'u1',
+          },
+        ],
+        { query: 'carlos' }
+      )
+    ).toHaveLength(1);
+  });
+
+  it('parses and serializes board filter URL params', () => {
+    expect(
+      parseWaitingRoomBoardFilters({
+        q: '  luna ',
+        wrStatus: 'called',
+        wrAssigned: 'u1',
+      })
+    ).toEqual({
+      query: 'luna',
+      status: 'called',
+      assignedUserId: 'u1',
+    });
+
+    const params = appendWaitingRoomBoardFilterParams(new URLSearchParams('date=2026-08-24'), {
+      query: 'ana',
+      status: 'active',
+      assignedUserId: 'u2',
+    });
+    expect(params.get('date')).toBe('2026-08-24');
+    expect(params.get('q')).toBe('ana');
+    expect(params.get('wrStatus')).toBe('active');
+    expect(params.get('wrAssigned')).toBe('u2');
+
+    const cleared = appendWaitingRoomBoardFilterParams(params, {
+      query: '',
+      status: 'all',
+      assignedUserId: null,
+    });
+    expect(cleared.has('q')).toBe(false);
+    expect(cleared.has('wrStatus')).toBe(false);
+    expect(cleared.has('wrAssigned')).toBe(false);
+  });
 });
 
 describe('waiting room ops dashboard metrics', () => {
@@ -216,6 +346,16 @@ describe('waiting room ops dashboard metrics', () => {
     expect(formatPortalWaitingEta(5)).toMatch(/breve/i);
     expect(formatPortalWaitingEta(30)).toContain('30');
   });
+
+  it('resolves minutes-per-patient with clinic override over measured avg', () => {
+    expect(resolveWaitingRoomMinutesPerPatient()).toBe(15);
+    expect(
+      resolveWaitingRoomMinutesPerPatient({ measuredAvg: 18 })
+    ).toBe(18);
+    expect(
+      resolveWaitingRoomMinutesPerPatient({ configured: 10, measuredAvg: 18 })
+    ).toBe(10);
+  });
 });
 
 describe('waiting room schemas', () => {
@@ -270,6 +410,16 @@ describe('waiting room schemas', () => {
     ).toBe(true);
     expect(waitingRoomRemoveSchema.safeParse({ entryId: 'x' }).success).toBe(false);
   });
+
+  it('validates internal notes payload', () => {
+    expect(
+      waitingRoomNotesSchema.safeParse({ entryId, notes: 'Trae radiografías' }).success
+    ).toBe(true);
+    expect(waitingRoomNotesSchema.safeParse({ entryId, notes: '' }).success).toBe(true);
+    expect(
+      waitingRoomNotesSchema.safeParse({ entryId, notes: 'x'.repeat(501) }).success
+    ).toBe(false);
+  });
 });
 
 describe('portal waiting room rows', () => {
@@ -293,6 +443,7 @@ describe('portal waiting room rows', () => {
         priority: 0,
         room: '1',
         ahead_count: 0,
+        minutes_per_patient: 12,
       },
       {
         waiting_room_entry_id: 'x',
@@ -303,7 +454,9 @@ describe('portal waiting room rows', () => {
     ]);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.patient_name).toBe('Luna');
+    expect(rows[0]?.minutes_per_patient).toBe(12);
     expect(PORTAL_WAITING_ROOM_STATUS_MESSAGES.called).toMatch(/llamando/i);
+    expect(PORTAL_WAITING_ROOM_STATUS_MESSAGES.payment_pending).toMatch(/pago/i);
   });
 });
 
@@ -353,5 +506,157 @@ describe('waiting room QR check-in parsers', () => {
     ]);
     expect(alerts).toHaveLength(1);
     expect(alerts[0]?.title).toMatch(/llamando/i);
+  });
+});
+
+describe('patient waiting room history', () => {
+  it('parses history rows and finds active entry', () => {
+    const rows = parsePatientWaitingRoomHistoryRows([
+      {
+        waiting_room_entry_id: 'w1',
+        appointment_id: 'a1',
+        checked_in_at: '2026-08-24T10:00:00Z',
+        waiting_room_status: 'waiting',
+        called_at: null,
+        completed_at: null,
+        removed: false,
+        room: null,
+        appointment_starts_at: '2026-08-24T10:30:00Z',
+        minutes_to_call: null,
+        minutes_dwell: null,
+      },
+      {
+        waiting_room_entry_id: 'w2',
+        appointment_id: 'a2',
+        checked_in_at: '2026-08-23T10:00:00Z',
+        waiting_room_status: 'completed',
+        called_at: '2026-08-23T10:15:00Z',
+        completed_at: '2026-08-23T11:00:00Z',
+        removed: false,
+        room: '1',
+        appointment_starts_at: '2026-08-23T10:30:00Z',
+        minutes_to_call: 15,
+        minutes_dwell: 60,
+      },
+      { waiting_room_entry_id: null },
+    ]);
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]?.waiting_room_status).toBe('waiting');
+    expect(rows[1]?.minutes_dwell).toBe(60);
+
+    expect(getPatientWaitingRoomActiveEntry(rows)?.waiting_room_entry_id).toBe('w1');
+    expect(getPatientWaitingRoomActiveEntry([rows[1]!])).toBeNull();
+  });
+});
+
+describe('owner waiting room history', () => {
+  it('parses owner history rows and finds active entries', () => {
+    const rows = parseOwnerWaitingRoomHistoryRows([
+      {
+        waiting_room_entry_id: 'w1',
+        appointment_id: 'a1',
+        patient_id: 'p1',
+        patient_name: 'Luna',
+        checked_in_at: '2026-08-24T10:00:00Z',
+        waiting_room_status: 'waiting',
+        called_at: null,
+        completed_at: null,
+        removed: false,
+        room: null,
+        appointment_starts_at: '2026-08-24T10:30:00Z',
+        minutes_to_call: null,
+        minutes_dwell: null,
+      },
+      {
+        waiting_room_entry_id: 'w2',
+        appointment_id: 'a2',
+        patient_id: 'p2',
+        patient_name: 'Milo',
+        checked_in_at: '2026-08-24T09:00:00Z',
+        waiting_room_status: 'called',
+        called_at: '2026-08-24T09:10:00Z',
+        completed_at: null,
+        removed: false,
+        room: '1',
+        appointment_starts_at: '2026-08-24T09:30:00Z',
+        minutes_to_call: 10,
+        minutes_dwell: null,
+      },
+    ]);
+
+    expect(rows).toHaveLength(2);
+    expect(getOwnerWaitingRoomActiveEntries(rows)).toHaveLength(2);
+    expect(getOwnerWaitingRoomActiveEntries([rows[1]!]).map((r) => r.patient_name)).toEqual([
+      'Milo',
+    ]);
+  });
+});
+
+describe('public check-in live status', () => {
+  it('parses valid status payload', () => {
+    const status = parsePublicCheckInStatus({
+      valid: true,
+      patient_name: 'Luna',
+      patient_species: 'Canino',
+      waiting_room_status: 'called',
+      queue_position: 2,
+      room: '1',
+      ahead_count: 0,
+      minutes_per_patient: 12,
+      checked_in_at: '2026-08-24T10:00:00Z',
+      terminal: false,
+    });
+    expect(status.valid).toBe(true);
+    expect(status.waiting_room_status).toBe('called');
+    expect(status.room).toBe('1');
+  });
+});
+
+describe('waiting room branch filter', () => {
+  it('resolves branch list arg and URL params', () => {
+    expect(resolveWaitingRoomListBranchId(undefined, 'branch-a')).toBe('branch-a');
+    expect(resolveWaitingRoomListBranchId('all', 'branch-a')).toBe('all');
+    expect(resolveWaitingRoomListBranchId('branch-b', 'branch-a')).toBe('branch-b');
+
+    const params = appendWaitingRoomBoardFilterParams(new URLSearchParams(), {
+      branchId: 'all',
+    });
+    expect(params.get('wrBranch')).toBe('all');
+  });
+
+  it('builds surface hrefs with branch and date', () => {
+    expect(buildWaitingRoomSurfaceHref('/sala-espera/pantalla')).toBe('/sala-espera/pantalla');
+    expect(buildWaitingRoomSurfaceHref('/sala-espera/kiosco', { wrBranch: 'all' })).toBe(
+      '/sala-espera/kiosco?wrBranch=all'
+    );
+    expect(
+      buildWaitingRoomSurfaceHref('/sala-espera/tablero', {
+        date: '2026-08-23',
+        today: '2026-08-24',
+        mine: true,
+        wrBranch: 'branch-b',
+      })
+    ).toBe('/sala-espera/tablero?date=2026-08-23&mine=1&wrBranch=branch-b');
+  });
+
+  it('resolves branch label and filters appointments', () => {
+    const branches = [
+      { id: 'branch-a', name: 'Centro', is_main: true },
+      { id: 'branch-b', name: 'Norte' },
+    ];
+    expect(resolveWaitingRoomBranchLabel('all', 'branch-a', branches)).toBe(
+      'Todas las sucursales'
+    );
+    expect(resolveWaitingRoomBranchLabel(undefined, 'branch-b', branches)).toBe('Norte');
+
+    const appointments = [
+      { id: '1', branch_id: 'branch-a' },
+      { id: '2', branch_id: 'branch-b' },
+    ];
+    expect(filterAppointmentsByWaitingRoomBranch(appointments, 'branch-b')).toEqual([
+      { id: '2', branch_id: 'branch-b' },
+    ]);
+    expect(filterAppointmentsByWaitingRoomBranch(appointments, 'all')).toEqual(appointments);
   });
 });

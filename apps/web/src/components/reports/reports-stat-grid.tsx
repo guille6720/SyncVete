@@ -1,4 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface ReportStat {
@@ -12,14 +13,18 @@ interface ReportsStatGridProps {
   title: string;
   description?: string;
   stats: ReportStat[];
+  action?: ReactNode;
 }
 
-export function ReportsStatGrid({ title, description, stats }: ReportsStatGridProps) {
+export function ReportsStatGrid({ title, description, stats, action }: ReportsStatGridProps) {
   return (
     <section className="space-y-3">
-      <div>
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-semibold">{title}</h2>
+          {description && <p className="text-sm text-muted-foreground">{description}</p>}
+        </div>
+        {action}
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (

@@ -407,7 +407,7 @@ describe.skipIf(!canRun)('@waiting-room Phase 1 backend', () => {
     expect(list.error).toBeNull();
   });
 
-  it('list_waiting_room never returns internal_notes', async () => {
+  it('list_waiting_room returns internal_notes for staff', async () => {
     if (!schemaReady) return;
     const client = await authed(emailA);
     const fixture = await createAppointmentFixture({
@@ -420,15 +420,16 @@ describe.skipIf(!canRun)('@waiting-room Phase 1 backend', () => {
     });
     const entryId = (checkIn.data as { id: string }).id;
 
-    await service
-      .from('waiting_room_entries')
-      .update({ internal_notes: 'secreto clínico' })
-      .eq('id', entryId);
+    const notesUpdate = await client.rpc('update_waiting_room_notes', {
+      p_entry_id: entryId,
+      p_notes: 'secreto clínico',
+    });
+    expect(notesUpdate.error).toBeNull();
 
     const { data, error } = await client.rpc('list_waiting_room', { p_branch_id: branchAId });
     expect(error).toBeNull();
     const row = (data ?? []).find((r) => r.appointment_id === fixture.appointmentId);
     expect(row).toBeTruthy();
-    expect(JSON.stringify(row)).not.toMatch(/secreto clínico|internal_notes/i);
+    expect(row?.internal_notes).toBe('secreto clínico');
   });
 });

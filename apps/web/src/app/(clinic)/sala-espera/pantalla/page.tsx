@@ -1,29 +1,37 @@
 import { redirect } from 'next/navigation';
-import { formatDateParam } from '@sincvete/shared';
+import { formatDateParam, parseWaitingRoomBoardFilters, resolveWaitingRoomBranchLabel, resolveWaitingRoomListBranchId } from '@sincvete/shared';
 import { getSessionContext } from '@/lib/session';
 import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import { getOrganization, getUserBranches } from '@/actions/settings';
 import { WaitingRoomDisplay } from '@/components/waiting-room/waiting-room-display';
 
-export default async function SalaEsperaPantallaPage() {
+interface SalaEsperaPantallaPageProps {
+  searchParams: Promise<{ wrBranch?: string }>;
+}
+
+export default async function SalaEsperaPantallaPage({ searchParams }: SalaEsperaPantallaPageProps) {
   const canRead = await canReadWaitingRoom();
   if (!canRead) redirect('/dashboard');
 
   const session = await getSessionContext();
   if (!session) redirect('/login');
 
+  const params = await searchParams;
   const today = formatDateParam(new Date());
+  const boardFilters = parseWaitingRoomBoardFilters(params);
+  const listBranchId = resolveWaitingRoomListBranchId(boardFilters.branchId, session.branchId);
 
   const [entries, organization, branches] = await Promise.all([
-    listWaitingRoom({ date: today }),
+    listWaitingRoom({ date: today, branchId: listBranchId }),
     getOrganization(),
     getUserBranches(),
   ]);
 
-  const branchName =
-    branches.find((b) => b.id === session.branchId)?.name ??
-    branches.find((b) => b.is_main)?.name ??
-    null;
+  const branchName = resolveWaitingRoomBranchLabel(
+    boardFilters.branchId,
+    session.branchId,
+    branches
+  );
 
   return (
     <WaitingRoomDisplay
@@ -31,6 +39,10 @@ export default async function SalaEsperaPantallaPage() {
       clinicName={organization?.name ?? 'Clínica'}
       branchName={branchName}
       today={today}
+      listBranchId={listBranchId}
+      branchOptions={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
+      sessionBranchId={session.branchId}
+      initialBranchFilter={boardFilters.branchId}
     />
   );
 }

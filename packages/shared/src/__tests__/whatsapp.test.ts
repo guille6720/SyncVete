@@ -65,6 +65,16 @@ describe('renderWhatsAppTemplate', () => {
     expect(withoutRoom).toContain('Clínica Sur!');
     expect(withoutRoom).not.toContain('Consultorio');
   });
+
+  it('fills waiting-room payment template', () => {
+    const body = renderWhatsAppTemplate('sala_espera_pago', {
+      owner: 'Ana',
+      patient: 'Luna',
+      clinic: 'Clínica Sur',
+    });
+    expect(body).toContain('recepción');
+    expect(body).toContain('Luna');
+  });
 });
 
 describe('buildWhatsAppUrl', () => {

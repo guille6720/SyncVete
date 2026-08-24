@@ -6,15 +6,18 @@ import { Volume2, VolumeX } from 'lucide-react';
 import { listWaitingRoom } from '@/actions/waiting-room';
 import { useWaitingRoomLive } from '@/hooks/use-waiting-room-live';
 import {
-  playWaitingRoomCallChime,
+  playWaitingRoomTvChimesOnRefresh,
   readWaitingRoomTvMuted,
   writeWaitingRoomTvMuted,
 } from '@/lib/waiting-room-chime';
+import { WaitingRoomBranchFilter } from '@/components/waiting-room/waiting-room-branch-filter';
 import {
   APP_NAME,
   SPECIES_EMOJI,
   WAITING_ROOM_STATUS_LABELS,
   formatAppointmentTime,
+  formatWaitMinutes,
+  minutesBetween,
   type WaitingRoomListRow,
 } from '@sincvete/shared';
 
@@ -23,6 +26,10 @@ interface WaitingRoomDisplayProps {
   clinicName: string;
   branchName: string | null;
   today: string;
+  listBranchId?: string | 'all';
+  branchOptions?: Array<{ id: string; name: string }>;
+  sessionBranchId?: string | null;
+  initialBranchFilter?: string | 'all' | null;
 }
 
 export function WaitingRoomDisplay({
@@ -30,10 +37,16 @@ export function WaitingRoomDisplay({
   clinicName,
   branchName,
   today,
+  listBranchId,
+  branchOptions = [],
+  sessionBranchId = null,
+  initialBranchFilter,
 }: WaitingRoomDisplayProps) {
   const [entries, setEntries] = useState(initialEntries);
   const [clock, setClock] = useState(() => formatClock(new Date()));
+  const [now, setNow] = useState(() => new Date());
   const [flashId, setFlashId] = useState<string | null>(null);
+  const [flashKind, setFlashKind] = useState<'called' | 'payment' | null>(null);
   const [muted, setMuted] = useState(false);
 
   useEffect(() => {
@@ -42,21 +55,36 @@ export function WaitingRoomDisplay({
 
   const refresh = useCallback(async () => {
     try {
-      const next = await listWaitingRoom({ date: today });
+      const next = await listWaitingRoom({ date: today, branchId: listBranchId });
       setEntries((prev) => {
-        const prevCalled = new Set(
-          prev
-            .filter((row) => row.waiting_room_status === 'called')
-            .map((row) => row.waiting_room_entry_id)
-        );
-        const newlyCalled = next.find(
-          (row) =>
-            row.waiting_room_status === 'called' && !prevCalled.has(row.waiting_room_entry_id)
-        );
-        if (newlyCalled) {
-          setFlashId(newlyCalled.waiting_room_entry_id);
-          if (!readWaitingRoomTvMuted()) {
-            playWaitingRoomCallChime();
+        const transition = playWaitingRoomTvChimesOnRefresh(prev, next);
+        if (transition === 'called') {
+          const row = next.find(
+            (item) =>
+              item.waiting_room_status === 'called' &&
+              !prev.some(
+                (p) =>
+                  p.waiting_room_entry_id === item.waiting_room_entry_id &&
+                  p.waiting_room_status === 'called'
+              )
+          );
+          if (row) {
+            setFlashId(row.waiting_room_entry_id);
+            setFlashKind('called');
+          }
+        } else if (transition === 'payment') {
+          const row = next.find(
+            (item) =>
+              item.waiting_room_status === 'payment_pending' &&
+              !prev.some(
+                (p) =>
+                  p.waiting_room_entry_id === item.waiting_room_entry_id &&
+                  p.waiting_room_status === 'payment_pending'
+              )
+          );
+          if (row) {
+            setFlashId(row.waiting_room_entry_id);
+            setFlashKind('payment');
           }
         }
         return next;
@@ -64,7 +92,7 @@ export function WaitingRoomDisplay({
     } catch (error) {
       console.error('[waiting-room display] refresh failed', error);
     }
-  }, [today]);
+  }, [listBranchId, today]);
 
   useWaitingRoomLive(() => {
     void refresh();
@@ -75,13 +103,20 @@ export function WaitingRoomDisplay({
   }, [initialEntries]);
 
   useEffect(() => {
-    const id = window.setInterval(() => setClock(formatClock(new Date())), 1000);
+    const id = window.setInterval(() => {
+      const current = new Date();
+      setClock(formatClock(current));
+      setNow(current);
+    }, 1000);
     return () => window.clearInterval(id);
   }, []);
 
   useEffect(() => {
     if (!flashId) return;
-    const id = window.setTimeout(() => setFlashId(null), 8000);
+    const id = window.setTimeout(() => {
+      setFlashId(null);
+      setFlashKind(null);
+    }, 8000);
     return () => window.clearTimeout(id);
   }, [flashId]);
 
@@ -99,13 +134,12 @@ export function WaitingRoomDisplay({
     () => entries.filter((row) => row.waiting_room_status === 'waiting'),
     [entries]
   );
-  const inRoom = useMemo(
-    () =>
-      entries.filter(
-        (row) =>
-          row.waiting_room_status === 'in_consultation' ||
-          row.waiting_room_status === 'payment_pending'
-      ),
+  const inConsultation = useMemo(
+    () => entries.filter((row) => row.waiting_room_status === 'in_consultation'),
+    [entries]
+  );
+  const paymentPending = useMemo(
+    () => entries.filter((row) => row.waiting_room_status === 'payment_pending'),
     [entries]
   );
 
@@ -147,6 +181,17 @@ export function WaitingRoomDisplay({
           </div>
         </div>
       </header>
+
+      {branchOptions.length > 1 && (
+        <div className="flex justify-center border-b border-white/10 px-6 py-3 md:px-10">
+          <WaitingRoomBranchFilter
+            branchOptions={branchOptions}
+            sessionBranchId={sessionBranchId}
+            branchFilter={initialBranchFilter}
+            variant="dark"
+          />
+        </div>
+      )}
 
       <main className="grid flex-1 gap-6 p-6 md:grid-cols-[1.4fr_1fr] md:gap-8 md:p-10">
         <section
@@ -202,8 +247,11 @@ export function WaitingRoomDisplay({
                     <span className="flex-1 font-medium">
                       {SPECIES_EMOJI[row.patient_species]} {row.patient_name}
                     </span>
-                    <span className="text-base tabular-nums text-slate-400">
-                      {formatAppointmentTime(row.appointment_starts_at)}
+                    <span className="text-right text-base tabular-nums text-slate-400">
+                      <span className="block">{formatWaitMinutes(minutesBetween(row.checked_in_at, now))}</span>
+                      <span className="block text-xs text-slate-500">
+                        turno {formatAppointmentTime(row.appointment_starts_at)}
+                      </span>
                     </span>
                   </li>
                 ))}
@@ -211,21 +259,46 @@ export function WaitingRoomDisplay({
             )}
           </div>
 
-          {inRoom.length > 0 && (
+          {inConsultation.length > 0 && (
             <div className="rounded-3xl border border-white/10 bg-white/5 p-5 md:p-6">
               <h2 className="mb-4 text-lg uppercase tracking-[0.18em] text-slate-300">
                 En atención
               </h2>
               <ul className="space-y-3 text-xl">
-                {inRoom.slice(0, 6).map((row) => (
+                {inConsultation.slice(0, 6).map((row) => (
                   <li key={row.waiting_room_entry_id} className="flex justify-between gap-3">
                     <span>
                       {SPECIES_EMOJI[row.patient_species]} {row.patient_name}
                     </span>
                     <span className="text-base text-slate-400">
-                      {row.room
-                        ? row.room
-                        : WAITING_ROOM_STATUS_LABELS[row.waiting_room_status]}
+                      {row.room ? row.room : WAITING_ROOM_STATUS_LABELS[row.waiting_room_status]}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {paymentPending.length > 0 && (
+            <div
+              className={`rounded-3xl border p-5 md:p-6 ${
+                flashKind === 'payment' &&
+                paymentPending.some((row) => row.waiting_room_entry_id === flashId)
+                  ? 'animate-pulse border-amber-300/50 bg-amber-400/10'
+                  : 'border-amber-300/30 bg-amber-400/5'
+              }`}
+            >
+              <h2 className="mb-4 text-lg uppercase tracking-[0.18em] text-amber-200/90">
+                Pago pendiente
+              </h2>
+              <ul className="space-y-3 text-xl">
+                {paymentPending.slice(0, 6).map((row) => (
+                  <li key={row.waiting_room_entry_id} className="flex justify-between gap-3">
+                    <span>
+                      {SPECIES_EMOJI[row.patient_species]} {row.patient_name}
+                    </span>
+                    <span className="text-base text-amber-200/80">
+                      {row.room ? row.room : 'Acercate a caja'}
                     </span>
                   </li>
                 ))}

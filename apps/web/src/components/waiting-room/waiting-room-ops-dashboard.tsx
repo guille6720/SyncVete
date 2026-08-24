@@ -26,6 +26,9 @@ interface WaitingRoomOpsDashboardProps {
   today?: string;
   variant?: 'light' | 'dark';
   showTitle?: boolean;
+  mineOnly?: boolean;
+  assignedUserId?: string | null;
+  listBranchId?: string | 'all';
 }
 
 export function WaitingRoomOpsDashboard({
@@ -34,6 +37,9 @@ export function WaitingRoomOpsDashboard({
   today,
   variant = 'light',
   showTitle = true,
+  mineOnly = false,
+  assignedUserId = null,
+  listBranchId,
 }: WaitingRoomOpsDashboardProps) {
   const [entries, setEntries] = useState(initialEntries);
 
@@ -41,15 +47,23 @@ export function WaitingRoomOpsDashboard({
     setEntries(initialEntries);
   }, [initialEntries]);
 
+  const filterEntries = useCallback(
+    (rows: WaitingRoomListRow[]) =>
+      mineOnly && assignedUserId
+        ? rows.filter((row) => row.assigned_user_id === assignedUserId)
+        : rows,
+    [assignedUserId, mineOnly]
+  );
+
   const refresh = useCallback(async () => {
     if (!today) return;
     try {
-      const next = await listWaitingRoom({ date: today });
-      setEntries(next);
+      const next = await listWaitingRoom({ date: today, branchId: listBranchId });
+      setEntries(filterEntries(next));
     } catch (error) {
       console.error('[waiting-room ops dashboard] refresh failed', error);
     }
-  }, [today]);
+  }, [filterEntries, listBranchId, today]);
 
   useWaitingRoomLive(() => {
     void refresh();

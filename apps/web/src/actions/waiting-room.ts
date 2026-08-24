@@ -10,6 +10,7 @@ import {
   waitingRoomListSchema,
   waitingRoomReorderQueueSchema,
   waitingRoomRemoveSchema,
+  waitingRoomNotesSchema,
   waitingRoomReorderSchema,
   waitingRoomUpdateStatusSchema,
   type ActionResult,
@@ -21,6 +22,12 @@ import {
   type WaitingRoomMutationResult,
   type WaitingRoomRemoveResult,
   type WaitingRoomReorderQueueResult,
+  type PatientWaitingRoomHistoryRow,
+  parsePatientWaitingRoomHistoryRows,
+  type OwnerWaitingRoomHistoryRow,
+  parseOwnerWaitingRoomHistoryRows,
+  parsePublicCheckInStatus,
+  type PublicCheckInStatus,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
 import {
@@ -81,7 +88,10 @@ export async function listWaitingRoom(input: {
   const supabase = await createServerClient();
 
   const { data, error } = await supabase.rpc('list_waiting_room', {
-    p_branch_id: parsed.branchId ?? session?.branchId ?? null,
+    p_branch_id:
+      parsed.branchId === 'all'
+        ? null
+        : parsed.branchId ?? session?.branchId ?? null,
     p_date: parsed.date ?? null,
   });
 
@@ -269,6 +279,54 @@ export async function removeWaitingRoomEntry(input: {
   }
 }
 
+export async function updateWaitingRoomNotes(input: {
+  entryId: string;
+  notes?: string | null;
+}): Promise<ActionResult<{ id: string; appointment_id: string; internal_notes: string | null }>> {
+  try {
+    await requirePermissionAndFeature('waiting_room:write', FEATURES.WAITING_ROOM);
+    const parsed = waitingRoomNotesSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('update_waiting_room_notes', {
+      p_entry_id: parsed.data.entryId,
+      p_notes: parsed.data.notes,
+    });
+
+    if (error) {
+      return { success: false, error: rpcErrorMessage(error) };
+    }
+
+    const raw = (data ?? {}) as {
+      id?: string;
+      appointment_id?: string;
+      internal_notes?: string | null;
+    };
+    if (!raw.id || !raw.appointment_id) {
+      return { success: false, error: 'No se pudo guardar la nota' };
+    }
+
+    revalidateWaitingRoom();
+    return {
+      success: true,
+      data: {
+        id: String(raw.id),
+        appointment_id: String(raw.appointment_id),
+        internal_notes: raw.internal_notes ?? null,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function createAppointmentCheckInToken(
   appointmentId: string
 ): Promise<ActionResult<WaitingRoomCheckInTokenResult>> {
@@ -317,6 +375,23 @@ export async function previewAppointmentCheckIn(
   return parseWaitingRoomCheckInPreview(data);
 }
 
+export async function getPublicCheckInStatus(token: string): Promise<PublicCheckInStatus> {
+  const parsed = waitingRoomCheckInRedeemSchema.safeParse({ token });
+  if (!parsed.success) {
+    return { valid: false, reason: 'invalid_token' };
+  }
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc('get_public_check_in_status', {
+    p_token: parsed.data.token,
+  });
+  if (error) {
+    console.error('[waiting-room] get_public_check_in_status', error.message);
+    return { valid: false, reason: 'status_failed' };
+  }
+  return parsePublicCheckInStatus(data);
+}
+
 export async function redeemAppointmentCheckIn(
   token: string
 ): Promise<ActionResult<WaitingRoomCheckInRedeemResult>> {
@@ -345,4 +420,54 @@ export async function redeemAppointmentCheckIn(
   } catch (error) {
     return actionError<WaitingRoomCheckInRedeemResult>(error);
   }
+}
+
+export async function listPatientWaitingRoomHistory(
+  patientId: string,
+  limit = 8
+): Promise<PatientWaitingRoomHistoryRow[]> {
+  await requirePermissionAndFeature('waiting_room:read', FEATURES.WAITING_ROOM);
+  const session = await getSessionContext();
+  if (!session?.permissions.includes('patients:read')) {
+    return [];
+  }
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 20);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc('list_patient_waiting_room_history', {
+    p_patient_id: patientId,
+    p_limit: safeLimit,
+  });
+
+  if (error) {
+    console.error('[waiting-room] list_patient_waiting_room_history', error.message);
+    return [];
+  }
+
+  return parsePatientWaitingRoomHistoryRows(data);
+}
+
+export async function listOwnerWaitingRoomHistory(
+  ownerId: string,
+  limit = 8
+): Promise<OwnerWaitingRoomHistoryRow[]> {
+  await requirePermissionAndFeature('waiting_room:read', FEATURES.WAITING_ROOM);
+  const session = await getSessionContext();
+  if (!session?.permissions.includes('patients:read')) {
+    return [];
+  }
+
+  const safeLimit = Math.min(Math.max(Math.trunc(limit), 1), 20);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc('list_owner_waiting_room_history', {
+    p_owner_id: ownerId,
+    p_limit: safeLimit,
+  });
+
+  if (error) {
+    console.error('[waiting-room] list_owner_waiting_room_history', error.message);
+    return [];
+  }
+
+  return parseOwnerWaitingRoomHistoryRows(data);
 }

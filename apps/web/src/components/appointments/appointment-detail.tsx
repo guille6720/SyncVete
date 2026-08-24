@@ -16,11 +16,14 @@ import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_VARIANT,
   APPOINTMENT_TYPE_LABELS,
+  WAITING_ROOM_STATUS_LABELS,
+  WAITING_ROOM_STATUS_VARIANT,
   formatAppointmentDateTime,
   SPECIES_EMOJI,
   buildWhatsAppComposePath,
   type AppointmentListRow,
   type AppointmentStatus,
+  type WaitingRoomStatus,
 } from '@sincvete/shared';
 
 interface AppointmentDetailProps {
@@ -30,6 +33,7 @@ interface AppointmentDetailProps {
   canSendWhatsApp?: boolean;
   canCheckInWaitingRoom?: boolean;
   consultationId?: string | null;
+  waitingRoomStatus?: WaitingRoomStatus | null;
 }
 
 const STATUS_ACTIONS: Partial<
@@ -54,6 +58,7 @@ export function AppointmentDetail({
   canSendWhatsApp = false,
   canCheckInWaitingRoom = false,
   consultationId = null,
+  waitingRoomStatus = null,
 }: AppointmentDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -222,7 +227,20 @@ export function AppointmentDetail({
             <Badge variant={APPOINTMENT_STATUS_VARIANT[appointment.status]}>
               {APPOINTMENT_STATUS_LABELS[appointment.status]}
             </Badge>
+            {waitingRoomStatus && (
+              <Badge variant={WAITING_ROOM_STATUS_VARIANT[waitingRoomStatus]}>
+                {WAITING_ROOM_STATUS_LABELS[waitingRoomStatus]}
+              </Badge>
+            )}
           </div>
+          {waitingRoomStatus && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              En sala de espera ·{' '}
+              <Link href="/sala-espera" className="text-primary hover:underline">
+                Ver cola
+              </Link>
+            </p>
+          )}
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <DetailField

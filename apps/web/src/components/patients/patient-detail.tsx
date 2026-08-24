@@ -15,6 +15,7 @@ import {
   Scissors,
   Syringe,
   Sparkles,
+  Hourglass,
   Trash2,
   Images,
 } from 'lucide-react';
@@ -22,6 +23,7 @@ import { deletePatient } from '@/actions/patients';
 import { runClinicExportAction } from '@/actions/data-migration';
 import { PatientVaccineStatus } from '@/components/vaccinations/patient-vaccine-status';
 import { PatientClinicalRecent } from '@/components/patients/patient-clinical-recent';
+import { PatientWaitingRoomHistory } from '@/components/patients/patient-waiting-room-history';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +40,7 @@ import {
   type Patient,
   type SurgeryStatus,
   type VaccinationDueRow,
+  type PatientWaitingRoomHistoryRow,
 } from '@sincvete/shared';
 
 interface PatientDetailProps {
@@ -55,6 +58,7 @@ interface PatientDetailProps {
   activeSurgery?: { id: string; status: SurgeryStatus } | null;
   vaccineStatus?: VaccinationDueRow[];
   entitledHrefs?: string[] | null;
+  waitingRoomHistory?: PatientWaitingRoomHistoryRow[];
 }
 
 function formatAge(birthDate: string | null): string | null {
@@ -92,6 +96,7 @@ export function PatientDetail({
   activeSurgery = null,
   vaccineStatus = [],
   entitledHrefs = null,
+  waitingRoomHistory = [],
 }: PatientDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -285,6 +290,14 @@ export function PatientDetail({
                 </Link>
               </Button>
             )}
+            {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/sala-espera">
+                  <Hourglass className="mr-2 h-4 w-4" />
+                  Sala de espera
+                </Link>
+              </Button>
+            )}
             {canWrite && (
               <>
                 <Button variant="outline" size="sm" asChild>
@@ -407,6 +420,10 @@ export function PatientDetail({
           )}
         </CardContent>
       </Card>
+
+      {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
+        <PatientWaitingRoomHistory history={waitingRoomHistory} />
+      )}
 
       {canReadClinical && entitled('/historia-clinica') && (
         <PatientClinicalRecent
