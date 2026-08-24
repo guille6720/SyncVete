@@ -14,6 +14,7 @@ export interface WhatsAppTemplateVars {
   invoice?: string;
   amount?: string;
   portal?: string;
+  room?: string;
 }
 
 export function normalizeWhatsAppPhone(
@@ -54,6 +55,12 @@ export function pickOwnerWhatsAppPhone(
   return normalizeWhatsAppPhone(phoneWhatsapp) ?? normalizeWhatsAppPhone(phone);
 }
 
+export function formatWhatsAppRoomSuffix(room?: string | null): string {
+  const value = room?.trim();
+  if (!value) return '';
+  return ` · Consultorio ${value}`;
+}
+
 export function renderWhatsAppTemplate(
   templateKey: WhatsAppTemplateKey,
   vars: WhatsAppTemplateVars = {}
@@ -69,6 +76,7 @@ export function renderWhatsAppTemplate(
     invoice: vars.invoice?.trim() || '',
     amount: vars.amount?.trim() || '',
     portal: vars.portal?.trim() || '',
+    room: formatWhatsAppRoomSuffix(vars.room),
   };
 
   return template.replace(/\{([a-z]+)\}/gi, (_, key: string) => values[key] ?? '');

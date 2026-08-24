@@ -8,6 +8,7 @@ import {
   waitingRoomCheckInSchema,
   waitingRoomCheckInTokenSchema,
   waitingRoomListSchema,
+  waitingRoomReorderQueueSchema,
   waitingRoomReorderSchema,
   waitingRoomUpdateStatusSchema,
   type ActionResult,
@@ -17,6 +18,7 @@ import {
   type WaitingRoomCheckInTokenResult,
   type WaitingRoomListRow,
   type WaitingRoomMutationResult,
+  type WaitingRoomReorderQueueResult,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
 import {
@@ -178,6 +180,45 @@ export async function reorderWaitingRoom(input: {
     return { success: true, data: data as unknown as WaitingRoomMutationResult };
   } catch (error) {
     return actionError<WaitingRoomMutationResult>(error);
+  }
+}
+
+export async function reorderWaitingRoomQueue(
+  orderedEntryIds: string[]
+): Promise<ActionResult<WaitingRoomReorderQueueResult>> {
+  try {
+    await requirePermissionAndFeature('waiting_room:write', FEATURES.WAITING_ROOM);
+    const parsed = waitingRoomReorderQueueSchema.safeParse({ orderedEntryIds });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Orden inválido',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('reorder_waiting_room_queue', {
+      p_ordered_entry_ids: parsed.data.orderedEntryIds,
+    });
+
+    if (error) {
+      return { success: false, error: rpcErrorMessage(error) };
+    }
+
+    const raw = (data ?? {}) as { updated?: number; ordered_ids?: string[] };
+    revalidateWaitingRoom();
+    return {
+      success: true,
+      data: {
+        updated: Number(raw.updated ?? parsed.data.orderedEntryIds.length),
+        ordered_ids: Array.isArray(raw.ordered_ids)
+          ? raw.ordered_ids.map(String)
+          : parsed.data.orderedEntryIds,
+      },
+    };
+  } catch (error) {
+    return actionError<WaitingRoomReorderQueueResult>(error);
   }
 }
 

@@ -141,3 +141,8 @@ export interface OwnerPortalAlert {
   read_at: string | null;
   created_at: string;
 }
+
+export interface WaitingRoomReorderQueueResult {
+  updated: number;
+  ordered_ids: string[];
+}

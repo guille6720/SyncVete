@@ -917,6 +917,7 @@ export const whatsappComposeSchema = z.object({
     'factura_saldo',
     'lab_listo',
     'portal_invite',
+    'sala_espera_llamado',
     'mensaje_libre',
   ]),
   body: z
@@ -1180,9 +1181,17 @@ export const waitingRoomCheckInRedeemSchema = z.object({
     .regex(/^[a-fA-F0-9]+$/, 'Código inválido'),
 });
 
+export const waitingRoomReorderQueueSchema = z.object({
+  orderedEntryIds: z
+    .array(z.string().uuid('Entrada inválida'))
+    .min(1, 'Indicá al menos una entrada')
+    .max(200, 'Demasiadas entradas'),
+});
+
 export type WaitingRoomListInput = z.infer<typeof waitingRoomListSchema>;
 export type WaitingRoomCheckInInput = z.infer<typeof waitingRoomCheckInSchema>;
 export type WaitingRoomUpdateStatusInput = z.infer<typeof waitingRoomUpdateStatusSchema>;
 export type WaitingRoomReorderInput = z.infer<typeof waitingRoomReorderSchema>;
 export type WaitingRoomCheckInTokenInput = z.infer<typeof waitingRoomCheckInTokenSchema>;
 export type WaitingRoomCheckInRedeemInput = z.infer<typeof waitingRoomCheckInRedeemSchema>;
+export type WaitingRoomReorderQueueInput = z.infer<typeof waitingRoomReorderQueueSchema>;

@@ -34,6 +34,42 @@ export function sortWaitingRoomQueue<T extends Pick<WaitingRoomListRow, 'priorit
   return [...rows].sort(compareWaitingRoomQueue);
 }
 
+/** Positions after a drag-and-drop reorder (priority normalized to 0). */
+export function buildWaitingRoomQueueOrder(
+  orderedEntryIds: readonly string[]
+): { entryId: string; queuePosition: number; priority: number }[] {
+  return orderedEntryIds.map((entryId, index) => ({
+    entryId,
+    queuePosition: index + 1,
+    priority: 0,
+  }));
+}
+
+/**
+ * Apply a visual reorder of IDs onto existing rows (optimistic UI).
+ * Unknown IDs are ignored; missing IDs keep prior relative order at the end.
+ */
+export function applyWaitingRoomQueueOrder<
+  T extends { waiting_room_entry_id: string; queue_position: number | null; priority: number },
+>(rows: T[], orderedEntryIds: readonly string[]): T[] {
+  const byId = new Map(rows.map((row) => [row.waiting_room_entry_id, row]));
+  const ordered: T[] = [];
+  for (const id of orderedEntryIds) {
+    const row = byId.get(id);
+    if (!row) continue;
+    ordered.push(row);
+    byId.delete(id);
+  }
+  for (const row of rows) {
+    if (byId.has(row.waiting_room_entry_id)) ordered.push(row);
+  }
+  return ordered.map((row, index) => ({
+    ...row,
+    queue_position: index + 1,
+    priority: 0,
+  }));
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   return value as Record<string, unknown>;

@@ -7,6 +7,7 @@ import {
   sortWaitingRoomQueue,
   waitingRoomCheckInSchema,
   waitingRoomListSchema,
+  waitingRoomReorderQueueSchema,
   waitingRoomReorderSchema,
   waitingRoomUpdateStatusSchema,
   FEATURES,
@@ -16,6 +17,8 @@ import {
   parseWaitingRoomCheckInPreview,
   parseWaitingRoomCheckInTokenResult,
   parseOwnerPortalAlerts,
+  applyWaitingRoomQueueOrder,
+  buildWaitingRoomQueueOrder,
   PORTAL_WAITING_ROOM_STATUS_MESSAGES,
 } from '../index';
 
@@ -86,6 +89,35 @@ describe('waiting room queue ordering', () => {
     const regular = { priority: 0, queue_position: 1, checked_in_at: '2026-08-24T10:00:00.000Z' };
     expect(compareWaitingRoomQueue(emergency, regular)).toBeLessThan(0);
   });
+
+  it('builds sequential queue positions after drag-and-drop', () => {
+    expect(buildWaitingRoomQueueOrder(['a', 'b', 'c'])).toEqual([
+      { entryId: 'a', queuePosition: 1, priority: 0 },
+      { entryId: 'b', queuePosition: 2, priority: 0 },
+      { entryId: 'c', queuePosition: 3, priority: 0 },
+    ]);
+  });
+
+  it('applies optimistic queue order and normalizes priority', () => {
+    const rows = [
+      {
+        waiting_room_entry_id: '1',
+        queue_position: 1,
+        priority: 5,
+        checked_in_at: '2026-08-24T10:00:00.000Z',
+      },
+      {
+        waiting_room_entry_id: '2',
+        queue_position: 2,
+        priority: 0,
+        checked_in_at: '2026-08-24T11:00:00.000Z',
+      },
+    ];
+    const next = applyWaitingRoomQueueOrder(rows, ['2', '1']);
+    expect(next.map((r) => r.waiting_room_entry_id)).toEqual(['2', '1']);
+    expect(next.map((r) => r.queue_position)).toEqual([1, 2]);
+    expect(next.every((r) => r.priority === 0)).toBe(true);
+  });
 });
 
 describe('waiting room schemas', () => {
@@ -123,6 +155,15 @@ describe('waiting room schemas', () => {
     ).toBe(true);
     expect(waitingRoomReorderSchema.safeParse({ entryId, priority: 10 }).success).toBe(true);
     expect(waitingRoomReorderSchema.safeParse({ entryId }).success).toBe(false);
+  });
+
+  it('validates batch queue reorder ids', () => {
+    expect(
+      waitingRoomReorderQueueSchema.safeParse({
+        orderedEntryIds: [entryId, appointmentId],
+      }).success
+    ).toBe(true);
+    expect(waitingRoomReorderQueueSchema.safeParse({ orderedEntryIds: [] }).success).toBe(false);
   });
 });
 

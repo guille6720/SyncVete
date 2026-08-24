@@ -46,6 +46,25 @@ describe('renderWhatsAppTemplate', () => {
     expect(body).toContain('Luna');
     expect(body).toContain('15:00');
   });
+
+  it('fills waiting-room called template with optional room', () => {
+    const withRoom = renderWhatsAppTemplate('sala_espera_llamado', {
+      owner: 'Ana',
+      patient: 'Luna',
+      clinic: 'Clínica Sur',
+      room: '2',
+    });
+    expect(withRoom).toContain('llamando a Luna');
+    expect(withRoom).toContain('Consultorio 2');
+
+    const withoutRoom = renderWhatsAppTemplate('sala_espera_llamado', {
+      owner: 'Ana',
+      patient: 'Luna',
+      clinic: 'Clínica Sur',
+    });
+    expect(withoutRoom).toContain('Clínica Sur!');
+    expect(withoutRoom).not.toContain('Consultorio');
+  });
 });
 
 describe('buildWhatsAppUrl', () => {
@@ -86,5 +105,18 @@ describe('buildWhatsAppComposePath', () => {
         template: 'factura_saldo',
       })
     ).toBe('/whatsapp?ownerId=o1&template=factura_saldo');
+  });
+
+  it('includes waiting-room called template and room', () => {
+    expect(
+      buildWhatsAppComposePath({
+        ownerId: 'o1',
+        appointmentId: 'a1',
+        template: 'sala_espera_llamado',
+        room: '3',
+      })
+    ).toBe(
+      '/whatsapp?ownerId=o1&template=sala_espera_llamado&appointmentId=a1&room=3'
+    );
   });
 });

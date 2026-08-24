@@ -5,6 +5,7 @@ export const WHATSAPP_TEMPLATES = [
   'factura_saldo',
   'lab_listo',
   'portal_invite',
+  'sala_espera_llamado',
   'mensaje_libre',
 ] as const;
 
@@ -17,6 +18,7 @@ export const WHATSAPP_TEMPLATE_LABELS: Record<WhatsAppTemplateKey, string> = {
   factura_saldo: 'Saldo de factura',
   lab_listo: 'Resultados de laboratorio',
   portal_invite: 'Invitación al portal',
+  sala_espera_llamado: 'Sala de espera · llamado',
   mensaje_libre: 'Mensaje libre',
 };
 
@@ -33,6 +35,8 @@ export const WHATSAPP_TEMPLATE_BODIES: Record<WhatsAppTemplateKey, string> = {
     'Hola {owner}, ya están los resultados de laboratorio de {patient}. Podés pasar a retirarlos o consultarlos en {clinic}.',
   portal_invite:
     'Hola {owner}, en {clinic} podés ver turnos, vacunas y facturas de {patient} desde el portal del tutor. Pedinos el enlace de acceso.',
+  sala_espera_llamado:
+    'Hola {owner}, ¡ya estamos llamando a {patient} en {clinic}{room}! Acercate por favor.',
   mensaje_libre: 'Hola {owner}, te escribimos desde {clinic}.',
 };
 
@@ -66,6 +70,7 @@ export function buildWhatsAppComposePath(params: {
   invoiceId?: string;
   labOrderId?: string;
   vaccinationId?: string;
+  room?: string;
 }): string {
   const search = new URLSearchParams();
   if (params.ownerId) search.set('ownerId', params.ownerId);
@@ -75,6 +80,7 @@ export function buildWhatsAppComposePath(params: {
   if (params.invoiceId) search.set('invoiceId', params.invoiceId);
   if (params.labOrderId) search.set('labOrderId', params.labOrderId);
   if (params.vaccinationId) search.set('vaccinationId', params.vaccinationId);
+  if (params.room?.trim()) search.set('room', params.room.trim());
   const query = search.toString();
   return query ? `/whatsapp?${query}` : '/whatsapp';
 }

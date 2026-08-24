@@ -12,6 +12,7 @@ import {
   canReadWaitingRoom,
   listWaitingRoom,
 } from '@/actions/waiting-room';
+import { canSendWhatsApp } from '@/actions/whatsapp';
 import { WaitingRoomBoard } from '@/components/waiting-room/waiting-room-board';
 import { Button } from '@/components/ui/button';
 
@@ -21,7 +22,10 @@ export default async function SalaEsperaPage() {
 
   const today = formatDateParam(new Date());
   const weekStart = getWeekStartDate(today);
-  const canWrite = await canManageWaitingRoom();
+  const [canWrite, canWhatsApp] = await Promise.all([
+    canManageWaitingRoom(),
+    canSendWhatsApp(),
+  ]);
 
   const [entries, weekAppointments] = await Promise.all([
     listWaitingRoom({ date: today }),
@@ -61,6 +65,7 @@ export default async function SalaEsperaPage() {
         entries={entries}
         checkInCandidates={checkInCandidates}
         canWrite={canWrite}
+        canSendWhatsApp={canWhatsApp}
         todayLabel={today}
       />
     </div>

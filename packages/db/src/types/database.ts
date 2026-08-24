@@ -6296,6 +6296,12 @@ export interface Database {
         };
         Returns: Json;
       };
+      reorder_waiting_room_queue: {
+        Args: {
+          p_ordered_entry_ids: string[];
+        };
+        Returns: Json;
+      };
       list_owner_portal_waiting_room: {
         Args: {
           p_date?: string | null;
