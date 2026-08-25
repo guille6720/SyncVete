@@ -66,9 +66,14 @@ export function SettlementsBulkToolbar({
     mode: 'confirm' | 'alert';
     description: string;
   } | null>(null);
+  const [reviewConfirmOpen, setReviewConfirmOpen] = useState(false);
   const [pending, run] = usePendingAction();
 
   if (selectedIds.length === 0) return null;
+
+  const draftIds = selectedSettlements
+    .filter((row) => row.status === 'draft')
+    .map((row) => row.id);
 
   const applyBulkResult = (data: BulkSettlementActionResult) => {
     const ok = data.succeeded.length;
@@ -90,6 +95,21 @@ export function SettlementsBulkToolbar({
     setFailedRows([]);
     void run(async () => {
       const result = await bulkApproveSettlements(selectedIds);
+      if (!result?.success || !result.data) {
+        throw new Error(result?.error ?? 'No se pudo completar la acción');
+      }
+      return result.data;
+    }).then((data) => {
+      if (!data) return;
+      applyBulkResult(data);
+    });
+  };
+
+  const runSubmitForReview = () => {
+    setMessage(null);
+    setFailedRows([]);
+    void run(async () => {
+      const result = await bulkSubmitSettlementsForReview(draftIds);
       if (!result?.success || !result.data) {
         throw new Error(result?.error ?? 'No se pudo completar la acción');
       }
@@ -129,16 +149,11 @@ export function SettlementsBulkToolbar({
       return;
     }
 
-    void run(async () => {
-      const result = await bulkSubmitSettlementsForReview(selectedIds);
-      if (!result?.success || !result.data) {
-        throw new Error(result?.error ?? 'No se pudo completar la acción');
-      }
-      return result.data;
-    }).then((data) => {
-      if (!data) return;
-      applyBulkResult(data);
-    });
+    if (draftIds.length === 0) {
+      setMessage('Seleccioná liquidaciones en borrador');
+      return;
+    }
+    setReviewConfirmOpen(true);
   };
 
   const openReturnDialog = () => {
@@ -279,6 +294,15 @@ export function SettlementsBulkToolbar({
         confirmLabel="Aprobar"
         onClose={() => setApproveDialog(null)}
         onConfirm={runApprove}
+      />
+
+      <SettlementsConfirmDialog
+        open={reviewConfirmOpen}
+        title="Enviar a revisión"
+        description={`¿Enviar ${draftIds.length} liquidación${draftIds.length !== 1 ? 'es' : ''} en borrador a revisión?`}
+        confirmLabel="Enviar a revisión"
+        onClose={() => setReviewConfirmOpen(false)}
+        onConfirm={runSubmitForReview}
       />
     </>
   );
