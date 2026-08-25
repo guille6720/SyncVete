@@ -117,7 +117,7 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
   const professionalIds = professionals.map((row) => row.id);
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }] =
+  const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }, { data: payments, error: paymentsError }] =
     await Promise.all([
       supabase
         .from('professional_settlements')
@@ -130,12 +130,20 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
         .in('professional_id', professionalIds)
         .is('deleted_at', null)
         .eq('is_active', true),
+      supabase
+        .from('professional_payments')
+        .select('professional_id, amount, paid_at, settlement_id')
+        .in('professional_id', professionalIds)
+        .is('deleted_at', null)
+        .order('paid_at', { ascending: false }),
     ]);
   if (settlementsError) throw settlementsError;
   if (schemesError) throw schemesError;
+  if (paymentsError) throw paymentsError;
 
   const openBalanceByPro = new Map<string, number>();
   const pendingCountByPro = new Map<string, number>();
+  const approvedUnpaidByPro = new Map<string, number>();
   for (const row of settlements ?? []) {
     const proId = String(row.professional_id);
     const status = String(row.status);
@@ -150,6 +158,7 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
         proId,
         (openBalanceByPro.get(proId) ?? 0) + Number(row.balance_due ?? 0)
       );
+      approvedUnpaidByPro.set(proId, (approvedUnpaidByPro.get(proId) ?? 0) + 1);
     }
   }
 
@@ -163,12 +172,33 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
     }
   }
 
-  return professionals.map((professional) => ({
-    ...professional,
-    openBalance: Math.round((openBalanceByPro.get(professional.id) ?? 0) * 100) / 100,
-    pendingSettlementCount: pendingCountByPro.get(professional.id) ?? 0,
-    activeSchemeName: schemeNameByPro.get(professional.id) ?? null,
-  }));
+  const lastPaymentByPro = new Map<
+    string,
+    { amount: number; paidAt: string; settlementId: string | null }
+  >();
+  for (const row of payments ?? []) {
+    const proId = String(row.professional_id);
+    if (lastPaymentByPro.has(proId)) continue;
+    lastPaymentByPro.set(proId, {
+      amount: Number(row.amount ?? 0),
+      paidAt: String(row.paid_at),
+      settlementId: row.settlement_id ? String(row.settlement_id) : null,
+    });
+  }
+
+  return professionals.map((professional) => {
+    const last = lastPaymentByPro.get(professional.id);
+    return {
+      ...professional,
+      openBalance: Math.round((openBalanceByPro.get(professional.id) ?? 0) * 100) / 100,
+      pendingSettlementCount: pendingCountByPro.get(professional.id) ?? 0,
+      approvedUnpaidCount: approvedUnpaidByPro.get(professional.id) ?? 0,
+      activeSchemeName: schemeNameByPro.get(professional.id) ?? null,
+      lastPaymentAmount: last?.amount ?? null,
+      lastPaymentDate: last?.paidAt ?? null,
+      lastPaymentSettlementId: last?.settlementId ?? null,
+    };
+  });
 }
 
 export async function getProfessionalSettlementSummary(
@@ -178,25 +208,38 @@ export async function getProfessionalSettlementSummary(
   const supabase = await createServerClient();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }] =
-    await Promise.all([
-      supabase
-        .from('professional_settlements')
-        .select('balance_due, status')
-        .eq('professional_id', professionalId)
-        .is('deleted_at', null),
-      supabase
-        .from('professional_compensation_schemes')
-        .select('name, is_active, valid_from, valid_to')
-        .eq('professional_id', professionalId)
-        .is('deleted_at', null)
-        .eq('is_active', true),
-    ]);
+  const [
+    { data: settlements, error: settlementsError },
+    { data: schemes, error: schemesError },
+    { data: lastPayment, error: paymentError },
+  ] = await Promise.all([
+    supabase
+      .from('professional_settlements')
+      .select('balance_due, status')
+      .eq('professional_id', professionalId)
+      .is('deleted_at', null),
+    supabase
+      .from('professional_compensation_schemes')
+      .select('name, is_active, valid_from, valid_to')
+      .eq('professional_id', professionalId)
+      .is('deleted_at', null)
+      .eq('is_active', true),
+    supabase
+      .from('professional_payments')
+      .select('amount, paid_at, settlement_id')
+      .eq('professional_id', professionalId)
+      .is('deleted_at', null)
+      .order('paid_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
   if (settlementsError) throw settlementsError;
   if (schemesError) throw schemesError;
+  if (paymentError) throw paymentError;
 
   let openBalance = 0;
   let pendingSettlementCount = 0;
+  let approvedUnpaidCount = 0;
   for (const row of settlements ?? []) {
     const status = String(row.status);
     if (status === 'draft' || status === 'review') pendingSettlementCount += 1;
@@ -204,6 +247,7 @@ export async function getProfessionalSettlementSummary(
       (status === 'approved' || status === 'partially_paid') &&
       Number(row.balance_due ?? 0) > 0
     ) {
+      approvedUnpaidCount += 1;
       openBalance += Number(row.balance_due ?? 0);
     }
   }
@@ -221,7 +265,13 @@ export async function getProfessionalSettlementSummary(
   return {
     openBalance: Math.round(openBalance * 100) / 100,
     pendingSettlementCount,
+    approvedUnpaidCount,
     activeSchemeName,
+    lastPaymentAmount: lastPayment ? Number(lastPayment.amount) : null,
+    lastPaymentDate: lastPayment ? String(lastPayment.paid_at) : null,
+    lastPaymentSettlementId: lastPayment?.settlement_id
+      ? String(lastPayment.settlement_id)
+      : null,
   };
 }
 

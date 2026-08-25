@@ -1,9 +1,9 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import {
+  cloneCompensationScheme,
   createCompensationRule,
   createCompensationScheme,
   updateCompensationRule,
@@ -58,7 +58,8 @@ export function CompensationPanel({
           <CardHeader>
             <CardTitle>Nuevo esquema de compensación</CardTitle>
             <CardDescription>
-              Los esquemos históricos se conservan. Definí vigencia y reglas por período.
+              Los esquemas históricos se conservan. Definí vigencia y reglas por período. No se
+              permiten solapamientos entre esquemas activos.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -128,12 +129,23 @@ function SchemeCard({
     updateCompensationRule,
     null
   );
+  const [cloneState, cloneAction, clonePending] = useActionState(cloneCompensationScheme, null);
 
   useEffect(() => {
-    if (ruleState?.success || schemeUpdateState?.success || ruleUpdateState?.success) {
+    if (
+      ruleState?.success ||
+      schemeUpdateState?.success ||
+      ruleUpdateState?.success ||
+      cloneState?.success
+    ) {
       router.refresh();
     }
-  }, [ruleState, schemeUpdateState, ruleUpdateState, router]);
+  }, [ruleState, schemeUpdateState, ruleUpdateState, cloneState, router]);
+
+  const conditions = scheme.conditions ?? {};
+  const defaultAnchor = conditions.anchor_date ? String(conditions.anchor_date) : '';
+  const defaultPeriodDays = conditions.period_days != null ? String(conditions.period_days) : '';
+  const cloneFromDefault = new Date().toISOString().slice(0, 10);
 
   return (
     <Card>
@@ -158,8 +170,99 @@ function SchemeCard({
             </Button>
           </form>
         ) : null}
+        {canWrite && !scheme.is_active ? (
+          <form action={schemeUpdateAction} className="pt-1">
+            <input type="hidden" name="id" value={scheme.id} />
+            <input type="hidden" name="isActive" value="true" />
+            <Button type="submit" variant="outline" size="sm" disabled={schemeUpdatePending}>
+              {schemeUpdatePending ? 'Reactivando...' : 'Reactivar esquema'}
+            </Button>
+            {schemeUpdateState?.error ? (
+              <p className="mt-1 text-sm text-destructive">{schemeUpdateState.error}</p>
+            ) : null}
+          </form>
+        ) : null}
       </CardHeader>
       <CardContent className="space-y-4">
+        {canWrite ? (
+          <form
+            action={schemeUpdateAction}
+            className="grid gap-3 rounded-md border bg-muted/20 p-3 sm:grid-cols-2"
+          >
+            <input type="hidden" name="id" value={scheme.id} />
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Nombre</Label>
+              <Input name="name" defaultValue={scheme.name} required />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Vigente desde</Label>
+              <Input name="validFrom" type="date" defaultValue={scheme.valid_from} required />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Vigente hasta</Label>
+              <Input name="validTo" type="date" defaultValue={scheme.valid_to ?? ''} />
+            </div>
+            <div className="sm:col-span-2">
+              <SchemeConditionsFields
+                idPrefix={`edit-${scheme.id}`}
+                defaultAnchorDate={defaultAnchor}
+                defaultPeriodDays={defaultPeriodDays}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <Button type="submit" size="sm" disabled={schemeUpdatePending}>
+                {schemeUpdatePending ? 'Guardando...' : 'Guardar esquema'}
+              </Button>
+            </div>
+            {schemeUpdateState?.error ? (
+              <p className="sm:col-span-2 text-sm text-destructive">{schemeUpdateState.error}</p>
+            ) : null}
+          </form>
+        ) : null}
+
+        {canWrite ? (
+          <form action={cloneAction} className="grid gap-3 rounded-md border p-3 sm:grid-cols-2">
+            <input type="hidden" name="sourceSchemeId" value={scheme.id} />
+            <div className="space-y-1 sm:col-span-2">
+              <p className="text-sm font-medium">Clonar esquema</p>
+              <p className="text-xs text-muted-foreground">
+                Copia reglas activas a un nuevo período. Si hay solapamiento con otro esquema activo,
+                la clonación se rechaza.
+              </p>
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <Label className="text-xs">Nombre nuevo</Label>
+              <Input name="name" required placeholder={`${scheme.name} (nuevo)`} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Vigente desde</Label>
+              <Input name="validFrom" type="date" required defaultValue={cloneFromDefault} />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Vigente hasta</Label>
+              <Input name="validTo" type="date" />
+            </div>
+            <label className="flex items-center gap-2 text-sm sm:col-span-2">
+              <input
+                type="checkbox"
+                name="deactivateSource"
+                value="true"
+                defaultChecked
+                className="h-4 w-4 rounded border"
+              />
+              Desactivar origen y cerrar vigencia el día anterior
+            </label>
+            <div className="sm:col-span-2">
+              <Button type="submit" size="sm" variant="secondary" disabled={clonePending}>
+                {clonePending ? 'Clonando...' : 'Clonar esquema'}
+              </Button>
+            </div>
+            {cloneState?.error ? (
+              <p className="sm:col-span-2 text-sm text-destructive">{cloneState.error}</p>
+            ) : null}
+          </form>
+        ) : null}
+
         {rules.length === 0 ? (
           <p className="text-sm text-muted-foreground">Sin reglas en este esquema.</p>
         ) : (
@@ -206,8 +309,17 @@ function SchemeCard({
                       </Button>
                     </form>
                   ) : null}
+                  {canWrite && !rule.is_active ? (
+                    <form action={ruleUpdateAction}>
+                      <input type="hidden" name="id" value={rule.id} />
+                      <input type="hidden" name="isActive" value="true" />
+                      <Button type="submit" variant="ghost" size="sm" disabled={ruleUpdatePending}>
+                        Reactivar
+                      </Button>
+                    </form>
+                  ) : null}
                 </div>
-                {canWrite && rule.is_active ? (
+                {canWrite ? (
                   <form
                     action={ruleUpdateAction}
                     className="mt-3 grid gap-2 rounded-md border bg-muted/20 p-3 sm:grid-cols-2"
@@ -278,7 +390,7 @@ function SchemeCard({
           </ul>
         )}
 
-        {canWrite && (
+        {canWrite && scheme.is_active ? (
           <form action={ruleAction} className="grid gap-3 rounded-md border bg-muted/20 p-4">
             <input type="hidden" name="compensationSchemeId" value={scheme.id} />
             <div className="grid gap-3 sm:grid-cols-2">
@@ -355,7 +467,13 @@ function SchemeCard({
               {rulePending ? 'Agregando...' : 'Agregar regla'}
             </Button>
           </form>
-        )}
+        ) : null}
+        {canWrite && !scheme.is_active ? (
+          <p className="text-xs text-muted-foreground">
+            Reactivá el esquema para agregar reglas nuevas. Podés editar las existentes y ajustar
+            vigencia antes de reactivar (sin solapar otro activo).
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

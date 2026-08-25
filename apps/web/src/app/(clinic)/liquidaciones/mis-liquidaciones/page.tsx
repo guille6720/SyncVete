@@ -18,6 +18,7 @@ interface PageProps {
     status?: string;
     pendingReview?: string;
     unpaid?: string;
+    paidInMonth?: string;
     periodStart?: string;
     periodEnd?: string;
   }>;
@@ -35,17 +36,19 @@ export default async function MisLiquidacionesPage({ searchParams }: PageProps) 
     : undefined;
   const pendingReview = params.pendingReview === '1';
   const unpaid = params.unpaid === '1';
+  const paidInMonth = params.paidInMonth === '1';
 
   const [professional, history, organization, summary] = await Promise.all([
     getProfessionalForCurrentUser(),
     listMySettlements({
       page,
       pageSize: 25,
-      status: pendingReview || unpaid ? undefined : status,
+      status: pendingReview || unpaid || paidInMonth ? undefined : status,
       pendingReview,
       unpaid,
-      periodStart: params.periodStart,
-      periodEnd: params.periodEnd,
+      paidInMonth,
+      periodStart: paidInMonth ? undefined : params.periodStart,
+      periodEnd: paidInMonth ? undefined : params.periodEnd,
     }),
     getOrganization(),
     getMySettlementsSummary(),
@@ -66,11 +69,12 @@ export default async function MisLiquidacionesPage({ searchParams }: PageProps) 
         </div>
         <SettlementsExportButton
           scope="mine"
-          status={pendingReview || unpaid ? undefined : status}
+          status={pendingReview || unpaid || paidInMonth ? undefined : status}
           pendingReview={pendingReview}
           unpaid={unpaid}
-          periodStart={params.periodStart}
-          periodEnd={params.periodEnd}
+          paidInMonth={paidInMonth}
+          periodStart={paidInMonth ? undefined : params.periodStart}
+          periodEnd={paidInMonth ? undefined : params.periodEnd}
         />
       </div>
 
@@ -80,11 +84,12 @@ export default async function MisLiquidacionesPage({ searchParams }: PageProps) 
         <SettlementsHistory
           data={history}
           professionals={[professional]}
-          initialStatus={pendingReview || unpaid ? '' : (status ?? '')}
+          initialStatus={pendingReview || unpaid || paidInMonth ? '' : (status ?? '')}
           initialPendingReview={pendingReview}
           initialUnpaid={unpaid}
-          initialPeriodStart={params.periodStart ?? ''}
-          initialPeriodEnd={params.periodEnd ?? ''}
+          initialPaidInMonth={paidInMonth}
+          initialPeriodStart={paidInMonth ? '' : (params.periodStart ?? '')}
+          initialPeriodEnd={paidInMonth ? '' : (params.periodEnd ?? '')}
           currency={currency}
           readOnly
           detailBasePath="/liquidaciones/mis-liquidaciones"

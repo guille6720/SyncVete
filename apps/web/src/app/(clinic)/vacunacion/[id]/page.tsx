@@ -4,6 +4,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { VaccinationDetail } from '@/components/vaccinations/vaccination-detail';
 
 interface VacunacionDetailPageProps {
@@ -26,8 +27,7 @@ export default async function VacunacionDetailPage({ params }: VacunacionDetailP
   const settlementClaim = settlementAccess
     ? await getSettlementClaimForSource('vaccination', vaccination.id)
     : null;
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   return (
     <VaccinationDetail

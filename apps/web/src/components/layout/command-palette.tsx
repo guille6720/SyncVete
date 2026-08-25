@@ -126,9 +126,11 @@ const PREFETCH_ON_OPEN = [
 export function CommandPalette({
   entitledHrefs = null,
   isPlatformAdmin = false,
+  showMySettlementsNav = false,
 }: {
   entitledHrefs?: string[] | null;
   isPlatformAdmin?: boolean;
+  showMySettlementsNav?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -165,6 +167,13 @@ export function CommandPalette({
 
   if (!open) return null;
 
+  const navItems = NAV_ITEMS.filter((item) => {
+    if (item.href === '/liquidaciones/mis-liquidaciones' && !showMySettlementsNav) {
+      return false;
+    }
+    return isClinicPathEntitled(item.href, entitledHrefs);
+  });
+
   return (
     <div className="fixed inset-0 z-50">
       <button
@@ -193,7 +202,7 @@ export function CommandPalette({
             </Command.Empty>
 
             <Command.Group heading="Navegación" className="px-1 py-1.5 text-xs font-medium text-muted-foreground">
-              {NAV_ITEMS.filter((item) => isClinicPathEntitled(item.href, entitledHrefs)).map((item) => (
+              {navItems.map((item) => (
                 <Command.Item
                   key={item.href}
                   value={`${item.label} ${item.keywords}`}

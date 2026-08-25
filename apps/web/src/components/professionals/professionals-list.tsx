@@ -58,6 +58,15 @@ export function ProfessionalsList({ professionals, currency = 'ARS' }: Professio
               {professional.pendingSettlementCount > 0 ? (
                 <span>{professional.pendingSettlementCount} en borrador/revisión</span>
               ) : null}
+              {professional.lastPaymentAmount != null && professional.lastPaymentDate ? (
+                <span>
+                  Último pago:{' '}
+                  <span className="text-foreground">
+                    {formatMoney(professional.lastPaymentAmount, currency)}
+                  </span>{' '}
+                  ({professional.lastPaymentDate.slice(0, 10)})
+                </span>
+              ) : null}
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

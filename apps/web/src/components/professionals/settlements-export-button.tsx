@@ -8,12 +8,14 @@ import {
 } from '@/actions/professional-settlements';
 import { Button } from '@/components/ui/button';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
+import { SETTLEMENT_EXPORT_MAX_ROWS } from '@sincvete/shared';
 
 interface SettlementsExportButtonProps {
   professionalId?: string;
   status?: string;
   pendingReview?: boolean;
   unpaid?: boolean;
+  paidInMonth?: boolean;
   periodStart?: string;
   periodEnd?: string;
   branchId?: string;
@@ -26,6 +28,7 @@ export function SettlementsExportButton({
   status,
   pendingReview,
   unpaid,
+  paidInMonth,
   periodStart,
   periodEnd,
   branchId,
@@ -36,11 +39,12 @@ export function SettlementsExportButton({
 
   const filters = {
     professionalId: professionalId || undefined,
-    status: pendingReview || unpaid ? undefined : status || undefined,
+    status: pendingReview || unpaid || paidInMonth ? undefined : status || undefined,
     pendingReview: pendingReview || undefined,
     unpaid: unpaid || undefined,
-    periodStart: periodStart || undefined,
-    periodEnd: periodEnd || undefined,
+    paidInMonth: paidInMonth || undefined,
+    periodStart: paidInMonth ? undefined : periodStart || undefined,
+    periodEnd: paidInMonth ? undefined : periodEnd || undefined,
     branchId: branchId || undefined,
   };
 
@@ -52,6 +56,7 @@ export function SettlementsExportButton({
           status: filters.status,
           pendingReview: filters.pendingReview,
           unpaid: filters.unpaid,
+          paidInMonth: filters.paidInMonth,
           periodStart: filters.periodStart,
           periodEnd: filters.periodEnd,
         });
@@ -77,7 +82,15 @@ export function SettlementsExportButton({
           : `liquidaciones-${new Date().toISOString().slice(0, 10)}.csv`;
     anchor.click();
     URL.revokeObjectURL(url);
-    setMessage(`${result.data.rowCount} liquidaciones exportadas`);
+    const { rowCount, total, truncated } = result.data;
+    const truncateHint = paidInMonth
+      ? 'filtrá estado o profesional'
+      : 'filtrá período';
+    setMessage(
+      truncated
+        ? `${rowCount} de ${total} exportadas (tope ${SETTLEMENT_EXPORT_MAX_ROWS} — ${truncateHint})`
+        : `${rowCount} liquidaciones exportadas`
+    );
   }
 
   return (
@@ -86,9 +99,14 @@ export function SettlementsExportButton({
         {pending ? 'Exportando...' : 'Exportar CSV'}
       </Button>
       {scope === 'org' ? (
-        <Button variant="outline" size="sm" disabled={pending} onClick={() => void downloadCsv('accounting')}>
-          {pending ? 'Exportando...' : 'Export contable'}
-        </Button>
+        <div className="flex flex-col gap-0.5">
+          <Button variant="outline" size="sm" disabled={pending} onClick={() => void downloadCsv('accounting')}>
+            {pending ? 'Exportando...' : 'Export contable'}
+          </Button>
+          <span className="text-[11px] text-muted-foreground">
+            CSV operativo (no comprobante fiscal)
+          </span>
+        </div>
       ) : null}
       {message ? <span className="text-xs text-muted-foreground">{message}</span> : null}
     </div>

@@ -36,6 +36,9 @@ export function mapSettlementRow(row: Record<string, unknown>): ProfessionalSett
     approved_at: row.approved_at ? String(row.approved_at) : null,
     approved_by: row.approved_by ? String(row.approved_by) : null,
     paid_at: row.paid_at ? String(row.paid_at) : null,
+    cancelled_at: row.cancelled_at ? String(row.cancelled_at) : null,
+    cancelled_by: row.cancelled_by ? String(row.cancelled_by) : null,
+    cancellation_reason: row.cancellation_reason ? String(row.cancellation_reason) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     deleted_at: row.deleted_at ? String(row.deleted_at) : null,
@@ -84,6 +87,22 @@ export function getSettlementItemSourceHref(
     default:
       return null;
   }
+}
+
+/** Access mode for clinical badges linking to settlement detail. */
+export type SettlementDetailAccess = 'admin' | 'own' | null | undefined;
+
+/** Base path for settlement detail (ops vs professional portal). */
+export function buildSettlementDetailBasePath(access: SettlementDetailAccess): string {
+  return access === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+}
+
+/** Full settlement detail href for clinical badges / deep links. */
+export function buildSettlementDetailHref(
+  access: SettlementDetailAccess,
+  settlementId: string
+): string {
+  return `${buildSettlementDetailBasePath(access)}/${settlementId}`;
 }
 
 export interface SettlementsSummary {
@@ -221,6 +240,8 @@ export function buildLiquidacionesHref(params: {
   status?: string | null;
   unpaid?: boolean;
   pendingReview?: boolean;
+  /** Settlements with a payment dated in the current calendar month (matches KPI). */
+  paidInMonth?: boolean;
   professionalId?: string | null;
   periodStart?: string | null;
   periodEnd?: string | null;
@@ -229,6 +250,7 @@ export function buildLiquidacionesHref(params: {
   const q = new URLSearchParams();
   if (params.unpaid) q.set('unpaid', '1');
   else if (params.pendingReview) q.set('pendingReview', '1');
+  else if (params.paidInMonth) q.set('paidInMonth', '1');
   else if (params.status) q.set('status', params.status);
   if (params.professionalId) q.set('professionalId', params.professionalId);
   if (params.periodStart) q.set('periodStart', params.periodStart);
@@ -236,6 +258,82 @@ export function buildLiquidacionesHref(params: {
   const query = q.toString();
   const base = params.basePath ?? '/liquidaciones';
   return query ? `${base}?${query}` : base;
+}
+
+/** Deep link for “pagado este mes” KPI (payments by paid_at in current month). */
+export function paidThisMonthLiquidacionesHref(_referenceDate = new Date()): string {
+  return buildLiquidacionesHref({ paidInMonth: true });
+}
+
+export const SETTLEMENT_EXPORT_MAX_ROWS = 500;
+
+/** Confirm copy for approve, distinguishing hard vs soft duplicate warnings. */
+export function settlementApproveConfirmMessage(
+  warnings: Array<{ severity: 'hard' | 'soft' }>
+): string {
+  const hard = warnings.filter((row) => row.severity === 'hard').length;
+  const soft = warnings.filter((row) => row.severity === 'soft').length;
+  if (hard > 0) {
+    return `Hay ${hard} conflicto${hard !== 1 ? 's' : ''} duro${hard !== 1 ? 's' : ''} (fuentes ya liquidadas). Recalculá u omití antes de aprobar.`;
+  }
+  if (soft > 0) {
+    return `Hay ${soft} aviso${soft !== 1 ? 's' : ''} suave${soft !== 1 ? 's' : ''} (misma fuente en otra liquidación abierta). ¿Aprobar de todos modos?`;
+  }
+  return '¿Aprobar esta liquidación? Quedará lista para pago.';
+}
+
+/** Short triage hint for history list rows. */
+export function settlementHistoryRowHint(settlement: {
+  status: string;
+  notes?: string | null;
+  cancellation_reason?: string | null;
+}): string | null {
+  if (settlement.status === 'cancelled') {
+    const reason = settlement.cancellation_reason?.trim();
+    return reason ? `Cancelada: ${reason}` : 'Cancelada';
+  }
+  const { returnPrefix } = parseSettlementReturnNotes(settlement.notes);
+  if (returnPrefix) {
+    return returnPrefix.length > 140 ? `${returnPrefix.slice(0, 137)}…` : returnPrefix;
+  }
+  return null;
+}
+
+const SETTLEMENT_RETURN_NOTES_SEP = ' · ';
+
+/** Split return-to-draft trail from editable notes body. */
+export function parseSettlementReturnNotes(notes: string | null | undefined): {
+  returnPrefix: string | null;
+  body: string;
+} {
+  const trimmed = notes?.trim() ?? '';
+  if (!trimmed) return { returnPrefix: null, body: '' };
+  if (!/^Devuelta a borrador:/i.test(trimmed)) {
+    return { returnPrefix: null, body: trimmed };
+  }
+  const sepIndex = trimmed.indexOf(SETTLEMENT_RETURN_NOTES_SEP);
+  if (sepIndex === -1) {
+    return { returnPrefix: trimmed, body: '' };
+  }
+  return {
+    returnPrefix: trimmed.slice(0, sepIndex).trim(),
+    body: trimmed.slice(sepIndex + SETTLEMENT_RETURN_NOTES_SEP.length).trim(),
+  };
+}
+
+/** Recombine protected return prefix with editable body (max 2000). */
+export function mergeSettlementReturnNotes(
+  returnPrefix: string | null | undefined,
+  body: string | null | undefined
+): string | null {
+  const prefix = returnPrefix?.trim() || null;
+  const bodyTrim = body?.trim() || '';
+  if (prefix && bodyTrim) {
+    return `${prefix}${SETTLEMENT_RETURN_NOTES_SEP}${bodyTrim}`.slice(0, 2000);
+  }
+  if (prefix) return prefix.slice(0, 2000);
+  if (bodyTrim) return bodyTrim.slice(0, 2000);
+  return null;
 }
 
 /** Cash-movement notes that can be parsed back to a settlement detail link. */
@@ -260,6 +358,16 @@ export function extractSettlementHrefFromCashNote(
   if (!notes) return null;
   const match = notes.match(/\/liquidaciones\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
   return match ? match[0] : null;
+}
+
+/** True when two closed/open date ranges overlap (inclusive, ISO date-only). */
+export function compensationSchemeRangesOverlap(
+  left: { validFrom: string; validTo?: string | null },
+  right: { validFrom: string; validTo?: string | null }
+): boolean {
+  const leftEnd = left.validTo && left.validTo.trim() ? left.validTo : '9999-12-31';
+  const rightEnd = right.validTo && right.validTo.trim() ? right.validTo : '9999-12-31';
+  return left.validFrom <= rightEnd && right.validFrom <= leftEnd;
 }
 
 /** Current calendar month range (local) for dashboard deep links. */

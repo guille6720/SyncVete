@@ -16,6 +16,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 
 interface ConsultaPageProps {
   params: Promise<{ id: string }>;
@@ -40,8 +41,7 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
     settlementAccess && consultation.status === 'completada'
       ? await getSettlementClaimForSource('consultation', consultation.id)
       : null;
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   const isOpen = consultation.status === 'en_curso' || consultation.status === 'en_espera';
 

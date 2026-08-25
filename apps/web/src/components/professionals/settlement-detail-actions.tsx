@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { exportSettlementDetailCsv, recalculateSettlementById } from '@/actions/professional-settlements';
 import { useRouter } from 'next/navigation';
+import { SettlementsConfirmDialog } from '@/components/professionals/settlements-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
 import {
@@ -26,7 +27,6 @@ interface SettlementDetailActionsProps {
   submitPending: boolean;
   exportOnly?: boolean;
   auditHref?: string | null;
-  paymentsAuditHref?: string | null;
 }
 
 export function SettlementDetailActions({
@@ -39,12 +39,13 @@ export function SettlementDetailActions({
   submitPending,
   exportOnly = false,
   auditHref = null,
-  paymentsAuditHref = null,
 }: SettlementDetailActionsProps) {
   const router = useRouter();
   const printRef = useRef<HTMLDivElement>(null);
   const [exportMessage, setExportMessage] = useState<string | null>(null);
   const [recalcMessage, setRecalcMessage] = useState<string | null>(null);
+  const [printMessage, setPrintMessage] = useState<string | null>(null);
+  const [recalcConfirmOpen, setRecalcConfirmOpen] = useState(false);
   const [exportPending, runExport] = usePendingAction();
   const [recalcPending, runRecalc] = usePendingAction();
 
@@ -63,14 +64,10 @@ export function SettlementDetailActions({
     anchor.download = result.data.filename;
     anchor.click();
     URL.revokeObjectURL(url);
-    setExportMessage('CSV descargado');
+    setExportMessage('CSV operativo descargado (no fiscal)');
   }
 
   async function handleRecalculate() {
-    const confirmed = window.confirm(
-      '¿Recalcular esta liquidación? Se regeneran ítems desde las reglas activas; los ajustes manuales se conservan.'
-    );
-    if (!confirmed) return;
     setRecalcMessage(null);
     const result = await runRecalc(() => recalculateSettlementById(settlement.id));
     if (!result) return;
@@ -83,11 +80,15 @@ export function SettlementDetailActions({
   }
 
   function handlePrint() {
+    setPrintMessage(null);
     const content = printRef.current;
     if (!content) return;
     const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=800,height=900');
-    if (!printWindow) return;
-    printWindow.document.write(`<!DOCTYPE html><html><head><title>Comprobante liquidación</title>
+    if (!printWindow) {
+      setPrintMessage('No se pudo abrir la ventana de impresión (bloqueada por el navegador).');
+      return;
+    }
+    printWindow.document.write(`<!DOCTYPE html><html><head><title>Resumen de liquidación</title>
       <style>
         body { font-family: system-ui, sans-serif; padding: 24px; color: #111; }
         h1 { font-size: 1.25rem; margin: 0 0 4px; }
@@ -110,48 +111,60 @@ export function SettlementDetailActions({
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2">
-        {!exportOnly && canSubmitForReview ? (
-          <form action={submitAction}>
-            <input type="hidden" name="settlementId" value={settlement.id} />
-            <Button type="submit" variant="secondary" disabled={submitPending}>
-              {submitPending ? 'Enviando...' : 'Enviar a revisión'}
+      <div className="space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {!exportOnly && canSubmitForReview ? (
+            <form action={submitAction}>
+              <input type="hidden" name="settlementId" value={settlement.id} />
+              <Button type="submit" variant="secondary" disabled={submitPending}>
+                {submitPending ? 'Enviando...' : 'Enviar a revisión'}
+              </Button>
+            </form>
+          ) : null}
+          {!exportOnly && canRecalculate ? (
+            <Button
+              variant="secondary"
+              size="sm"
+              disabled={recalcPending}
+              onClick={() => setRecalcConfirmOpen(true)}
+            >
+              {recalcPending ? 'Recalculando...' : 'Recalcular'}
             </Button>
-          </form>
-        ) : null}
-        {!exportOnly && canRecalculate ? (
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={recalcPending}
-            onClick={() => void handleRecalculate()}
-          >
-            {recalcPending ? 'Recalculando...' : 'Recalcular'}
+          ) : null}
+          <Button variant="outline" size="sm" disabled={exportPending} onClick={() => void downloadCsv()}>
+            {exportPending ? 'Exportando...' : 'Exportar CSV'}
           </Button>
-        ) : null}
-        <Button variant="outline" size="sm" disabled={exportPending} onClick={() => void downloadCsv()}>
-          {exportPending ? 'Exportando...' : 'Exportar CSV'}
-        </Button>
-        <Button variant="outline" size="sm" onClick={handlePrint}>
-          Imprimir comprobante
-        </Button>
-        {auditHref ? (
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={auditHref}>Ver en auditoría</Link>
+          <Button variant="outline" size="sm" onClick={handlePrint}>
+            Imprimir resumen
           </Button>
-        ) : null}
-        {paymentsAuditHref ? (
-          <Button variant="ghost" size="sm" asChild>
-            <Link href={paymentsAuditHref}>Auditoría de pagos</Link>
-          </Button>
-        ) : null}
-        {exportMessage ? <span className="text-xs text-muted-foreground">{exportMessage}</span> : null}
-        {recalcMessage ? <span className="text-xs text-muted-foreground">{recalcMessage}</span> : null}
+          {auditHref ? (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={auditHref}>Ver en auditoría</Link>
+            </Button>
+          ) : null}
+          {exportMessage ? <span className="text-xs text-muted-foreground">{exportMessage}</span> : null}
+          {recalcMessage ? <span className="text-xs text-muted-foreground">{recalcMessage}</span> : null}
+          {printMessage ? <span className="text-xs text-amber-700 dark:text-amber-400">{printMessage}</span> : null}
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          CSV e impresión son operativos internos — no comprobante fiscal ni recibo legal.
+        </p>
       </div>
+
+      <SettlementsConfirmDialog
+        open={recalcConfirmOpen}
+        title="Recalcular liquidación"
+        description="¿Recalcular esta liquidación? Se regeneran ítems desde las reglas activas; los ajustes manuales se conservan."
+        confirmLabel="Recalcular"
+        onClose={() => setRecalcConfirmOpen(false)}
+        onConfirm={() => {
+          void handleRecalculate();
+        }}
+      />
 
       <div ref={printRef} className="hidden" aria-hidden>
         <h1>{organizationName}</h1>
-        <p className="muted">Comprobante de liquidación · {new Date().toLocaleDateString('es-AR')}</p>
+        <p className="muted">Resumen operativo de liquidación · {new Date().toLocaleDateString('es-AR')}</p>
         <p>
           <strong>{professionalName}</strong>
         </p>
@@ -159,6 +172,10 @@ export function SettlementDetailActions({
           Período: {settlement.period_start} → {settlement.period_end}
         </p>
         <p>Estado: {SETTLEMENT_STATUS_LABELS[settlement.status]}</p>
+        {settlement.cancellation_reason ? (
+          <p>Motivo cancelación: {settlement.cancellation_reason}</p>
+        ) : null}
+        {settlement.notes ? <p>Notas: {settlement.notes}</p> : null}
         <table>
           <tbody>
             <tr>
@@ -260,6 +277,29 @@ export function SettlementDetailActions({
                     <td>{SETTLEMENT_ADJUSTMENT_TYPE_LABELS[adjustment.adjustment_type]}</td>
                     <td>{adjustment.reason}</td>
                     <td>{formatMoney(adjustment.amount, currency)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        ) : null}
+        {settlement.omissions.length > 0 ? (
+          <>
+            <p style={{ marginTop: '16px' }}>
+              <strong>Ítems excluidos</strong>
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Tipo</th>
+                  <th>Motivo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {settlement.omissions.map((omission) => (
+                  <tr key={omission.id}>
+                    <td>{SETTLEMENT_ITEM_SOURCE_TYPE_LABELS[omission.source_type]}</td>
+                    <td>{omission.reason}</td>
                   </tr>
                 ))}
               </tbody>

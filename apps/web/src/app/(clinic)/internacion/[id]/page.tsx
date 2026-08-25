@@ -4,6 +4,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimsForSources,
 } from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { HospitalizationStay } from '@/components/hospitalizations/hospitalization-stay';
 
 interface InternacionDetailPageProps {
@@ -23,8 +24,7 @@ export default async function InternacionDetailPage({ params }: InternacionDetai
 
   if (!result) notFound();
 
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
   const settlementClaimsByNoteId =
     settlementAccess && result.notes.length > 0
       ? await getSettlementClaimsForSources(

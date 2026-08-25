@@ -4,6 +4,7 @@ import {
   AUDIT_DEFAULT_RANGE_DAYS,
   AUDIT_DIFF_SKIP_KEYS,
   AUDIT_ENTITY_LABELS,
+  AUDIT_LIQUIDACIONES_FAMILY,
   AUDIT_MAX_RANGE_DAYS,
   type AuditAction,
   type AuditEntityType,
@@ -20,6 +21,7 @@ export function isAuditAction(value: string): value is AuditAction {
 }
 
 export function auditEntityLabel(entityType: string): string {
+  if (entityType === AUDIT_LIQUIDACIONES_FAMILY) return 'Liquidaciones (familia)';
   return AUDIT_ENTITY_LABELS[entityType as AuditEntityType] ?? entityType.replace(/_/g, ' ');
 }
 
@@ -111,6 +113,8 @@ export function buildAuditEntityHref(
     case 'professional_compensation_rules':
       return '/profesionales';
     case 'professional_settlement_items':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
+    case 'professional_settlement_item_omissions':
       return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
     case 'professional_settlement_adjustments':
       return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';

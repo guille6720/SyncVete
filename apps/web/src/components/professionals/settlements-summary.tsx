@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatMoney, type SettlementsSummary } from '@sincvete/shared';
+import { formatMoney, paidThisMonthLiquidacionesHref, type SettlementsSummary } from '@sincvete/shared';
 
 interface SettlementsSummaryProps {
   summary: SettlementsSummary;
@@ -34,7 +34,8 @@ export function SettlementsSummaryPanel({ summary }: SettlementsSummaryProps) {
       <SummaryCard
         label="Pagado este mes"
         value={formatMoney(summary.paidThisMonth, currency)}
-        hint="Pagos registrados"
+        href={paidThisMonthLiquidacionesHref()}
+        hint="Pagos registrados este mes (por fecha de pago)"
       />
     </div>
   );

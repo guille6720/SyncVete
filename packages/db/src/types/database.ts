@@ -7644,6 +7644,13 @@ export interface Database {
         };
         Returns: Json;
       };
+      return_professional_settlement_to_draft: {
+        Args: {
+          p_settlement_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
       omit_professional_settlement_item: {
         Args: {
           p_item_id: string;

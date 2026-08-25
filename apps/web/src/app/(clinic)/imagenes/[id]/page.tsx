@@ -4,6 +4,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { ClinicalImageDetail } from '@/components/images/clinical-image-detail';
 
 interface ImagenDetailPageProps {
@@ -28,8 +29,7 @@ export default async function ImagenDetailPage({ params }: ImagenDetailPageProps
     settlementAccess && procedureKinds.has(image.kind)
       ? await getSettlementClaimForSource('procedure', image.id)
       : null;
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   return (
     <ClinicalImageDetail

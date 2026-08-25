@@ -14,6 +14,8 @@ import {
   SETTLEMENT_STATUS_LABELS,
   SETTLEMENT_STATUS_VARIANT,
   formatMoney,
+  resolveSettlementPeriodRange,
+  settlementHistoryRowHint,
   type PaginatedResult,
   type Professional,
   type ProfessionalSettlement,
@@ -32,6 +34,7 @@ interface SettlementsHistoryProps {
   initialStatus?: string;
   initialPendingReview?: boolean;
   initialUnpaid?: boolean;
+  initialPaidInMonth?: boolean;
   initialProfessionalId?: string;
   initialPeriodStart?: string;
   initialPeriodEnd?: string;
@@ -58,6 +61,7 @@ export function SettlementsHistory({
   initialStatus = '',
   initialPendingReview = false,
   initialUnpaid = false,
+  initialPaidInMonth = false,
   initialProfessionalId = '',
   initialPeriodStart = '',
   initialPeriodEnd = '',
@@ -132,23 +136,106 @@ export function SettlementsHistory({
   const showBulk =
     !readOnly && (canBulkApprove || canBulkSubmit || canBulkPay) && selectableIds.length > 0;
 
+  const hasActiveFilters = Boolean(
+    initialStatus ||
+      initialPendingReview ||
+      initialUnpaid ||
+      initialPaidInMonth ||
+      initialProfessionalId ||
+      initialPeriodStart ||
+      initialPeriodEnd ||
+      initialBranchId
+  );
+
+  const clearAllFilters = () => {
+    updateParams({
+      status: null,
+      pendingReview: null,
+      unpaid: null,
+      paidInMonth: null,
+      professionalId: null,
+      periodStart: null,
+      periodEnd: null,
+      branchId: null,
+    });
+  };
+
   const statusSelectValue = initialUnpaid
     ? '__unpaid__'
     : initialPendingReview
       ? '__pending_review__'
-      : initialStatus;
+      : initialPaidInMonth
+        ? '__paid_in_month__'
+        : initialStatus;
 
   const handleStatusChange = (value: string) => {
     if (value === '__pending_review__') {
-      updateParams({ status: null, pendingReview: '1', unpaid: null });
+      updateParams({ status: null, pendingReview: '1', unpaid: null, paidInMonth: null });
       return;
     }
     if (value === '__unpaid__') {
-      updateParams({ status: null, pendingReview: null, unpaid: '1' });
+      updateParams({ status: null, pendingReview: null, unpaid: '1', paidInMonth: null });
       return;
     }
-    updateParams({ status: value || null, pendingReview: null, unpaid: null });
+    if (value === '__paid_in_month__') {
+      updateParams({
+        status: null,
+        pendingReview: null,
+        unpaid: null,
+        paidInMonth: '1',
+        periodStart: null,
+        periodEnd: null,
+      });
+      return;
+    }
+    updateParams({
+      status: value || null,
+      pendingReview: null,
+      unpaid: null,
+      paidInMonth: null,
+    });
   };
+
+  const applyPeriodPreset = (kind: 'month' | 'last_month' | 'biweekly') => {
+    const range = resolveSettlementPeriodRange({ kind });
+    updateParams({
+      periodStart: range.start,
+      periodEnd: range.end,
+      paidInMonth: null,
+    });
+  };
+
+  const periodPresetButtons = (
+    <div className="flex flex-wrap gap-2">
+      <Button type="button" variant="outline" size="sm" onClick={() => applyPeriodPreset('month')}>
+        Este mes
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => applyPeriodPreset('last_month')}
+      >
+        Mes anterior
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        onClick={() => applyPeriodPreset('biweekly')}
+      >
+        Quincena
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        onClick={() => updateParams({ periodStart: null, periodEnd: null, paidInMonth: null })}
+      >
+        Limpiar fechas
+      </Button>
+    </div>
+  );
 
   const statusFilter = (
     <Select
@@ -159,6 +246,7 @@ export function SettlementsHistory({
       <option value="">Todos los estados</option>
       <option value="__pending_review__">Borrador / revisión</option>
       <option value="__unpaid__">Con saldo / por pagar</option>
+      <option value="__paid_in_month__">Pagadas este mes (por fecha de pago)</option>
       {SETTLEMENT_STATUSES.map((status) => (
         <option key={status} value={status}>
           {SETTLEMENT_STATUS_LABELS[status]}
@@ -200,6 +288,7 @@ export function SettlementsHistory({
             <option value="">Todos los estados</option>
             <option value="__pending_review__">Borrador / revisión</option>
             <option value="__unpaid__">Con saldo / por pagar</option>
+            <option value="__paid_in_month__">Pagadas este mes (por fecha de pago)</option>
             {SETTLEMENT_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {SETTLEMENT_STATUS_LABELS[status]}
@@ -223,37 +312,62 @@ export function SettlementsHistory({
           <Input
             type="date"
             value={initialPeriodStart}
-            onChange={(e) => updateParams({ periodStart: e.target.value || null })}
+            onChange={(e) =>
+              updateParams({ periodStart: e.target.value || null, paidInMonth: null })
+            }
             aria-label="Período desde"
             className="w-full"
           />
           <Input
             type="date"
             value={initialPeriodEnd}
-            onChange={(e) => updateParams({ periodEnd: e.target.value || null })}
+            onChange={(e) =>
+              updateParams({ periodEnd: e.target.value || null, paidInMonth: null })
+            }
             aria-label="Período hasta"
             className="w-full"
           />
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {statusFilter}
-          <Input
-            type="date"
-            value={initialPeriodStart}
-            onChange={(e) => updateParams({ periodStart: e.target.value || null })}
-            aria-label="Período desde"
-            className="w-full"
-          />
-          <Input
-            type="date"
-            value={initialPeriodEnd}
-            onChange={(e) => updateParams({ periodEnd: e.target.value || null })}
-            aria-label="Período hasta"
-            className="w-full"
-          />
+        <div className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {statusFilter}
+            <Input
+              type="date"
+              value={initialPeriodStart}
+              onChange={(e) =>
+                updateParams({ periodStart: e.target.value || null, paidInMonth: null })
+              }
+              aria-label="Período desde"
+              className="w-full"
+            />
+            <Input
+              type="date"
+              value={initialPeriodEnd}
+              onChange={(e) =>
+                updateParams({ periodEnd: e.target.value || null, paidInMonth: null })
+              }
+              aria-label="Período hasta"
+              className="w-full"
+            />
+          </div>
+          {periodPresetButtons}
         </div>
       )}
+
+      {!readOnly ? <div className="pt-1">{periodPresetButtons}</div> : null}
+
+      {initialPaidInMonth ? (
+        <p className="text-xs text-muted-foreground">
+          Filtro activo: pagadas este mes (por fecha de pago). Las fechas de período no aplican.
+        </p>
+      ) : null}
+      {initialPendingReview || initialUnpaid ? (
+        <p className="text-xs text-muted-foreground">
+          Filtro activo:{' '}
+          {initialPendingReview ? 'borrador / revisión' : 'con saldo / por pagar'}.
+        </p>
+      ) : null}
 
       {showBulk ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -282,14 +396,26 @@ export function SettlementsHistory({
       ) : null}
 
       {data.data.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No hay liquidaciones para los filtros seleccionados.
+        <div className="space-y-3 rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
+          <p>
+            {hasActiveFilters
+              ? 'No hay resultados para los filtros seleccionados.'
+              : readOnly
+                ? 'Todavía no hay liquidaciones en tu portal.'
+                : 'Todavía no hay liquidaciones calculadas.'}
+          </p>
+          {hasActiveFilters ? (
+            <Button type="button" variant="outline" size="sm" onClick={clearAllFilters}>
+              Limpiar filtros
+            </Button>
+          ) : null}
         </div>
       ) : (
         <div className="divide-y rounded-lg border">
           {data.data.map((settlement) => {
             const isSelectable = selectableIds.includes(settlement.id);
             const status = settlement.status as SettlementStatus;
+            const rowHint = settlementHistoryRowHint(settlement);
             return (
               <div
                 key={settlement.id}
@@ -317,6 +443,9 @@ export function SettlementsHistory({
                         ? SETTLEMENT_STATUS_LABELS[status]
                         : `${settlement.period_start} → ${settlement.period_end}`}
                     </p>
+                    {rowHint ? (
+                      <p className="mt-0.5 text-xs text-muted-foreground">{rowHint}</p>
+                    ) : null}
                   </Link>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">

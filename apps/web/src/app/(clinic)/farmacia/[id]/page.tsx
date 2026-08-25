@@ -4,6 +4,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { PrescriptionDetail } from '@/components/pharmacy/prescription-detail';
 
 interface FarmaciaDetailPageProps {
@@ -27,8 +28,7 @@ export default async function FarmaciaDetailPage({ params }: FarmaciaDetailPageP
     settlementAccess && data.prescription.status === 'dispensada'
       ? await getSettlementClaimForSource('prescription', data.prescription.id)
       : null;
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   return (
     <PrescriptionDetail

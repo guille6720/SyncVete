@@ -4,9 +4,17 @@ import Link from 'next/link';
 import { useState } from 'react';
 import {
   bulkApproveSettlements,
+  bulkCancelSettlements,
+  bulkReturnSettlementsToDraft,
   bulkSubmitSettlementsForReview,
+  preflightBulkApproveDuplicates,
 } from '@/actions/professional-settlements';
 import { SettlementsBulkPayDialog } from '@/components/professionals/settlements-bulk-pay-dialog';
+import {
+  SettlementsBulkReasonDialog,
+  type SettlementsBulkReasonMode,
+} from '@/components/professionals/settlements-bulk-reason-dialog';
+import { SettlementsConfirmDialog } from '@/components/professionals/settlements-confirm-dialog';
 import { Button } from '@/components/ui/button';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
 import type { BulkSettlementActionResult, Professional, ProfessionalSettlement } from '@sincvete/shared';
@@ -50,49 +58,138 @@ export function SettlementsBulkToolbar({
   const [message, setMessage] = useState<string | null>(null);
   const [failedRows, setFailedRows] = useState<BulkSettlementActionResult['failed']>([]);
   const [payOpen, setPayOpen] = useState(false);
+  const [reasonDialog, setReasonDialog] = useState<{
+    mode: SettlementsBulkReasonMode;
+    ids: string[];
+  } | null>(null);
+  const [approveDialog, setApproveDialog] = useState<{
+    mode: 'confirm' | 'alert';
+    description: string;
+  } | null>(null);
   const [pending, run] = usePendingAction();
 
   if (selectedIds.length === 0) return null;
 
-  const handleBulk = (mode: 'approve' | 'review') => {
-    if (mode === 'approve') {
-      const confirmed = window.confirm(
-        `¿Aprobar ${selectedIds.length} liquidación${selectedIds.length !== 1 ? 'es' : ''} seleccionada${selectedIds.length !== 1 ? 's' : ''}?`
-      );
-      if (!confirmed) return;
+  const applyBulkResult = (data: BulkSettlementActionResult) => {
+    const ok = data.succeeded.length;
+    const fail = data.failed.length;
+    setFailedRows(data.failed);
+    setMessage(
+      fail > 0
+        ? `${ok} OK · ${fail} con error`
+        : `${ok} liquidacion${ok !== 1 ? 'es' : ''} procesada${ok !== 1 ? 's' : ''}`
+    );
+    if (fail === 0) {
+      onClear();
+      onComplete();
     }
+  };
+
+  const runApprove = () => {
     setMessage(null);
     setFailedRows([]);
     void run(async () => {
-      const result =
-        mode === 'approve'
-          ? await bulkApproveSettlements(selectedIds)
-          : await bulkSubmitSettlementsForReview(selectedIds);
+      const result = await bulkApproveSettlements(selectedIds);
       if (!result?.success || !result.data) {
         throw new Error(result?.error ?? 'No se pudo completar la acción');
       }
       return result.data;
     }).then((data) => {
       if (!data) return;
-      const ok = data.succeeded.length;
-      const fail = data.failed.length;
-      setFailedRows(data.failed);
-      setMessage(
-        fail > 0
-          ? `${ok} OK · ${fail} con error`
-          : `${ok} liquidacion${ok !== 1 ? 'es' : ''} procesada${ok !== 1 ? 's' : ''}`
-      );
-      if (fail === 0) {
-        onClear();
-        onComplete();
-      }
+      applyBulkResult(data);
     });
+  };
+
+  const handleBulk = (mode: 'approve' | 'review') => {
+    setMessage(null);
+    setFailedRows([]);
+    if (mode === 'approve') {
+      void run(async () => {
+        const preflight = await preflightBulkApproveDuplicates(selectedIds);
+        if (!preflight?.success || !preflight.data) {
+          throw new Error(preflight?.error ?? 'No se pudo validar conflictos');
+        }
+        return preflight.data;
+      }).then((data) => {
+        if (!data) return;
+        if (data.hardSettlements > 0) {
+          setApproveDialog({
+            mode: 'alert',
+            description: `${data.hardSettlements} liquidación${data.hardSettlements !== 1 ? 'es' : ''} con conflictos duros (${data.hardWarnings} fuente${data.hardWarnings !== 1 ? 's' : ''} ya liquidadas). Revisá u omití antes de aprobar en bloque.`,
+          });
+          return;
+        }
+        const softNote =
+          data.softSettlements > 0 ? ` ${data.softSettlements} con avisos suaves.` : '';
+        setApproveDialog({
+          mode: 'confirm',
+          description: `¿Aprobar ${selectedIds.length} liquidación${selectedIds.length !== 1 ? 'es' : ''} seleccionada${selectedIds.length !== 1 ? 's' : ''}?${softNote}`,
+        });
+      });
+      return;
+    }
+
+    void run(async () => {
+      const result = await bulkSubmitSettlementsForReview(selectedIds);
+      if (!result?.success || !result.data) {
+        throw new Error(result?.error ?? 'No se pudo completar la acción');
+      }
+      return result.data;
+    }).then((data) => {
+      if (!data) return;
+      applyBulkResult(data);
+    });
+  };
+
+  const openReturnDialog = () => {
+    const reviewIds = selectedSettlements
+      .filter((row) => row.status === 'review')
+      .map((row) => row.id);
+    if (reviewIds.length === 0) {
+      setMessage('Seleccioná liquidaciones en revisión');
+      return;
+    }
+    setReasonDialog({ mode: 'return', ids: reviewIds });
+  };
+
+  const openCancelDialog = () => {
+    const cancelIds = selectedSettlements
+      .filter((row) => row.status === 'draft' || row.status === 'review')
+      .map((row) => row.id);
+    if (cancelIds.length === 0) {
+      setMessage('Seleccioná liquidaciones en borrador o revisión');
+      return;
+    }
+    setReasonDialog({ mode: 'cancel', ids: cancelIds });
+  };
+
+  const handleReasonConfirm = async (reason: string) => {
+    if (!reasonDialog) return;
+    setMessage(null);
+    setFailedRows([]);
+    const result =
+      reasonDialog.mode === 'return'
+        ? await bulkReturnSettlementsToDraft(reasonDialog.ids, reason)
+        : await bulkCancelSettlements(reasonDialog.ids, reason);
+    if (!result?.success || !result.data) {
+      throw new Error(
+        result?.error ??
+          (reasonDialog.mode === 'return'
+            ? 'No se pudo devolver a borrador'
+            : 'No se pudo cancelar')
+      );
+    }
+    applyBulkResult(result.data);
   };
 
   const payableSettlements = selectedSettlements.filter(
     (row) =>
       (row.status === 'approved' || row.status === 'partially_paid') && row.balance_due > 0
   );
+  const returnableCount = selectedSettlements.filter((row) => row.status === 'review').length;
+  const cancellableCount = selectedSettlements.filter(
+    (row) => row.status === 'draft' || row.status === 'review'
+  ).length;
 
   const settlementById = new Map(selectedSettlements.map((row) => [row.id, row]));
 
@@ -109,6 +206,16 @@ export function SettlementsBulkToolbar({
           {canApprove ? (
             <Button size="sm" disabled={pending} onClick={() => handleBulk('approve')}>
               Aprobar
+            </Button>
+          ) : null}
+          {canApprove && returnableCount > 0 ? (
+            <Button size="sm" variant="outline" disabled={pending} onClick={openReturnDialog}>
+              Devolver a borrador
+            </Button>
+          ) : null}
+          {canApprove && cancellableCount > 0 ? (
+            <Button size="sm" variant="outline" disabled={pending} onClick={openCancelDialog}>
+              Cancelar
             </Button>
           ) : null}
           {canPay && payableSettlements.length > 0 ? (
@@ -154,6 +261,24 @@ export function SettlementsBulkToolbar({
           onClear();
           onComplete();
         }}
+      />
+
+      <SettlementsBulkReasonDialog
+        open={Boolean(reasonDialog)}
+        mode={reasonDialog?.mode ?? 'return'}
+        count={reasonDialog?.ids.length ?? 0}
+        onClose={() => setReasonDialog(null)}
+        onConfirm={handleReasonConfirm}
+      />
+
+      <SettlementsConfirmDialog
+        open={Boolean(approveDialog)}
+        title={approveDialog?.mode === 'alert' ? 'No se puede aprobar' : 'Aprobar liquidaciones'}
+        description={approveDialog?.description ?? ''}
+        mode={approveDialog?.mode ?? 'confirm'}
+        confirmLabel="Aprobar"
+        onClose={() => setApproveDialog(null)}
+        onConfirm={runApprove}
       />
     </>
   );

@@ -1,6 +1,10 @@
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatMoney, type MySettlementsSummary } from '@sincvete/shared';
+import {
+  formatMoney,
+  buildLiquidacionesHref,
+  type MySettlementsSummary,
+} from '@sincvete/shared';
 
 interface MySettlementsSummaryProps {
   summary: MySettlementsSummary;
@@ -8,9 +12,13 @@ interface MySettlementsSummaryProps {
 
 export function MySettlementsSummaryPanel({ summary }: MySettlementsSummaryProps) {
   const currency = summary.currency;
+  const paidThisMonthHref = buildLiquidacionesHref({
+    paidInMonth: true,
+    basePath: '/liquidaciones/mis-liquidaciones',
+  });
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
       <SummaryCard
         label="Saldo pendiente"
         value={formatMoney(summary.openBalance, currency)}
@@ -38,6 +46,12 @@ export function MySettlementsSummaryPanel({ summary }: MySettlementsSummaryProps
         }
       />
       <SummaryCard
+        label="Pagado este mes"
+        value={formatMoney(summary.paidThisMonth, currency)}
+        hint="Por fecha de pago"
+        href={paidThisMonthHref}
+      />
+      <SummaryCard
         label="Último pago"
         value={
           summary.lastPaymentAmount != null
@@ -48,6 +62,11 @@ export function MySettlementsSummaryPanel({ summary }: MySettlementsSummaryProps
           summary.lastPaymentDate
             ? summary.lastPaymentDate.slice(0, 10)
             : 'Sin pagos registrados'
+        }
+        href={
+          summary.lastPaymentSettlementId
+            ? `/liquidaciones/mis-liquidaciones/${summary.lastPaymentSettlementId}`
+            : undefined
         }
       />
     </div>

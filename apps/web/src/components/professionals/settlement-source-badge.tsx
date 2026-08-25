@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import {
   SETTLEMENT_STATUS_LABELS,
   SETTLEMENT_STATUS_VARIANT,
+  buildSettlementDetailHref,
+  type SettlementDetailAccess,
   type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
 
@@ -10,15 +12,17 @@ interface SettlementSourceBadgeProps {
   claim: SettlementSourceClaimInfo;
   compact?: boolean;
   detailHref?: string;
+  access?: SettlementDetailAccess;
 }
 
 export function SettlementSourceBadge({
   claim,
   compact = false,
   detailHref,
+  access = 'admin',
 }: SettlementSourceBadgeProps) {
   const status = claim.status as keyof typeof SETTLEMENT_STATUS_LABELS;
-  const href = detailHref ?? `/liquidaciones/${claim.settlementId}`;
+  const href = detailHref ?? buildSettlementDetailHref(access, claim.settlementId);
 
   if (compact) {
     return (

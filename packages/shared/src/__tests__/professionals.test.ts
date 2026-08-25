@@ -18,7 +18,11 @@ import {
   voidProfessionalPaymentSchema,
   omitSettlementItemSchema,
   restoreSettlementOmissionSchema,
+  returnSettlementToDraftSchema,
+  cloneCompensationSchemeSchema,
   getSettlementItemSourceHref,
+  buildSettlementDetailBasePath,
+  buildSettlementDetailHref,
   resolveSettlementPeriodRange,
   settlementPresetToPeriodKind,
   COMPENSATION_FREQUENCIES_UI,
@@ -28,6 +32,12 @@ import {
   buildProfessionalPaymentCashNote,
   extractSettlementHrefFromCashNote,
   currentMonthPeriodRange,
+  compensationSchemeRangesOverlap,
+  paidThisMonthLiquidacionesHref,
+  settlementApproveConfirmMessage,
+  settlementHistoryRowHint,
+  parseSettlementReturnNotes,
+  mergeSettlementReturnNotes,
   SETTLEMENT_ITEM_SOURCE_TYPE_LABELS,
   SETTLEMENT_ADJUSTMENT_TYPE_LABELS,
   SETTLEMENT_STATUS_LABELS,
@@ -173,6 +183,20 @@ describe('professionals schemas', () => {
         omissionId: '00000000-0000-4000-8000-000000000005',
       }).success
     ).toBe(true);
+    expect(
+      returnSettlementToDraftSchema.safeParse({
+        settlementId: '00000000-0000-4000-8000-000000000006',
+        reason: 'Falta ajuste',
+      }).success
+    ).toBe(true);
+    expect(
+      cloneCompensationSchemeSchema.safeParse({
+        sourceSchemeId: '00000000-0000-4000-8000-000000000007',
+        name: 'Septiembre 2026',
+        validFrom: '2026-09-01',
+        deactivateSource: false,
+      }).success
+    ).toBe(true);
   });
 
   it('validates professional payment method reuse', () => {
@@ -213,12 +237,16 @@ describe('professionals money helpers', () => {
       approved_at: null,
       approved_by: null,
       paid_at: null,
+      cancelled_at: null,
+      cancelled_by: null,
+      cancellation_reason: null,
       created_at: '2026-08-01T00:00:00Z',
       updated_at: '2026-08-01T00:00:00Z',
       deleted_at: null,
     });
     expect(settlement.total_amount).toBe(1505000);
     expect(settlement.balance_due).toBe(1505000);
+    expect(settlement.cancelled_at).toBeNull();
   });
 
   it('maps settlement item rows', () => {
@@ -255,6 +283,14 @@ describe('professionals money helpers', () => {
     expect(getSettlementItemSourceHref('vaccination', 'vac1')).toBe('/vacunacion/vac1');
     expect(getSettlementItemSourceHref('fixed_compensation', 'abc')).toBeNull();
     expect(getSettlementItemSourceHref('consultation', null)).toBeNull();
+  });
+
+  it('builds settlement detail hrefs by access', () => {
+    expect(buildSettlementDetailBasePath('admin')).toBe('/liquidaciones');
+    expect(buildSettlementDetailBasePath('own')).toBe('/liquidaciones/mis-liquidaciones');
+    expect(buildSettlementDetailBasePath(null)).toBe('/liquidaciones');
+    expect(buildSettlementDetailHref('own', 's1')).toBe('/liquidaciones/mis-liquidaciones/s1');
+    expect(buildSettlementDetailHref('admin', 's1')).toBe('/liquidaciones/s1');
   });
 
   it('resolves settlement period presets', () => {
@@ -300,6 +336,33 @@ describe('professionals money helpers', () => {
         periodEnd: '2026-08-31',
       })
     ).toBe('/liquidaciones?unpaid=1&periodStart=2026-08-01&periodEnd=2026-08-31');
+    expect(paidThisMonthLiquidacionesHref(new Date(2026, 7, 20))).toBe(
+      '/liquidaciones?paidInMonth=1'
+    );
+    expect(settlementApproveConfirmMessage([{ severity: 'hard' }])).toContain('conflicto');
+    expect(settlementApproveConfirmMessage([{ severity: 'soft' }])).toContain('aviso');
+    expect(settlementApproveConfirmMessage([])).toContain('Aprobar esta liquidación');
+    expect(
+      settlementHistoryRowHint({
+        status: 'cancelled',
+        cancellation_reason: 'Duplicada',
+      })
+    ).toBe('Cancelada: Duplicada');
+    expect(
+      settlementHistoryRowHint({
+        status: 'draft',
+        notes: 'Devuelta a borrador: Falta ajuste · nota previa',
+      })
+    ).toContain('Devuelta a borrador');
+    expect(
+      parseSettlementReturnNotes('Devuelta a borrador: Falta ajuste · nota previa')
+    ).toEqual({
+      returnPrefix: 'Devuelta a borrador: Falta ajuste',
+      body: 'nota previa',
+    });
+    expect(
+      mergeSettlementReturnNotes('Devuelta a borrador: Falta ajuste', 'nota nueva')
+    ).toBe('Devuelta a borrador: Falta ajuste · nota nueva');
     expect(
       buildProfessionalPaymentCashNote({
         settlementId: '00000000-0000-4000-8000-000000000099',
@@ -316,6 +379,27 @@ describe('professionals money helpers', () => {
       start: '2026-08-01',
       end: '2026-08-31',
     });
+  });
+
+  it('detects compensation scheme date range overlaps', () => {
+    expect(
+      compensationSchemeRangesOverlap(
+        { validFrom: '2026-08-01', validTo: '2026-08-31' },
+        { validFrom: '2026-08-15', validTo: '2026-09-15' }
+      )
+    ).toBe(true);
+    expect(
+      compensationSchemeRangesOverlap(
+        { validFrom: '2026-08-01', validTo: '2026-08-31' },
+        { validFrom: '2026-09-01', validTo: null }
+      )
+    ).toBe(false);
+    expect(
+      compensationSchemeRangesOverlap(
+        { validFrom: '2026-08-01', validTo: null },
+        { validFrom: '2026-09-01', validTo: '2026-09-30' }
+      )
+    ).toBe(true);
   });
 
   it('exposes readable labels for UI', () => {

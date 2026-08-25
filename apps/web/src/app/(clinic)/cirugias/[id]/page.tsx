@@ -4,6 +4,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { SurgeryStay } from '@/components/surgeries/surgery-stay';
 
 interface CirugiaDetailPageProps {
@@ -27,8 +28,7 @@ export default async function CirugiaDetailPage({ params }: CirugiaDetailPagePro
     settlementAccess && surgery.status === 'completada'
       ? await getSettlementClaimForSource('surgery', surgery.id)
       : null;
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   return (
     <SurgeryStay

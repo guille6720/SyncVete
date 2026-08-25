@@ -5,6 +5,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { LabOrderDetail } from '@/components/lab/lab-order-detail';
 
 interface LabDetailPageProps {
@@ -29,8 +30,7 @@ export default async function LabDetailPage({ params }: LabDetailPageProps) {
     settlementAccess && data.order.status === 'completada'
       ? await getSettlementClaimForSource('lab_order', data.order.id)
       : null;
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   return (
     <LabOrderDetail

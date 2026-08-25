@@ -1,5 +1,6 @@
 import { notFound, redirect } from 'next/navigation';
 import {
+  canReadProfessionalSettlements,
   canViewProfessionalSettlement,
   getSettlement,
 } from '@/actions/professional-settlements';
@@ -22,19 +23,22 @@ export default async function MisLiquidacionDetailPage({ params }: PageProps) {
   const access = await canViewProfessionalSettlement(settlement.professional_id);
   if (access !== 'own') redirect('/liquidaciones/mis-liquidaciones');
 
-  const [professional, organization] = await Promise.all([
+  const [professional, organization, canReadOps] = await Promise.all([
     getProfessionalForCurrentUser(),
     getOrganization(),
+    canReadProfessionalSettlements(),
   ]);
 
   return (
     <div className="space-y-4">
-      <Button variant="ghost" size="sm" asChild>
-        <Link href="/liquidaciones/mis-liquidaciones">
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver a mis liquidaciones
-        </Link>
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="ghost" size="sm" asChild>
+          <Link href="/liquidaciones/mis-liquidaciones">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver a mis liquidaciones
+          </Link>
+        </Button>
+      </div>
 
       <SettlementDetail
         settlement={settlement}
@@ -44,6 +48,7 @@ export default async function MisLiquidacionDetailPage({ params }: PageProps) {
         canPay={false}
         canAdjust={false}
         readOnly
+        operationalHref={canReadOps ? `/liquidaciones/${settlement.id}` : null}
       />
     </div>
   );

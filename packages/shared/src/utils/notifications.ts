@@ -3,6 +3,8 @@ import {
   type NotificationKind,
 } from '../constants/notifications';
 
+export type LiquidacionNotificationAudience = 'ops' | 'portal';
+
 const KIND_HREF: Record<NotificationKind, (id: string) => string> = {
   cita: (id) => `/agenda/${id}`,
   laboratorio: (id) => `/laboratorio/${id}`,
@@ -12,7 +14,7 @@ const KIND_HREF: Record<NotificationKind, (id: string) => string> = {
   receta: (id) => `/farmacia/${id}`,
   plan: () => '/configuracion?tab=plan',
   migracion: () => '/configuracion?tab=import-export',
-  liquidacion: (id) => `/liquidaciones/${id}`,
+  liquidacion: (id) => buildLiquidacionNotificationHref(id, 'ops'),
 };
 
 export function isNotificationKind(value: string): value is NotificationKind {
@@ -21,6 +23,16 @@ export function isNotificationKind(value: string): value is NotificationKind {
 
 export function isNotificationUnread(readAt: string | null | undefined): boolean {
   return !readAt;
+}
+
+export function buildLiquidacionNotificationHref(
+  settlementId: string,
+  audience: LiquidacionNotificationAudience = 'ops'
+): string {
+  if (audience === 'portal') {
+    return `/liquidaciones/mis-liquidaciones/${settlementId}`;
+  }
+  return `/liquidaciones/${settlementId}`;
 }
 
 export function buildNotificationHref(kind: NotificationKind, relatedId: string): string {

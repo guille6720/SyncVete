@@ -108,6 +108,11 @@ export const voidProfessionalPaymentSchema = z.object({
   reason: z.string().trim().min(3).max(500),
 });
 
+export const linkProfessionalPaymentToCashSchema = z.object({
+  paymentId: z.string().uuid(),
+  cashSessionId: z.string().uuid(),
+});
+
 export const omitSettlementItemSchema = z.object({
   itemId: z.string().uuid(),
   reason: z.string().trim().min(3).max(500),
@@ -130,7 +135,20 @@ export const approveSettlementSchema = z.object({
 
 export const cancelSettlementSchema = z.object({
   settlementId: z.string().uuid(),
-  reason: z.string().trim().min(3).max(500).optional(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const returnSettlementToDraftSchema = z.object({
+  settlementId: z.string().uuid(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const cloneCompensationSchemeSchema = z.object({
+  sourceSchemeId: z.string().uuid(),
+  name: z.string().trim().min(2).max(120),
+  validFrom: z.string().date(),
+  validTo: z.string().date().optional().nullable(),
+  deactivateSource: z.boolean().optional().default(true),
 });
 
 export const registerProfessionalPaymentSchema = z.object({
@@ -153,7 +171,7 @@ export const listSettlementsSchema = z.object({
   periodEnd: z.string().date().optional(),
   branchId: z.string().uuid().optional(),
   page: z.coerce.number().int().min(1).default(1),
-  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  pageSize: z.coerce.number().int().min(1).max(500).default(25),
 });
 
 export const bulkSettlementIdsSchema = z.object({
@@ -216,3 +234,6 @@ export type CalculateSettlementInput = z.infer<typeof calculateSettlementSchema>
 export type RegisterProfessionalPaymentInput = z.infer<typeof registerProfessionalPaymentSchema>;
 export type OmitSettlementItemInput = z.infer<typeof omitSettlementItemSchema>;
 export type RestoreSettlementOmissionInput = z.infer<typeof restoreSettlementOmissionSchema>;
+export type ReturnSettlementToDraftInput = z.infer<typeof returnSettlementToDraftSchema>;
+export type CloneCompensationSchemeInput = z.infer<typeof cloneCompensationSchemeSchema>;
+export type LinkProfessionalPaymentToCashInput = z.infer<typeof linkProfessionalPaymentToCashSchema>;

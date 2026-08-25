@@ -6,8 +6,7 @@ import {
   formatMoney,
   SETTLEMENT_STATUS_LABELS,
   isSettlementStatus,
-  buildLiquidacionesHref,
-  currentMonthPeriodRange,
+  paidThisMonthLiquidacionesHref,
   type SettlementStatus,
   type SettlementsSummary,
 } from '@sincvete/shared';
@@ -33,12 +32,7 @@ export function DashboardSettlementsSnapshot({ summary }: DashboardSettlementsSn
     summary.totalBalanceDue > 0;
 
   const statusTotal = summary.byStatus.reduce((sum, item) => sum + item.count, 0);
-  const monthRange = currentMonthPeriodRange();
-  const paidThisMonthHref = buildLiquidacionesHref({
-    status: 'paid',
-    periodStart: monthRange.start,
-    periodEnd: monthRange.end,
-  });
+  const paidThisMonthHref = paidThisMonthLiquidacionesHref();
 
   return (
     <section className="rounded-xl border border-violet-200/70 bg-card/95 p-5 text-card-foreground shadow-sm backdrop-blur-sm dark:border-violet-800">

@@ -26,8 +26,12 @@ interface BranchOption {
   name: string;
 }
 
+type CalculateProfessional = Professional & {
+  activeSchemeName?: string | null;
+};
+
 interface SettlementCalculateFormProps {
-  professionals: Professional[];
+  professionals: CalculateProfessional[];
   branches: BranchOption[];
   defaultBranchId?: string;
   defaultProfessionalId?: string;
@@ -52,9 +56,7 @@ export function SettlementCalculateForm({
   const [periodStart, setPeriodStart] = useState(initialRange.start);
   const [periodEnd, setPeriodEnd] = useState(initialRange.end);
   const [branchId, setBranchId] = useState(defaultBranchId ?? '');
-  const [selectedBulkIds, setSelectedBulkIds] = useState<string[]>(() =>
-    professionals.map((row) => row.id)
-  );
+  const [selectedBulkIds, setSelectedBulkIds] = useState<string[]>([]);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
   const [bulkSucceeded, setBulkSucceeded] = useState<
     Array<{ professionalId: string; settlementId: string }>
@@ -65,7 +67,7 @@ export function SettlementCalculateForm({
   const [bulkPending, runBulk] = usePendingAction();
 
   useEffect(() => {
-    setSelectedBulkIds(professionals.map((row) => row.id));
+    setSelectedBulkIds([]);
   }, [professionals]);
 
   useEffect(() => {
@@ -144,6 +146,9 @@ export function SettlementCalculateForm({
               {professionals.map((professional) => (
                 <option key={professional.id} value={professional.id}>
                   {professional.last_name}, {professional.first_name}
+                  {professional.activeSchemeName
+                    ? ` · ${professional.activeSchemeName}`
+                    : ' · sin esquema activo'}
                 </option>
               ))}
             </Select>
@@ -229,7 +234,8 @@ export function SettlementCalculateForm({
           <div>
             <p className="text-sm font-medium">Cálculo masivo</p>
             <p className="text-xs text-muted-foreground">
-              Mismo período y sucursal. Seleccioná profesionales o usá todos los activos.
+              Mismo período y sucursal. Empezá vacío: seleccioná profesionales o usá Todos. Sin
+              esquema activo aparecen atenuados.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -241,23 +247,49 @@ export function SettlementCalculateForm({
             >
               Todos
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setSelectedBulkIds(
+                  professionals.filter((row) => Boolean(row.activeSchemeName)).map((row) => row.id)
+                )
+              }
+            >
+              Todos con esquema
+            </Button>
             <Button type="button" variant="outline" size="sm" onClick={() => setSelectedBulkIds([])}>
               Ninguno
             </Button>
           </div>
           <div className="max-h-48 space-y-1 overflow-y-auto rounded-md border p-3">
-            {professionals.map((professional) => (
-              <label key={professional.id} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={selectedBulkIds.includes(professional.id)}
-                  onChange={(e) => toggleBulkId(professional.id, e.target.checked)}
-                />
-                <span>
-                  {professional.last_name}, {professional.first_name}
-                </span>
-              </label>
-            ))}
+            {professionals.map((professional) => {
+              const hasScheme = Boolean(professional.activeSchemeName);
+              return (
+                <label
+                  key={professional.id}
+                  className={`flex items-center gap-2 text-sm ${hasScheme ? '' : 'opacity-60'}`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedBulkIds.includes(professional.id)}
+                    onChange={(e) => toggleBulkId(professional.id, e.target.checked)}
+                  />
+                  <span>
+                    {professional.last_name}, {professional.first_name}
+                    {hasScheme ? (
+                      <span className="text-muted-foreground">
+                        {' '}
+                        · {professional.activeSchemeName}
+                      </span>
+                    ) : (
+                      <span className="text-amber-700 dark:text-amber-400"> · sin esquema activo</span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
           </div>
           <Button
             type="button"

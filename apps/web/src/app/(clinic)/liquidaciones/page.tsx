@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { getSessionContext } from '@/actions/auth';
 import { getOpenCashSession } from '@/actions/cash';
 import { getOrganization, getUserBranches } from '@/actions/settings';
-import { listProfessionals } from '@/actions/professionals';
+import { listProfessionalsWithSummary } from '@/actions/professionals';
 import {
   canApproveProfessionalSettlements,
   canPayProfessionalSettlements,
@@ -26,6 +26,7 @@ interface PageProps {
     status?: string;
     pendingReview?: string;
     unpaid?: string;
+    paidInMonth?: string;
     professionalId?: string;
     periodStart?: string;
     periodEnd?: string;
@@ -45,11 +46,11 @@ export default async function LiquidacionesPage({ searchParams }: PageProps) {
     : undefined;
   const pendingReview = params.pendingReview === '1';
   const unpaid = params.unpaid === '1';
+  const paidInMonth = params.paidInMonth === '1';
 
   const session = await getSessionContext();
   const [
-    activeProfessionals,
-    allProfessionals,
+    professionalsWithSummary,
     history,
     canCalculate,
     canApprove,
@@ -59,17 +60,17 @@ export default async function LiquidacionesPage({ searchParams }: PageProps) {
     summary,
     canCash,
   ] = await Promise.all([
-    listProfessionals({ activeOnly: true }),
-    listProfessionals(),
+    listProfessionalsWithSummary(),
     listSettlements({
       page,
       pageSize: 25,
-      status: pendingReview || unpaid ? undefined : status,
+      status: pendingReview || unpaid || paidInMonth ? undefined : status,
       pendingReview,
       unpaid,
+      paidInMonth,
       professionalId: params.professionalId,
-      periodStart: params.periodStart,
-      periodEnd: params.periodEnd,
+      periodStart: paidInMonth ? undefined : params.periodStart,
+      periodEnd: paidInMonth ? undefined : params.periodEnd,
       branchId: params.branchId,
     }),
     canWriteProfessionalCompensation(),
@@ -80,6 +81,9 @@ export default async function LiquidacionesPage({ searchParams }: PageProps) {
     getSettlementsSummary(),
     canPermissionAndFeature('billing:write', FEATURES.CASH_REGISTER),
   ]);
+
+  const activeProfessionals = professionalsWithSummary.filter((row) => row.is_active);
+  const allProfessionals = professionalsWithSummary;
 
   let openCashSessionId: string | null = null;
   if (canCash && canPay) {
@@ -109,6 +113,7 @@ export default async function LiquidacionesPage({ searchParams }: PageProps) {
           status={status}
           pendingReview={pendingReview}
           unpaid={unpaid}
+          paidInMonth={paidInMonth}
           periodStart={params.periodStart}
           periodEnd={params.periodEnd}
           branchId={params.branchId}
@@ -133,12 +138,13 @@ export default async function LiquidacionesPage({ searchParams }: PageProps) {
           data={history}
           professionals={allProfessionals}
           branches={branches}
-          initialStatus={pendingReview || unpaid ? '' : (status ?? '')}
+          initialStatus={pendingReview || unpaid || paidInMonth ? '' : (status ?? '')}
           initialPendingReview={pendingReview}
           initialUnpaid={unpaid}
+          initialPaidInMonth={paidInMonth}
           initialProfessionalId={params.professionalId ?? ''}
-          initialPeriodStart={params.periodStart ?? ''}
-          initialPeriodEnd={params.periodEnd ?? ''}
+          initialPeriodStart={paidInMonth ? '' : (params.periodStart ?? '')}
+          initialPeriodEnd={paidInMonth ? '' : (params.periodEnd ?? '')}
           initialBranchId={params.branchId ?? ''}
           currency={currency}
           canBulkApprove={canApprove}

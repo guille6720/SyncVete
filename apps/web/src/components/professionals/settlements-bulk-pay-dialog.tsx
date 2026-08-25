@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { bulkRegisterProfessionalPayments } from '@/actions/professional-settlements';
+import { SettlementsModalShell } from '@/components/professionals/settlements-modal-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -54,7 +56,7 @@ export function SettlementsBulkPayDialog({
   const [invoiceAmount, setInvoiceAmount] = useState('');
   const [invoiceAttachmentUrl, setInvoiceAttachmentUrl] = useState('');
   const [useCustomAmounts, setUseCustomAmounts] = useState(false);
-  const [postCashEgreso, setPostCashEgreso] = useState(false);
+  const [postCashEgreso, setPostCashEgreso] = useState(true);
   const [amountsById, setAmountsById] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [failedRows, setFailedRows] = useState<Array<{ id: string; error: string }>>([]);
@@ -76,8 +78,8 @@ export function SettlementsBulkPayDialog({
     setInvoiceAttachmentUrl('');
     setNotes('');
     setPaidAt(new Date().toISOString().slice(0, 16));
-    setPostCashEgreso(false);
-  }, [open, selectedSettlements]);
+    setPostCashEgreso(canPostCashEgreso && Boolean(openCashSessionId));
+  }, [open, selectedSettlements, canPostCashEgreso, openCashSessionId]);
 
   if (!open) return null;
 
@@ -167,14 +169,14 @@ export function SettlementsBulkPayDialog({
     : false;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg border bg-background p-5 shadow-lg">
-        <h3 className="text-lg font-semibold">Pagar liquidaciones seleccionadas</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {selectedSettlements.length} liquidacion{selectedSettlements.length !== 1 ? 'es' : ''} · total a
-          registrar {formatMoney(totalDue, currency)}
-        </p>
-
+    <SettlementsModalShell
+      open={open}
+      titleId="settlements-bulk-pay-title"
+      title="Pagar liquidaciones seleccionadas"
+      description={`${selectedSettlements.length} liquidacion${selectedSettlements.length !== 1 ? 'es' : ''} · total a registrar ${formatMoney(totalDue, currency)}`}
+      onClose={pending ? () => undefined : onClose}
+      maxWidthClassName="max-w-lg"
+    >
         <div className="mt-4 space-y-3">
           <label className="flex items-center gap-2 text-sm">
             <input
@@ -222,8 +224,11 @@ export function SettlementsBulkPayDialog({
               id="bulk-pay-method"
               value={method}
               onChange={(e) => {
-                setMethod(e.target.value);
-                if (e.target.value !== 'efectivo') setPostCashEgreso(false);
+                const next = e.target.value;
+                setMethod(next);
+                setPostCashEgreso(
+                  next === 'efectivo' && canPostCashEgreso && Boolean(openCashSessionId)
+                );
               }}
             >
               {PAYMENT_METHODS.map((item) => (
@@ -276,7 +281,13 @@ export function SettlementsBulkPayDialog({
             </label>
           ) : canPostCashEgreso && method === 'efectivo' && !openCashSessionId ? (
             <p className="text-xs text-muted-foreground">
-              No hay caja abierta en esta sucursal para registrar egreso.
+              Los pagos se registran igual. No hay caja abierta en esta sucursal — vinculá el
+              egreso desde el detalle de cada liquidación.
+            </p>
+          ) : !canPostCashEgreso && method === 'efectivo' ? (
+            <p className="text-xs text-muted-foreground">
+              Los pagos se registran igual. Sin permiso de caja o módulo deshabilitado: no se
+              crea egreso automático.
             </p>
           ) : null}
           {requiresInvoice ? (
@@ -346,7 +357,17 @@ export function SettlementsBulkPayDialog({
         {warnings.length > 0 ? (
           <ul className="mt-2 space-y-1 text-xs text-amber-700 dark:text-amber-400">
             {warnings.map((row) => (
-              <li key={`${row.id}-${row.message}`}>{row.message}</li>
+              <li key={`${row.id}-${row.message}`}>
+                <Link
+                  href={`/liquidaciones/${row.id}`}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Ver liquidación
+                </Link>
+                {': '}
+                {row.message}
+                {' — vinculá el egreso desde el detalle si hay caja abierta.'}
+              </li>
             ))}
           </ul>
         ) : null}
@@ -356,14 +377,19 @@ export function SettlementsBulkPayDialog({
               const settlement = selectedSettlements.find((item) => item.id === row.id);
               return (
                 <li key={row.id}>
-                  {settlement ? settlementLabel(settlement, professionals) : row.id.slice(0, 8)}:{' '}
+                  <Link
+                    href={`/liquidaciones/${row.id}`}
+                    className="font-medium underline underline-offset-2"
+                  >
+                    {settlement ? settlementLabel(settlement, professionals) : row.id.slice(0, 8)}
+                  </Link>
+                  {': '}
                   {row.error}
                 </li>
               );
             })}
           </ul>
         ) : null}
-      </div>
-    </div>
+    </SettlementsModalShell>
   );
 }

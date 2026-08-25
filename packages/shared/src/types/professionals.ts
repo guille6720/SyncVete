@@ -94,6 +94,9 @@ export interface ProfessionalSettlement {
   approved_at: string | null;
   approved_by: string | null;
   paid_at: string | null;
+  cancelled_at: string | null;
+  cancelled_by: string | null;
+  cancellation_reason: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -162,6 +165,8 @@ export interface ProfessionalSettlementItemOmission {
   created_by: string;
   created_at: string;
   deleted_at: string | null;
+  /** Resolved server-side when static href is insufficient (e.g. shift → internación). */
+  source_href?: string | null;
 }
 
 export interface ProfessionalSettlementDetail extends ProfessionalSettlement {
@@ -201,12 +206,17 @@ export interface BulkCalculateSettlementsResult {
 export interface ProfessionalSettlementSummary {
   openBalance: number;
   pendingSettlementCount: number;
+  approvedUnpaidCount: number;
   activeSchemeName: string | null;
+  lastPaymentAmount: number | null;
+  lastPaymentDate: string | null;
+  lastPaymentSettlementId: string | null;
 }
 
 export interface ProfessionalListRow extends Professional, ProfessionalSettlementSummary {}
 
 export interface SettlementDuplicateClaimWarning {
+  itemId: string;
   itemDescription: string;
   sourceType: SettlementItemSourceType;
   sourceId: string;
@@ -214,13 +224,17 @@ export interface SettlementDuplicateClaimWarning {
   conflictingStatus: SettlementStatus;
   conflictingPeriodStart: string;
   conflictingPeriodEnd: string;
+  /** hard = claim already reserved (approve will fail); soft = peer draft/review item */
+  severity: 'hard' | 'soft';
 }
 
 export interface MySettlementsSummary {
   openBalance: number;
   pendingReviewCount: number;
   approvedUnpaidCount: number;
+  paidThisMonth: number;
   lastPaymentAmount: number | null;
   lastPaymentDate: string | null;
+  lastPaymentSettlementId: string | null;
   currency: string;
 }

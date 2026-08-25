@@ -1,8 +1,7 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import {
@@ -13,11 +12,14 @@ import {
   registerProfessionalPayment,
   omitSettlementItem,
   restoreSettlementOmission,
+  returnSettlementToDraft,
   submitSettlementForReview,
   updateSettlementAdjustment,
   updateSettlementNotes,
   voidProfessionalPayment,
+  linkProfessionalPaymentToCash,
 } from '@/actions/professional-settlements';
+import { SettlementsConfirmDialog } from '@/components/professionals/settlements-confirm-dialog';
 import { SettlementDetailActions } from '@/components/professionals/settlement-detail-actions';
 import { SettlementDuplicateWarnings } from '@/components/professionals/settlement-duplicate-warnings';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +40,8 @@ import {
   formatMoney,
   getSettlementItemSourceHref,
   isSettlementLocked,
+  parseSettlementReturnNotes,
+  settlementApproveConfirmMessage,
   type Professional,
   type ProfessionalSettlementDetail,
   type SettlementDuplicateClaimWarning,
@@ -55,6 +59,10 @@ interface SettlementDetailProps {
   showAuditLink?: boolean;
   openCashSessionId?: string | null;
   canPostCashEgreso?: boolean;
+  /** Dual-role: jump from portal read-only to clinic ops detail. */
+  operationalHref?: string | null;
+  /** Dual-role: jump from ops detail to professional portal view. */
+  portalHref?: string | null;
 }
 
 export function SettlementDetail({
@@ -69,6 +77,8 @@ export function SettlementDetail({
   showAuditLink = false,
   openCashSessionId = null,
   canPostCashEgreso = false,
+  operationalHref = null,
+  portalHref = null,
 }: SettlementDetailProps) {
   const router = useRouter();
   const currency = settlement.currency ?? 'ARS';
@@ -76,8 +86,13 @@ export function SettlementDetail({
   const canRegisterPayment =
     canPay && (settlement.status === 'approved' || settlement.status === 'partially_paid');
   const canApproveNow = canApprove && (settlement.status === 'draft' || settlement.status === 'review');
+  const canReturnToDraft = canApprove && settlement.status === 'review';
   const canCancelNow =
-    canApprove && settlement.status !== 'paid' && settlement.status !== 'cancelled';
+    canApprove && (settlement.status === 'draft' || settlement.status === 'review');
+  const hardDuplicateCount = duplicateWarnings.filter((row) => row.severity === 'hard').length;
+  const canOmitFromWarnings = !readOnly && !locked && (canAdjust || canApprove);
+  const { returnPrefix, body: notesBody } = parseSettlementReturnNotes(settlement.notes);
+  const returnToDraftHint = returnPrefix;
 
   const canSubmitForReview = canAdjust && settlement.status === 'draft';
   const canRecalculate =
@@ -97,13 +112,55 @@ export function SettlementDetail({
   const [notesState, notesAction, notesPending] = useActionState(updateSettlementNotes, null);
   const [payState, payAction, payPending] = useActionState(registerProfessionalPayment, null);
   const [voidPayState, voidPayAction, voidPayPending] = useActionState(voidProfessionalPayment, null);
+  const [linkCashState, linkCashAction, linkCashPending] = useActionState(
+    linkProfessionalPaymentToCash,
+    null
+  );
   const [omitState, omitAction, omitPending] = useActionState(omitSettlementItem, null);
   const [restoreOmitState, restoreOmitAction, restoreOmitPending] = useActionState(
     restoreSettlementOmission,
     null
   );
   const [cancelState, cancelAction, cancelPending] = useActionState(cancelSettlement, null);
+  const [returnDraftState, returnDraftAction, returnDraftPending] = useActionState(
+    returnSettlementToDraft,
+    null
+  );
   const [payMethod, setPayMethod] = useState<string>('transferencia');
+  const skipConfirmRef = useRef(false);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    mode: 'confirm' | 'alert';
+    title: string;
+    description: string;
+    variant?: 'default' | 'destructive';
+    confirmLabel?: string;
+    form?: HTMLFormElement;
+  } | null>(null);
+
+  const requestFormConfirm = (
+    event: FormEvent<HTMLFormElement>,
+    options: {
+      title: string;
+      description: string;
+      mode?: 'confirm' | 'alert';
+      variant?: 'default' | 'destructive';
+      confirmLabel?: string;
+    }
+  ) => {
+    if (skipConfirmRef.current) {
+      skipConfirmRef.current = false;
+      return;
+    }
+    event.preventDefault();
+    setConfirmDialog({
+      mode: options.mode ?? 'confirm',
+      title: options.title,
+      description: options.description,
+      variant: options.variant,
+      confirmLabel: options.confirmLabel,
+      form: options.mode === 'alert' ? undefined : event.currentTarget,
+    });
+  };
 
   useEffect(() => {
     if (
@@ -115,9 +172,11 @@ export function SettlementDetail({
       notesState?.success ||
       payState?.success ||
       voidPayState?.success ||
+      linkCashState?.success ||
       omitState?.success ||
       restoreOmitState?.success ||
-      cancelState?.success
+      cancelState?.success ||
+      returnDraftState?.success
     ) {
       router.refresh();
     }
@@ -130,9 +189,11 @@ export function SettlementDetail({
     notesState,
     payState,
     voidPayState,
+    linkCashState,
     omitState,
     restoreOmitState,
     cancelState,
+    returnDraftState,
     router,
   ]);
 
@@ -144,6 +205,16 @@ export function SettlementDetail({
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a liquidaciones
           </Link>
+        </Button>
+      ) : null}
+      {readOnly && operationalHref ? (
+        <Button variant="outline" size="sm" asChild>
+          <Link href={operationalHref}>Abrir vista operativa</Link>
+        </Button>
+      ) : null}
+      {!readOnly && portalHref ? (
+        <Button variant="outline" size="sm" asChild>
+          <Link href={portalHref}>Ver en mis liquidaciones</Link>
         </Button>
       ) : null}
 
@@ -161,6 +232,22 @@ export function SettlementDetail({
               : 'Profesional'}{' '}
             · {settlement.period_start} → {settlement.period_end}
           </p>
+          {settlement.status === 'cancelled' ? (
+            <p className="text-sm text-destructive">
+              Cancelada
+              {settlement.cancelled_at
+                ? ` · ${settlement.cancelled_at.slice(0, 16).replace('T', ' ')}`
+                : ''}
+              {settlement.cancellation_reason
+                ? ` · ${settlement.cancellation_reason}`
+                : ''}
+            </p>
+          ) : null}
+          {returnToDraftHint && settlement.status !== 'cancelled' ? (
+            <p className="rounded-md border border-amber-300/80 bg-amber-50/80 px-3 py-2 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+              {returnToDraftHint}
+            </p>
+          ) : null}
         </CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <Stat label="Bruto" value={formatMoney(settlement.gross_amount, currency)} />
@@ -180,11 +267,16 @@ export function SettlementDetail({
           <CardContent>
             <form action={notesAction} className="grid max-w-xl gap-3">
               <input type="hidden" name="settlementId" value={settlement.id} />
+              {returnPrefix ? (
+                <p className="rounded-md border border-amber-300/80 bg-amber-50/80 px-3 py-2 text-xs text-amber-900 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-100">
+                  Prefijo protegido (no se borra al guardar): {returnPrefix}
+                </p>
+              ) : null}
               <Textarea
                 name="notes"
                 rows={3}
                 maxLength={2000}
-                defaultValue={settlement.notes ?? ''}
+                defaultValue={notesBody}
                 placeholder="Observaciones internas de la liquidación"
               />
               {notesState?.error && <p className="text-sm text-destructive">{notesState.error}</p>}
@@ -206,7 +298,12 @@ export function SettlementDetail({
       ) : null}
 
       {!readOnly && canApproveNow ? (
-        <SettlementDuplicateWarnings warnings={duplicateWarnings} />
+        <SettlementDuplicateWarnings
+          warnings={duplicateWarnings}
+          canOmit={canOmitFromWarnings}
+          omitAction={omitAction}
+          omitPending={omitPending}
+        />
       ) : null}
 
       {!readOnly ? (
@@ -220,12 +317,7 @@ export function SettlementDetail({
           submitPending={submitPending}
           auditHref={
             showAuditLink
-              ? `/auditoria?entityType=professional_settlements&search=${settlement.id}`
-              : null
-          }
-          paymentsAuditHref={
-            showAuditLink
-              ? `/auditoria?entityType=professional_payments&search=${settlement.id}`
+              ? `/auditoria?entityType=liquidaciones_family&search=${settlement.id}`
               : null
           }
         />
@@ -309,7 +401,11 @@ export function SettlementDetail({
             <CardTitle className="text-base">Ítems excluidos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {settlement.omissions.map((omission) => (
+            {settlement.omissions.map((omission) => {
+              const sourceHref =
+                omission.source_href ??
+                getSettlementItemSourceHref(omission.source_type, omission.source_id);
+              return (
               <div
                 key={omission.id}
                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-dashed px-3 py-2 text-sm"
@@ -319,6 +415,11 @@ export function SettlementDetail({
                     {SETTLEMENT_ITEM_SOURCE_TYPE_LABELS[omission.source_type]}
                   </p>
                   <p className="text-muted-foreground">{omission.reason}</p>
+                  {sourceHref ? (
+                    <Link href={sourceHref} className="text-xs text-primary hover:underline">
+                      Ver origen
+                    </Link>
+                  ) : null}
                 </div>
                 {!readOnly && canAdjust && !locked ? (
                   <form action={restoreOmitAction}>
@@ -329,10 +430,11 @@ export function SettlementDetail({
                   </form>
                 ) : null}
               </div>
-            ))}
+              );
+            })}
             {restoreOmitState?.success ? (
               <p className="text-xs text-muted-foreground">
-                Omisión quitada. Recalculá la liquidación para volver a incluir el ítem.
+                Omisión restaurada y liquidación recalculada.
               </p>
             ) : null}
             {restoreOmitState?.error ? (
@@ -421,10 +523,10 @@ export function SettlementDetail({
       )}
 
       {settlement.payments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Pagos registrados</CardTitle>
-          </CardHeader>
+      <Card id="payments">
+        <CardHeader>
+          <CardTitle className="text-base">Pagos registrados</CardTitle>
+        </CardHeader>
           <CardContent className="space-y-2">
             {settlement.payments.map((payment) => {
               const voided = Boolean(payment.deleted_at);
@@ -466,7 +568,7 @@ export function SettlementDetail({
                       Ver adjunto factura
                     </a>
                   ) : null}
-                  {payment.cash_session_id && !voided ? (
+                  {payment.cash_session_id && !voided && !readOnly ? (
                     <Link
                       href={`/caja/${payment.cash_session_id}`}
                       className="mt-1 inline-block text-sm text-primary hover:underline"
@@ -474,20 +576,48 @@ export function SettlementDetail({
                       Ver egreso en caja
                     </Link>
                   ) : null}
+                  {!payment.cash_session_id && !voided && payment.method === 'efectivo' && !readOnly ? (
+                    <div className="mt-1 space-y-1">
+                      <p className="text-xs text-amber-700 dark:text-amber-400">
+                        Sin egreso de caja vinculado (anular puede no revertir caja).
+                      </p>
+                      {canPay && canPostCashEgreso && openCashSessionId ? (
+                        <form action={linkCashAction} className="flex flex-wrap items-center gap-2">
+                          <input type="hidden" name="paymentId" value={payment.id} />
+                          <input type="hidden" name="cashSessionId" value={openCashSessionId} />
+                          <Button type="submit" size="sm" variant="outline" disabled={linkCashPending}>
+                            {linkCashPending ? 'Vinculando...' : 'Vincular a caja abierta'}
+                          </Button>
+                        </form>
+                      ) : canPay && canPostCashEgreso && !openCashSessionId ? (
+                        <p className="text-xs text-muted-foreground">
+                          Abrí una caja para vincular el egreso en efectivo.{' '}
+                          <Link href="/caja" className="text-primary hover:underline">
+                            Ir a caja
+                          </Link>
+                        </p>
+                      ) : canPay && !canPostCashEgreso ? (
+                        <p className="text-xs text-muted-foreground">
+                          Sin permiso de caja para vincular egreso. Pedí a alguien con acceso a
+                          caja.
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {!readOnly && canPay && !voided ? (
                     <form
                       action={voidPayAction}
                       className="mt-2 grid max-w-md gap-2"
-                      onSubmit={(event) => {
-                        const confirmed = window.confirm(
-                          payment.cash_session_id
+                      onSubmit={(event) =>
+                        requestFormConfirm(event, {
+                          title: 'Anular pago',
+                          description: payment.cash_session_id
                             ? '¿Anular este pago? Se recalcula el saldo y se elimina el egreso de caja vinculado.'
-                            : '¿Anular este pago? El saldo de la liquidación se recalcula.'
-                        );
-                        if (!confirmed) {
-                          event.preventDefault();
-                        }
-                      }}
+                            : '¿Anular este pago? El saldo de la liquidación se recalcula.',
+                          variant: 'destructive',
+                          confirmLabel: 'Anular pago',
+                        })
+                      }
                     >
                       <input type="hidden" name="paymentId" value={payment.id} />
                       <Input
@@ -513,6 +643,20 @@ export function SettlementDetail({
             })}
             {voidPayState?.error ? (
               <p className="text-sm text-destructive">{voidPayState.error}</p>
+            ) : null}
+            {linkCashState?.error ? (
+              <p className="text-sm text-destructive">{linkCashState.error}</p>
+            ) : null}
+            {linkCashState?.success ? (
+              <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                Egreso vinculado a caja.{' '}
+                <Link
+                  href={`/caja/${linkCashState.data?.cashSessionId}`}
+                  className="font-medium underline underline-offset-2"
+                >
+                  Ver sesión
+                </Link>
+              </p>
             ) : null}
             {voidPayState?.success ? (
               <div className="space-y-1 text-sm text-emerald-700 dark:text-emerald-400">
@@ -588,42 +732,87 @@ export function SettlementDetail({
           <form
             action={approveAction}
             onSubmit={(event) => {
-              const warningCount = duplicateWarnings.length;
-              const confirmed = window.confirm(
-                warningCount > 0
-                  ? `Hay ${warningCount} advertencia${warningCount !== 1 ? 's' : ''} de reclamos duplicados. ¿Aprobar igual?`
-                  : '¿Aprobar esta liquidación? Quedará lista para pago.'
-              );
-              if (!confirmed) event.preventDefault();
+              if (hardDuplicateCount > 0) {
+                requestFormConfirm(event, {
+                  title: 'No se puede aprobar',
+                  description: settlementApproveConfirmMessage(duplicateWarnings),
+                  mode: 'alert',
+                });
+                return;
+              }
+              requestFormConfirm(event, {
+                title: 'Aprobar liquidación',
+                description: settlementApproveConfirmMessage(duplicateWarnings),
+                confirmLabel: 'Aprobar',
+              });
             }}
           >
             <input type="hidden" name="settlementId" value={settlement.id} />
-            <Button type="submit" disabled={approvePending}>
+            <Button type="submit" disabled={approvePending || hardDuplicateCount > 0}>
               {approvePending ? 'Aprobando...' : 'Aprobar liquidación'}
             </Button>
+            {hardDuplicateCount > 0 ? (
+              <p className="mt-1 text-xs text-destructive">
+                Hay conflictos duros: recalculá u omití antes de aprobar.
+              </p>
+            ) : null}
           </form>
         )}
         {approveState?.error ? (
           <p className="w-full text-sm text-destructive">{approveState.error}</p>
         ) : null}
 
-        {canCancelNow && (
+        {canReturnToDraft ? (
           <form
-            action={cancelAction}
+            action={returnDraftAction}
             className="flex flex-wrap items-end gap-2"
-            onSubmit={(event) => {
-              const confirmed = window.confirm(
-                '¿Cancelar esta liquidación? Quedará fuera del flujo de pago.'
-              );
-              if (!confirmed) event.preventDefault();
-            }}
+            onSubmit={(event) =>
+              requestFormConfirm(event, {
+                title: 'Devolver a borrador',
+                description: '¿Devolver esta liquidación a borrador? Quedará editable otra vez.',
+                confirmLabel: 'Devolver',
+              })
+            }
           >
             <input type="hidden" name="settlementId" value={settlement.id} />
             <Input
               name="reason"
-              placeholder="Motivo de cancelación"
-              className="max-w-xs"
+              required
               minLength={3}
+              maxLength={500}
+              placeholder="Motivo de devolución"
+              className="max-w-xs"
+            />
+            <Button type="submit" variant="secondary" disabled={returnDraftPending}>
+              {returnDraftPending ? 'Devolviendo...' : 'Devolver a borrador'}
+            </Button>
+          </form>
+        ) : null}
+        {returnDraftState?.error ? (
+          <p className="w-full text-sm text-destructive">{returnDraftState.error}</p>
+        ) : null}
+
+        {canCancelNow && (
+          <form
+            action={cancelAction}
+            className="flex flex-wrap items-end gap-2"
+            onSubmit={(event) =>
+              requestFormConfirm(event, {
+                title: 'Cancelar liquidación',
+                description: '¿Cancelar esta liquidación? Quedará fuera del flujo de pago.',
+                variant: 'destructive',
+                confirmLabel: 'Cancelar liquidación',
+              })
+            }
+          >
+            <input type="hidden" name="settlementId" value={settlement.id} />
+            <Input
+              name="reason"
+              required
+              minLength={3}
+              maxLength={500}
+              placeholder="Motivo de cancelación (obligatorio)"
+              className="max-w-xs"
             />
             <Button type="submit" variant="outline" disabled={cancelPending}>
               {cancelPending ? 'Cancelando...' : 'Cancelar'}
@@ -722,7 +911,7 @@ export function SettlementDetail({
                       name="postCashEgreso"
                       value="1"
                       className="mt-1"
-                      defaultChecked={false}
+                      defaultChecked
                     />
                     <span>
                       Registrar egreso en la caja abierta. Vínculo operativo, sin conciliación
@@ -732,12 +921,26 @@ export function SettlementDetail({
                 </div>
               ) : canPostCashEgreso && payMethod === 'efectivo' && !openCashSessionId ? (
                 <p className="text-xs text-muted-foreground">
-                  No hay caja abierta para registrar egreso en efectivo.
+                  El pago se registra igual. No hay caja abierta para egreso en efectivo — podés
+                  vincularlo después desde Pagos.{' '}
+                  <Link href="/caja" className="text-primary hover:underline">
+                    Ir a caja
+                  </Link>
+                </p>
+              ) : !canPostCashEgreso && payMethod === 'efectivo' ? (
+                <p className="text-xs text-muted-foreground">
+                  El pago se registra igual. Sin permiso de caja o módulo deshabilitado: no se
+                  crea egreso automático; alguien con acceso a caja puede vincularlo luego.
                 </p>
               ) : null}
               {payState?.error && <p className="text-sm text-destructive">{payState.error}</p>}
               {payState?.success && payState.data?.cashError ? (
-                <p className="text-sm text-amber-700 dark:text-amber-400">{payState.data.cashError}</p>
+                <div className="space-y-1 text-sm text-amber-700 dark:text-amber-400">
+                  <p>{payState.data.cashError}</p>
+                  <a href="#payments" className="font-medium underline underline-offset-2">
+                    Ir a pagos para vincular a caja abierta
+                  </a>
+                </div>
               ) : null}
               {payState?.success && payState.data?.cashSessionId ? (
                 <p className="text-sm text-emerald-700 dark:text-emerald-400">
@@ -757,6 +960,21 @@ export function SettlementDetail({
           </CardContent>
         </Card>
       )}
+
+      <SettlementsConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title ?? ''}
+        description={confirmDialog?.description ?? ''}
+        mode={confirmDialog?.mode ?? 'confirm'}
+        variant={confirmDialog?.variant ?? 'default'}
+        confirmLabel={confirmDialog?.confirmLabel}
+        onClose={() => setConfirmDialog(null)}
+        onConfirm={() => {
+          if (!confirmDialog?.form) return;
+          skipConfirmRef.current = true;
+          confirmDialog.form.requestSubmit();
+        }}
+      />
     </div>
   );
 }

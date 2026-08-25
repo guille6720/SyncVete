@@ -1,5 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
-import { formatDateParam } from '@sincvete/shared';
+import { formatDateParam, buildSettlementDetailBasePath } from '@sincvete/shared';
 import { getAppointment, canReadAppointments, canManageAppointments } from '@/actions/appointments';
 import { canManageConsultations, getConsultationByAppointment } from '@/actions/consultations';
 import { canSendWhatsApp } from '@/actions/whatsapp';
@@ -37,8 +37,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
     settlementAccess && appointment.status === 'completada'
       ? await getSettlementClaimForSource('appointment', appointment.id)
       : null;
-  const settlementDetailBasePath =
-    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   let waitingRoomStatus = null;
   if (canReadWr) {

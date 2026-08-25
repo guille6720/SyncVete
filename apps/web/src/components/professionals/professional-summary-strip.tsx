@@ -18,10 +18,11 @@ export function ProfessionalSummaryStrip({
 }: ProfessionalSummaryStripProps) {
   return (
     <div className="space-y-3">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <SummaryCard
           label="Saldo pendiente"
           value={formatMoney(summary.openBalance, currency)}
+          hint="Aprobadas sin pagar"
           href={
             summary.openBalance > 0
               ? `/liquidaciones?professionalId=${professionalId}&unpaid=1`
@@ -31,6 +32,7 @@ export function ProfessionalSummaryStrip({
         <SummaryCard
           label="En borrador / revisión"
           value={String(summary.pendingSettlementCount)}
+          hint="Pendientes de aprobación"
           href={
             summary.pendingSettlementCount > 0
               ? `/liquidaciones?professionalId=${professionalId}&pendingReview=1`
@@ -38,8 +40,37 @@ export function ProfessionalSummaryStrip({
           }
         />
         <SummaryCard
+          label="Por pagar"
+          value={String(summary.approvedUnpaidCount)}
+          hint="Con saldo abierto"
+          href={
+            summary.approvedUnpaidCount > 0
+              ? `/liquidaciones?professionalId=${professionalId}&unpaid=1`
+              : undefined
+          }
+        />
+        <SummaryCard
+          label="Último pago"
+          value={
+            summary.lastPaymentAmount != null
+              ? formatMoney(summary.lastPaymentAmount, currency)
+              : '—'
+          }
+          hint={
+            summary.lastPaymentDate
+              ? summary.lastPaymentDate.slice(0, 10)
+              : 'Sin pagos registrados'
+          }
+          href={
+            summary.lastPaymentSettlementId
+              ? `/liquidaciones/${summary.lastPaymentSettlementId}`
+              : undefined
+          }
+        />
+        <SummaryCard
           label="Esquema vigente"
           value={summary.activeSchemeName ?? 'Sin esquema'}
+          hint="Compensación activa"
         />
         {canCalculate ? (
           <Card>
@@ -61,10 +92,12 @@ export function ProfessionalSummaryStrip({
 function SummaryCard({
   label,
   value,
+  hint,
   href,
 }: {
   label: string;
   value: string;
+  hint?: string;
   href?: string;
 }) {
   const content = (
@@ -72,6 +105,7 @@ function SummaryCard({
       <CardContent className="px-4 py-3">
         <p className="text-xs text-muted-foreground">{label}</p>
         <p className="text-xl font-semibold tracking-tight">{value}</p>
+        {hint ? <p className="text-xs text-muted-foreground">{hint}</p> : null}
       </CardContent>
     </Card>
   );
