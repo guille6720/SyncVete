@@ -16,18 +16,19 @@ export function SettlementsSummaryPanel({ summary }: SettlementsSummaryProps) {
       <SummaryCard
         label="En borrador / revisión"
         value={String(summary.pendingReviewCount)}
-        href="/liquidaciones?status=draft"
-        hint="Pendientes de aprobar"
+        href="/liquidaciones?pendingReview=1"
+        hint="Borrador y pendiente de aprobación"
       />
       <SummaryCard
         label="Aprobadas con saldo"
         value={String(summary.approvedUnpaidCount)}
-        href="/liquidaciones?status=approved"
+        href="/liquidaciones?unpaid=1"
         hint="Listas para pagar"
       />
       <SummaryCard
         label="Saldo pendiente"
         value={formatMoney(summary.totalBalanceDue, currency)}
+        href={summary.totalBalanceDue > 0 ? '/liquidaciones?unpaid=1' : undefined}
         hint="Total por pagar"
       />
       <SummaryCard

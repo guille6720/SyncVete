@@ -24,12 +24,14 @@ interface ClinicalImageDetailProps {
   image: ClinicalImageListRow;
   canWrite: boolean;
   settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
 export function ClinicalImageDetail({
   image,
   canWrite,
   settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
 }: ClinicalImageDetailProps) {
   const router = useRouter();
 
@@ -68,7 +70,12 @@ export function ClinicalImageDetail({
         </div>
       </div>
 
-      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

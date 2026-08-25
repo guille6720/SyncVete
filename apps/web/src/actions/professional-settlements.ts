@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache';
 import {
   approveSettlementSchema,
   calculateSettlementSchema,
+  bulkCalculateSettlementsSchema,
+  voidProfessionalPaymentSchema,
   cancelSettlementSchema,
   compensationRuleCreateSchema,
   compensationRuleUpdateSchema,
@@ -14,6 +16,11 @@ import {
   bulkRegisterProfessionalPaymentsSchema,
   registerProfessionalPaymentSchema,
   settlementAdjustmentSchema,
+  settlementNotesSchema,
+  deleteSettlementAdjustmentSchema,
+  updateSettlementAdjustmentSchema,
+  omitSettlementItemSchema,
+  restoreSettlementOmissionSchema,
   type ActionResult,
   type CalculateSettlementResult,
   type CompensationRule,
@@ -23,18 +30,26 @@ import {
   mapSettlementRow,
   buildPaginatedResult,
   buildCsv,
+  buildProfessionalPaymentCashNote,
   SETTLEMENT_ADJUSTMENT_TYPE_LABELS,
   SETTLEMENT_ITEM_SOURCE_TYPE_LABELS,
   SETTLEMENT_STATUS_LABELS,
   type SettlementsSummary,
   type SettlementSourceClaimInfo,
   type SettlementItemSourceType,
+  type SettlementDuplicateClaimWarning,
+  type MySettlementsSummary,
   type ReportProfessionalsSettlements,
   type BulkSettlementActionResult,
+  type BulkCalculateSettlementsResult,
   getSettlementItemSourceHref,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
-import { getProfessionalForCurrentUser, listProfessionals } from '@/actions/professionals';
+import {
+  getProfessional,
+  getProfessionalForCurrentUser,
+  listProfessionals,
+} from '@/actions/professionals';
 import {
   PermissionError,
   canPermissionAndFeature,
@@ -79,6 +94,20 @@ function rpcErrorMessage(error: { message?: string } | null): string {
   const message = error?.message?.trim();
   if (!message) return 'No se pudo completar la operación';
   return message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
+}
+
+function buildSchemeConditionsFromForm(formData: FormData): Record<string, unknown> | null {
+  const anchorDate = String(formData.get('anchorDate') ?? '').trim();
+  const periodDaysRaw = String(formData.get('periodDays') ?? '').trim();
+  const conditions: Record<string, unknown> = {};
+  if (anchorDate) conditions.anchor_date = anchorDate;
+  if (periodDaysRaw) {
+    const periodDays = Number(periodDaysRaw);
+    if (Number.isFinite(periodDays) && periodDays > 0) {
+      conditions.period_days = periodDays;
+    }
+  }
+  return Object.keys(conditions).length > 0 ? conditions : null;
 }
 
 function mapScheme(row: Record<string, unknown>): CompensationScheme {
@@ -131,6 +160,12 @@ export async function canReadProfessionalSettlements(): Promise<boolean> {
 
 export async function canReadOwnProfessionalSettlements(): Promise<boolean> {
   return (await getProfessionalForCurrentUser()) != null;
+}
+
+export async function canReadSettlementSourceClaims(): Promise<'admin' | 'own' | null> {
+  if (await canReadProfessionalSettlements()) return 'admin';
+  if (await getProfessionalForCurrentUser()) return 'own';
+  return null;
 }
 
 export async function canViewProfessionalSettlement(
@@ -209,9 +244,7 @@ export async function createCompensationScheme(
       validTo: formData.get('validTo') || null,
       currency: formData.get('currency') || 'ARS',
       isActive: formData.get('isActive') !== 'false',
-      conditions: formData.get('conditions')
-        ? JSON.parse(String(formData.get('conditions')))
-        : null,
+      conditions: buildSchemeConditionsFromForm(formData),
     });
     if (!parsed.success) {
       return { success: false, error: 'Datos inválidos' };
@@ -270,7 +303,9 @@ export async function updateCompensationScheme(
       isActive: formData.has('isActive') ? formData.get('isActive') !== 'false' : undefined,
       conditions: formData.get('conditions')
         ? JSON.parse(String(formData.get('conditions')))
-        : undefined,
+        : formData.has('anchorDate') || formData.has('periodDays')
+          ? buildSchemeConditionsFromForm(formData)
+          : undefined,
     });
     if (!parsed.success) return { success: false, error: 'Datos inválidos' };
 
@@ -445,6 +480,11 @@ export async function calculateSettlement(
       p_branch_id: parsed.data.branchId ?? null,
     });
     if (error) return { success: false, error: rpcErrorMessage(error) };
+    if (settlementId) {
+      await supabase.rpc('apply_professional_settlement_omissions', {
+        p_settlement_id: String(settlementId),
+      });
+    }
 
     const detail = await getSettlement(String(settlementId));
     if (!detail) return { success: false, error: 'No se pudo obtener la liquidación' };
@@ -462,6 +502,65 @@ export async function calculateSettlement(
         item_count: detail.items.length,
       },
     };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function calculateSettlementsForPeriod(input: {
+  periodStart: string;
+  periodEnd: string;
+  branchId?: string | null;
+  professionalIds?: string[];
+}): Promise<ActionResult<BulkCalculateSettlementsResult>> {
+  try {
+    await requirePermissionAndFeature(
+      'professional_settlements:read',
+      FEATURES.PROFESSIONALS_SETTLEMENTS
+    );
+    await requirePermission('professional_compensation:write');
+
+    const parsed = bulkCalculateSettlementsSchema.safeParse(input);
+    if (!parsed.success) return { success: false, error: 'Datos inválidos' };
+
+    const professionals = await listProfessionals({ activeOnly: true });
+    const targets =
+      parsed.data.professionalIds && parsed.data.professionalIds.length > 0
+        ? professionals.filter((row) => parsed.data.professionalIds!.includes(row.id))
+        : professionals;
+
+    if (targets.length === 0) {
+      return { success: false, error: 'No hay profesionales activos para calcular' };
+    }
+
+    const supabase = await createServerClient();
+    const succeeded: BulkCalculateSettlementsResult['succeeded'] = [];
+    const failed: BulkCalculateSettlementsResult['failed'] = [];
+
+    for (const professional of targets) {
+      const { data: settlementId, error } = await supabase.rpc('calculate_professional_settlement', {
+        p_professional_id: professional.id,
+        p_period_start: parsed.data.periodStart,
+        p_period_end: parsed.data.periodEnd,
+        p_branch_id: parsed.data.branchId ?? null,
+      });
+      if (error) {
+        failed.push({ professionalId: professional.id, error: rpcErrorMessage(error) });
+        continue;
+      }
+      if (settlementId) {
+        await supabase.rpc('apply_professional_settlement_omissions', {
+          p_settlement_id: String(settlementId),
+        });
+      }
+      succeeded.push({
+        professionalId: professional.id,
+        settlementId: String(settlementId),
+      });
+    }
+
+    if (succeeded.length > 0) revalidateProfessionalsModule();
+    return { success: true, data: { succeeded, failed } };
   } catch (error) {
     return actionError(error);
   }
@@ -531,6 +630,19 @@ export async function getSettlement(settlementId: string): Promise<ProfessionalS
       created_by: String(row.created_by),
       created_at: String(row.created_at),
       updated_at: String(row.updated_at),
+      deleted_at: row.deleted_at ? String(row.deleted_at) : null,
+      cash_session_id: row.cash_session_id ? String(row.cash_session_id) : null,
+      cash_movement_id: row.cash_movement_id ? String(row.cash_movement_id) : null,
+    })),
+    omissions: ((payload.omissions as Record<string, unknown>[]) ?? []).map((row) => ({
+      id: String(row.id),
+      organization_id: String(row.organization_id),
+      settlement_id: String(row.settlement_id),
+      source_type: row.source_type as ProfessionalSettlementDetail['omissions'][number]['source_type'],
+      source_id: String(row.source_id),
+      reason: String(row.reason),
+      created_by: String(row.created_by),
+      created_at: String(row.created_at),
       deleted_at: row.deleted_at ? String(row.deleted_at) : null,
     })),
   };
@@ -630,9 +742,53 @@ export async function getSettlementsSummary(currency = 'ARS'): Promise<Settlemen
   };
 }
 
+async function querySettlementsPaginated(input: {
+  professionalId?: string;
+  statuses?: Array<ProfessionalSettlement['status']>;
+  status?: ProfessionalSettlement['status'];
+  unpaidOnly?: boolean;
+  periodStart?: string;
+  periodEnd?: string;
+  branchId?: string;
+  page: number;
+  pageSize: number;
+}) {
+  const supabase = await createServerClient();
+  const from = (input.page - 1) * input.pageSize;
+  const to = from + input.pageSize - 1;
+
+  let query = supabase
+    .from('professional_settlements')
+    .select('*', { count: 'exact' })
+    .is('deleted_at', null);
+
+  if (input.unpaidOnly) {
+    query = query.in('status', ['approved', 'partially_paid']).gt('balance_due', 0);
+  } else if (input.statuses?.length) {
+    query = query.in('status', input.statuses);
+  } else if (input.status) {
+    query = query.eq('status', input.status);
+  }
+  if (input.professionalId) query = query.eq('professional_id', input.professionalId);
+  if (input.periodStart) query = query.gte('period_end', input.periodStart);
+  if (input.periodEnd) query = query.lte('period_start', input.periodEnd);
+  if (input.branchId) query = query.eq('branch_id', input.branchId);
+
+  const { data, error, count } = await query
+    .order('period_end', { ascending: false })
+    .order('created_at', { ascending: false })
+    .range(from, to);
+  if (error) throw error;
+
+  const settlements = (data ?? []).map((row) => mapSettlementRow(row as Record<string, unknown>));
+  return buildPaginatedResult(settlements, Number(count ?? 0), input.page, input.pageSize);
+}
+
 export async function listSettlements(input: {
   professionalId?: string;
   status?: string;
+  pendingReview?: boolean;
+  unpaid?: boolean;
   periodStart?: string;
   periodEnd?: string;
   branchId?: string;
@@ -642,6 +798,30 @@ export async function listSettlements(input: {
   await requirePermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
   const parsed = listSettlementsSchema.safeParse(input);
   if (!parsed.success) throw new Error('Parámetros inválidos');
+
+  if (input.unpaid) {
+    return querySettlementsPaginated({
+      professionalId: parsed.data.professionalId,
+      unpaidOnly: true,
+      periodStart: parsed.data.periodStart,
+      periodEnd: parsed.data.periodEnd,
+      branchId: parsed.data.branchId,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
+  }
+
+  if (input.pendingReview) {
+    return querySettlementsPaginated({
+      professionalId: parsed.data.professionalId,
+      statuses: ['draft', 'review'],
+      periodStart: parsed.data.periodStart,
+      periodEnd: parsed.data.periodEnd,
+      branchId: parsed.data.branchId,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
+  }
 
   const supabase = await createServerClient();
   const { data, error } = await supabase.rpc('list_professional_settlements', {
@@ -672,6 +852,10 @@ export async function listSettlements(input: {
 
 export async function listMySettlements(input: {
   status?: string;
+  pendingReview?: boolean;
+  unpaid?: boolean;
+  periodStart?: string;
+  periodEnd?: string;
   page?: number;
   pageSize?: number;
 }) {
@@ -693,11 +877,35 @@ export async function listMySettlements(input: {
   });
   if (!parsed.success) throw new Error('Parámetros inválidos');
 
+  if (input.unpaid) {
+    return querySettlementsPaginated({
+      professionalId: linked.id,
+      unpaidOnly: true,
+      periodStart: parsed.data.periodStart,
+      periodEnd: parsed.data.periodEnd,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
+  }
+
+  if (input.pendingReview) {
+    return querySettlementsPaginated({
+      professionalId: linked.id,
+      statuses: ['draft', 'review'],
+      periodStart: parsed.data.periodStart,
+      periodEnd: parsed.data.periodEnd,
+      page: parsed.data.page,
+      pageSize: parsed.data.pageSize,
+    });
+  }
+
   const supabase = await createServerClient();
   const { data, error } = await supabase.rpc('list_my_professional_settlements', {
     p_status: parsed.data.status ?? null,
     p_page: parsed.data.page,
     p_page_size: parsed.data.pageSize,
+    p_period_start: parsed.data.periodStart ?? null,
+    p_period_end: parsed.data.periodEnd ?? null,
   });
   if (error) throw error;
 
@@ -794,12 +1002,28 @@ export async function bulkRegisterProfessionalPayments(input: {
   paidAt?: string;
   reference?: string | null;
   notes?: string | null;
-}): Promise<ActionResult<BulkSettlementActionResult>> {
+  invoiceNumber?: string | null;
+  invoiceDate?: string | null;
+  invoiceAmount?: number | null;
+  invoiceAttachmentUrl?: string | null;
+  postCashEgreso?: boolean;
+  cashSessionId?: string | null;
+}): Promise<
+  ActionResult<BulkSettlementActionResult & { warnings?: Array<{ id: string; message: string }> }>
+> {
   try {
     await requirePermissionAndFeature('professional_settlements:pay', FEATURES.PROFESSIONALS_SETTLEMENTS);
     const parsed = bulkRegisterProfessionalPaymentsSchema.safeParse(input);
     if (!parsed.success) {
       return { success: false, error: 'Datos de pago inválidos' };
+    }
+
+    let paidAt: string | undefined = parsed.data.paidAt;
+    if (input.paidAt && !paidAt) {
+      const parsedDate = new Date(input.paidAt);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        paidAt = parsedDate.toISOString();
+      }
     }
 
     const supabase = await createServerClient();
@@ -813,6 +1037,19 @@ export async function bulkRegisterProfessionalPayments(input: {
             settlementId,
             amount: null as number | null,
           }));
+
+    const wantsCash =
+      Boolean(input.postCashEgreso) &&
+      parsed.data.method === 'efectivo' &&
+      Boolean(input.cashSessionId);
+    const canCash = wantsCash
+      ? await canPermissionAndFeature('billing:write', FEATURES.CASH_REGISTER)
+      : false;
+    const warnings: Array<{ id: string; message: string }> = [];
+    const professionals = wantsCash ? await listProfessionals() : [];
+    const professionalNameById = new Map(
+      professionals.map((row) => [row.id, `${row.last_name}, ${row.first_name}`])
+    );
 
     const result = await runBulkSettlementAction(
       paymentTargets.map((row) => row.settlementId),
@@ -841,24 +1078,64 @@ export async function bulkRegisterProfessionalPayments(input: {
           return { success: false, error: 'El monto excede el saldo pendiente' };
         }
 
-        const { error } = await supabase.rpc('register_professional_payment', {
+        const { data, error } = await supabase.rpc('register_professional_payment', {
           p_settlement_id: settlementId,
           p_amount: amount,
           p_method: parsed.data.method,
-          p_paid_at: parsed.data.paidAt ?? null,
+          p_paid_at: paidAt ?? parsed.data.paidAt ?? null,
           p_reference: parsed.data.reference ?? null,
           p_notes: parsed.data.notes ?? null,
-          p_invoice_number: null,
-          p_invoice_date: null,
-          p_invoice_amount: null,
-          p_invoice_attachment_url: null,
+          p_invoice_number: parsed.data.invoiceNumber ?? null,
+          p_invoice_date: parsed.data.invoiceDate ?? null,
+          p_invoice_amount: parsed.data.invoiceAmount ?? null,
+          p_invoice_attachment_url: parsed.data.invoiceAttachmentUrl ?? null,
         });
         if (error) return { success: false, error: rpcErrorMessage(error) };
+
+        if (wantsCash) {
+          if (!canCash) {
+            warnings.push({
+              id: settlementId,
+              message: 'Pago OK; sin permiso para egreso en caja',
+            });
+          } else {
+            const paymentPayload = data as { payment?: { id?: string } } | null;
+            const paymentId = String(paymentPayload?.payment?.id ?? '');
+            const professionalName = professionalNameById.get(settlement.professional_id);
+            const { error: cashMoveError } = await supabase.rpc('add_cash_movement', {
+              p_session_id: String(input.cashSessionId),
+              p_kind: 'egreso',
+              p_amount: amount,
+              p_method: 'efectivo',
+              p_notes: buildProfessionalPaymentCashNote({
+                settlementId,
+                paymentId,
+                professionalName,
+              }),
+              p_professional_payment_id: paymentId || null,
+            });
+            if (cashMoveError) {
+              warnings.push({
+                id: settlementId,
+                message: `Pago OK; egreso caja falló: ${rpcErrorMessage(cashMoveError)}`,
+              });
+            }
+          }
+        }
+
         return { success: true };
       }
     );
 
-    return { success: true, data: result };
+    if (warnings.length > 0 && input.cashSessionId) {
+      revalidatePath('/caja');
+      revalidatePath(`/caja/${input.cashSessionId}`);
+    } else if (wantsCash && canCash && result.succeeded.length > 0 && input.cashSessionId) {
+      revalidatePath('/caja');
+      revalidatePath(`/caja/${input.cashSessionId}`);
+    }
+
+    return { success: true, data: { ...result, warnings } };
   } catch (error) {
     return actionError(error);
   }
@@ -957,20 +1234,134 @@ export async function addSettlementAdjustment(
   }
 }
 
-export async function registerProfessionalPayment(
-  _prev: ActionResult<{ payment_id: string }> | null,
+export async function deleteSettlementAdjustment(
+  _prev: ActionResult | null,
   formData: FormData
-): Promise<ActionResult<{ payment_id: string }>> {
+): Promise<ActionResult<void>> {
+  try {
+    await requirePermissionAndFeature(
+      'professional_settlements:read',
+      FEATURES.PROFESSIONALS_SETTLEMENTS
+    );
+    await requirePermission('professional_compensation:write');
+    const parsed = deleteSettlementAdjustmentSchema.safeParse({
+      adjustmentId: formData.get('adjustmentId'),
+    });
+    if (!parsed.success) return { success: false, error: 'Ajuste inválido' };
+
+    const supabase = await createServerClient();
+    const { error } = await supabase.rpc('delete_professional_settlement_adjustment', {
+      p_adjustment_id: parsed.data.adjustmentId,
+    });
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    revalidateProfessionalsModule();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateSettlementAdjustment(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult<void>> {
+  try {
+    await requirePermissionAndFeature(
+      'professional_settlements:read',
+      FEATURES.PROFESSIONALS_SETTLEMENTS
+    );
+    await requirePermission('professional_compensation:write');
+    const parsed = updateSettlementAdjustmentSchema.safeParse({
+      adjustmentId: formData.get('adjustmentId'),
+      adjustmentType: formData.get('adjustmentType'),
+      amount: formData.get('amount'),
+      reason: formData.get('reason'),
+    });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const supabase = await createServerClient();
+    const { error } = await supabase.rpc('update_professional_settlement_adjustment', {
+      p_adjustment_id: parsed.data.adjustmentId,
+      p_type: parsed.data.adjustmentType,
+      p_amount: parsed.data.amount,
+      p_reason: parsed.data.reason,
+    });
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    revalidateProfessionalsModule();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updateSettlementNotes(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult<void>> {
+  try {
+    await requirePermissionAndFeature(
+      'professional_settlements:read',
+      FEATURES.PROFESSIONALS_SETTLEMENTS
+    );
+    await requirePermission('professional_compensation:write');
+    const parsed = settlementNotesSchema.safeParse({
+      settlementId: formData.get('settlementId'),
+      notes: formData.get('notes') || null,
+    });
+    if (!parsed.success) return { success: false, error: 'Notas inválidas' };
+
+    const supabase = await createServerClient();
+    const { error } = await supabase.rpc('update_professional_settlement_notes', {
+      p_settlement_id: parsed.data.settlementId,
+      p_notes: parsed.data.notes ?? null,
+    });
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    revalidateProfessionalsModule();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function registerProfessionalPayment(
+  _prev: ActionResult<{
+    payment_id: string;
+    cashError?: string;
+    cashSessionId?: string | null;
+  }> | null,
+  formData: FormData
+): Promise<
+  ActionResult<{
+    payment_id: string;
+    cashError?: string;
+    cashSessionId?: string | null;
+  }>
+> {
   try {
     await requirePermissionAndFeature(
       'professional_settlements:pay',
       FEATURES.PROFESSIONALS_SETTLEMENTS
     );
+    const paidAtRaw = formData.get('paidAt');
+    let paidAt: string | undefined;
+    if (typeof paidAtRaw === 'string' && paidAtRaw.trim()) {
+      const parsedDate = new Date(paidAtRaw);
+      if (!Number.isNaN(parsedDate.getTime())) {
+        paidAt = parsedDate.toISOString();
+      }
+    }
+
     const parsed = registerProfessionalPaymentSchema.safeParse({
       settlementId: formData.get('settlementId'),
       amount: formData.get('amount'),
       method: formData.get('method'),
-      paidAt: formData.get('paidAt') || undefined,
+      paidAt,
       reference: formData.get('reference') || null,
       notes: formData.get('notes') || null,
       invoiceNumber: formData.get('invoiceNumber') || null,
@@ -1001,10 +1392,185 @@ export async function registerProfessionalPayment(
     });
     if (error) return { success: false, error: rpcErrorMessage(error) };
     const paymentPayload = data as { payment?: { id?: string } } | null;
+    const paymentId = String(paymentPayload?.payment?.id ?? '');
+
+    let cashError: string | undefined;
+    let linkedCashSessionId: string | null = null;
+    const wantsCashEgreso =
+      formData.get('postCashEgreso') === '1' || formData.get('postCashEgreso') === 'on';
+    const cashSessionId = String(formData.get('cashSessionId') ?? '').trim();
+    if (wantsCashEgreso && parsed.data.method === 'efectivo' && cashSessionId) {
+      const canCash = await canPermissionAndFeature('billing:write', FEATURES.CASH_REGISTER);
+      if (!canCash) {
+        cashError = 'Pago registrado. Sin permiso para egreso en caja.';
+      } else {
+        const settlement = await getSettlement(parsed.data.settlementId);
+        const professional = settlement
+          ? await getProfessional(settlement.professional_id)
+          : null;
+        const professionalName = professional
+          ? `${professional.last_name}, ${professional.first_name}`
+          : null;
+        const { error: cashMoveError } = await supabase.rpc('add_cash_movement', {
+          p_session_id: cashSessionId,
+          p_kind: 'egreso',
+          p_amount: parsed.data.amount,
+          p_method: 'efectivo',
+          p_notes: buildProfessionalPaymentCashNote({
+            settlementId: parsed.data.settlementId,
+            paymentId,
+            professionalName,
+          }),
+          p_professional_payment_id: paymentId || null,
+        });
+        if (cashMoveError) {
+          cashError = `Pago registrado. No se pudo crear el egreso en caja: ${rpcErrorMessage(cashMoveError)}`;
+        } else {
+          linkedCashSessionId = cashSessionId;
+          revalidatePath('/caja');
+          revalidatePath(`/caja/${cashSessionId}`);
+        }
+      }
+    }
+
     revalidateProfessionalsModule();
     return {
       success: true,
-      data: { payment_id: String(paymentPayload?.payment?.id ?? '') },
+      data: {
+        payment_id: paymentId,
+        cashError,
+        cashSessionId: linkedCashSessionId,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function voidProfessionalPayment(
+  _prev: ActionResult<{
+    cashReversed?: boolean;
+    cashSessionId?: string | null;
+    cashWarning?: string | null;
+  }> | null,
+  formData: FormData
+): Promise<
+  ActionResult<{
+    cashReversed?: boolean;
+    cashSessionId?: string | null;
+    cashWarning?: string | null;
+  }>
+> {
+  try {
+    await requirePermissionAndFeature(
+      'professional_settlements:pay',
+      FEATURES.PROFESSIONALS_SETTLEMENTS
+    );
+    const parsed = voidProfessionalPaymentSchema.safeParse({
+      paymentId: formData.get('paymentId'),
+      reason: formData.get('reason'),
+    });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('void_professional_payment', {
+      p_payment_id: parsed.data.paymentId,
+      p_reason: parsed.data.reason,
+    });
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    const payload = (data ?? {}) as {
+      cash_reversed?: boolean;
+      cash_session_id?: string | null;
+      cash_warning?: string | null;
+    };
+    if (payload.cash_session_id) {
+      revalidatePath('/caja');
+      revalidatePath(`/caja/${payload.cash_session_id}`);
+    }
+    revalidateProfessionalsModule();
+    return {
+      success: true,
+      data: {
+        cashReversed: Boolean(payload.cash_reversed),
+        cashSessionId: payload.cash_session_id ?? null,
+        cashWarning: payload.cash_warning ?? null,
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function omitSettlementItem(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult<void>> {
+  try {
+    await requirePermissionAndFeature(
+      'professional_compensation:write',
+      FEATURES.PROFESSIONALS_SETTLEMENTS
+    );
+    const parsed = omitSettlementItemSchema.safeParse({
+      itemId: formData.get('itemId'),
+      reason: formData.get('reason'),
+    });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const supabase = await createServerClient();
+    const { error } = await supabase.rpc('omit_professional_settlement_item', {
+      p_item_id: parsed.data.itemId,
+      p_reason: parsed.data.reason,
+    });
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    revalidateProfessionalsModule();
+    return { success: true, data: undefined };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function restoreSettlementOmission(
+  _prev: ActionResult<{ settlementId: string }> | null,
+  formData: FormData
+): Promise<ActionResult<{ settlementId: string }>> {
+  try {
+    await requirePermissionAndFeature(
+      'professional_compensation:write',
+      FEATURES.PROFESSIONALS_SETTLEMENTS
+    );
+    const parsed = restoreSettlementOmissionSchema.safeParse({
+      omissionId: formData.get('omissionId'),
+    });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('restore_professional_settlement_omission', {
+      p_omission_id: parsed.data.omissionId,
+    });
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    const payload = (data ?? {}) as { settlement_id?: string };
+    revalidateProfessionalsModule();
+    return {
+      success: true,
+      data: { settlementId: String(payload.settlement_id ?? '') },
     };
   } catch (error) {
     return actionError(error);
@@ -1081,7 +1647,7 @@ export async function exportSettlementDetailCsv(
     }
 
     if (detail.payments.length > 0) {
-      rows.push([], ['Pagos'], ['Fecha', 'Método', 'Importe', 'Referencia', 'Factura']);
+      rows.push([], ['Pagos'], ['Fecha', 'Método', 'Importe', 'Referencia', 'Factura', 'Estado', 'Notas']);
       rows.push(
         ...detail.payments.map((payment) => [
           payment.paid_at.slice(0, 10),
@@ -1089,6 +1655,8 @@ export async function exportSettlementDetailCsv(
           payment.amount,
           payment.reference,
           payment.invoice_number,
+          payment.deleted_at ? 'Anulado' : 'Activo',
+          payment.notes,
         ])
       );
     }
@@ -1108,6 +1676,8 @@ export async function exportSettlementDetailCsv(
 export async function exportSettlementsHistoryCsv(input: {
   professionalId?: string;
   status?: string;
+  pendingReview?: boolean;
+  unpaid?: boolean;
   periodStart?: string;
   periodEnd?: string;
   branchId?: string;
@@ -1157,9 +1727,66 @@ export async function exportSettlementsHistoryCsv(input: {
   }
 }
 
+export async function exportMySettlementsHistoryCsv(input: {
+  status?: string;
+  pendingReview?: boolean;
+  unpaid?: boolean;
+  periodStart?: string;
+  periodEnd?: string;
+}): Promise<ActionResult<{ csv: string; rowCount: number }>> {
+  try {
+    const session = await getSessionContext();
+    if (!session) return { success: false, error: 'No autenticado' };
+    await requireFeature(session.organizationId, FEATURES.PROFESSIONALS_SETTLEMENTS);
+    const linked = await getProfessionalForCurrentUser();
+    if (!linked) return { success: false, error: 'Sin profesional vinculado' };
+
+    const result = await listMySettlements({
+      ...input,
+      page: 1,
+      pageSize: 500,
+    });
+
+    const professionalName = `${linked.last_name}, ${linked.first_name}`;
+    const rows: Array<Array<string | number | null>> = [
+      [
+        'Profesional',
+        'Período inicio',
+        'Período fin',
+        'Estado',
+        'Total',
+        'Pagado',
+        'Saldo',
+        'Moneda',
+        'ID liquidación',
+      ],
+      ...result.data.map((settlement) => [
+        professionalName,
+        settlement.period_start,
+        settlement.period_end,
+        SETTLEMENT_STATUS_LABELS[settlement.status],
+        settlement.total_amount,
+        settlement.total_paid,
+        settlement.balance_due,
+        settlement.currency,
+        settlement.id,
+      ]),
+    ];
+
+    return {
+      success: true,
+      data: { csv: buildCsv(rows), rowCount: result.data.length },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function exportSettlementsAccountingCsv(input: {
   professionalId?: string;
   status?: string;
+  pendingReview?: boolean;
+  unpaid?: boolean;
   periodStart?: string;
   periodEnd?: string;
   branchId?: string;
@@ -1250,8 +1877,12 @@ export async function recalculateSettlementById(
       p_branch_id: settlement.branch_id,
     });
     if (error) return { success: false, error: rpcErrorMessage(error) };
+    const nextId = String(data ?? settlementId);
+    await supabase.rpc('apply_professional_settlement_omissions', {
+      p_settlement_id: nextId,
+    });
 
-    const detail = await getSettlement(String(data ?? settlementId));
+    const detail = await getSettlement(nextId);
     if (!detail) return { success: false, error: 'No se pudo cargar la liquidación recalculada' };
 
     revalidateProfessionalsModule();
@@ -1276,7 +1907,11 @@ export async function getSettlementClaimForSource(
   sourceType: SettlementItemSourceType,
   sourceId: string
 ): Promise<SettlementSourceClaimInfo | null> {
-  await requirePermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
+  const access = await canReadSettlementSourceClaims();
+  if (!access) return null;
+
+  const linked =
+    access === 'own' ? await getProfessionalForCurrentUser() : null;
   const supabase = await createServerClient();
 
   const { data: claim, error: claimError } = await supabase
@@ -1290,12 +1925,15 @@ export async function getSettlementClaimForSource(
 
   const { data: settlement, error: settlementError } = await supabase
     .from('professional_settlements')
-    .select('id, status, period_start, period_end')
+    .select('id, status, period_start, period_end, professional_id')
     .eq('id', claim.settlement_id)
     .is('deleted_at', null)
     .maybeSingle();
   if (settlementError) throw settlementError;
   if (!settlement) return null;
+  if (access === 'own' && linked && String(settlement.professional_id) !== linked.id) {
+    return null;
+  }
 
   return {
     settlementId: settlement.id,
@@ -1311,7 +1949,11 @@ export async function getSettlementClaimsForSources(
 ): Promise<Record<string, SettlementSourceClaimInfo>> {
   if (sourceIds.length === 0) return {};
 
-  await requirePermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
+  const access = await canReadSettlementSourceClaims();
+  if (!access) return {};
+
+  const linked =
+    access === 'own' ? await getProfessionalForCurrentUser() : null;
   const supabase = await createServerClient();
 
   const { data: claims, error: claimError } = await supabase
@@ -1325,7 +1967,7 @@ export async function getSettlementClaimsForSources(
   const settlementIds = [...new Set(claims.map((row) => String(row.settlement_id)))];
   const { data: settlements, error: settlementError } = await supabase
     .from('professional_settlements')
-    .select('id, status, period_start, period_end')
+    .select('id, status, period_start, period_end, professional_id')
     .in('id', settlementIds)
     .is('deleted_at', null);
   if (settlementError) throw settlementError;
@@ -1338,6 +1980,7 @@ export async function getSettlementClaimsForSources(
         status: row.status as SettlementSourceClaimInfo['status'],
         periodStart: String(row.period_start),
         periodEnd: String(row.period_end),
+        professionalId: String(row.professional_id),
       },
     ])
   );
@@ -1347,10 +1990,145 @@ export async function getSettlementClaimsForSources(
     const sourceId = claim.source_id ? String(claim.source_id) : null;
     if (!sourceId) continue;
     const info = settlementById.get(String(claim.settlement_id));
-    if (info) result[sourceId] = info;
+    if (!info) continue;
+    if (access === 'own' && linked && info.professionalId !== linked.id) continue;
+    result[sourceId] = {
+      settlementId: info.settlementId,
+      status: info.status,
+      periodStart: info.periodStart,
+      periodEnd: info.periodEnd,
+    };
   }
 
   return result;
+}
+
+export async function getSettlementDuplicateClaimWarnings(
+  settlementId: string
+): Promise<SettlementDuplicateClaimWarning[]> {
+  const settlement = await getSettlement(settlementId);
+  if (!settlement) return [];
+  if (settlement.status !== 'draft' && settlement.status !== 'review') return [];
+
+  const itemsWithSource = settlement.items.filter((item) => item.source_id);
+  if (itemsWithSource.length === 0) return [];
+
+  await requirePermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
+  const supabase = await createServerClient();
+
+  const sourceIds = [...new Set(itemsWithSource.map((item) => item.source_id as string))];
+  const { data: claims, error: claimError } = await supabase
+    .from('professional_settlement_source_claims')
+    .select('source_type, source_id, settlement_id')
+    .in('source_id', sourceIds)
+    .neq('settlement_id', settlementId);
+  if (claimError) throw claimError;
+  if (!claims?.length) return [];
+
+  const itemKey = (sourceType: string, sourceId: string) => `${sourceType}:${sourceId}`;
+  const itemByKey = new Map(
+    itemsWithSource.map((item) => [
+      itemKey(item.source_type, item.source_id as string),
+      item,
+    ])
+  );
+
+  const conflictingClaims = claims.filter((claim) => {
+    if (!claim.source_id) return false;
+    return itemByKey.has(itemKey(String(claim.source_type), String(claim.source_id)));
+  });
+  if (conflictingClaims.length === 0) return [];
+
+  const settlementIds = [...new Set(conflictingClaims.map((row) => String(row.settlement_id)))];
+  const { data: settlements, error: settlementError } = await supabase
+    .from('professional_settlements')
+    .select('id, status, period_start, period_end')
+    .in('id', settlementIds)
+    .is('deleted_at', null);
+  if (settlementError) throw settlementError;
+
+  const settlementById = new Map((settlements ?? []).map((row) => [String(row.id), row]));
+  const warnings: SettlementDuplicateClaimWarning[] = [];
+  const seen = new Set<string>();
+
+  for (const claim of conflictingClaims) {
+    if (!claim.source_id) continue;
+    const item = itemByKey.get(itemKey(String(claim.source_type), String(claim.source_id)));
+    const conflicting = settlementById.get(String(claim.settlement_id));
+    if (!item || !conflicting) continue;
+    const conflictingStatus = String(conflicting.status);
+    if (conflictingStatus !== 'draft' && conflictingStatus !== 'review') continue;
+
+    const dedupeKey = `${claim.source_id}-${conflicting.id}`;
+    if (seen.has(dedupeKey)) continue;
+    seen.add(dedupeKey);
+
+    warnings.push({
+      itemDescription: item.description,
+      sourceType: item.source_type,
+      sourceId: String(claim.source_id),
+      conflictingSettlementId: String(conflicting.id),
+      conflictingStatus: conflicting.status as SettlementDuplicateClaimWarning['conflictingStatus'],
+      conflictingPeriodStart: String(conflicting.period_start),
+      conflictingPeriodEnd: String(conflicting.period_end),
+    });
+  }
+
+  return warnings;
+}
+
+export async function getMySettlementsSummary(): Promise<MySettlementsSummary | null> {
+  const linked = await getProfessionalForCurrentUser();
+  if (!linked) return null;
+
+  const session = await getSessionContext();
+  if (!session) return null;
+  await requireFeature(session.organizationId, FEATURES.PROFESSIONALS_SETTLEMENTS);
+
+  const supabase = await createServerClient();
+  const { data: settlements, error: settlementsError } = await supabase
+    .from('professional_settlements')
+    .select('status, balance_due, currency')
+    .eq('professional_id', linked.id)
+    .is('deleted_at', null);
+  if (settlementsError) throw settlementsError;
+
+  const { data: lastPayment, error: paymentError } = await supabase
+    .from('professional_payments')
+    .select('amount, paid_at, currency')
+    .eq('professional_id', linked.id)
+    .is('deleted_at', null)
+    .order('paid_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (paymentError) throw paymentError;
+
+  let openBalance = 0;
+  let pendingReviewCount = 0;
+  let approvedUnpaidCount = 0;
+  let currency = 'ARS';
+
+  for (const row of settlements ?? []) {
+    currency = String(row.currency ?? currency);
+    const status = String(row.status);
+    if (status === 'draft' || status === 'review') pendingReviewCount += 1;
+    if (
+      (status === 'approved' || status === 'partially_paid') &&
+      Number(row.balance_due ?? 0) > 0
+    ) {
+      approvedUnpaidCount += 1;
+      openBalance += Number(row.balance_due ?? 0);
+    }
+  }
+
+  return {
+    openBalance: Math.round(openBalance * 100) / 100,
+    pendingReviewCount,
+    approvedUnpaidCount,
+    lastPaymentAmount: lastPayment ? Number(lastPayment.amount) : null,
+    lastPaymentDate: lastPayment ? String(lastPayment.paid_at) : null,
+    currency: lastPayment?.currency ? String(lastPayment.currency) : currency,
+  };
 }
 
 export async function getProfessionalSettlementsReport(

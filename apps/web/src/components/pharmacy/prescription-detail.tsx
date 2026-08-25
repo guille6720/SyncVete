@@ -18,18 +18,24 @@ import {
   formatPrescriptionItemLine,
   type PrescriptionItem,
   type PrescriptionListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface PrescriptionDetailProps {
   prescription: PrescriptionListRow;
   items: PrescriptionItem[];
   canWrite: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
 export function PrescriptionDetail({
   prescription,
   items,
   canWrite,
+  settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
 }: PrescriptionDetailProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +86,13 @@ export function PrescriptionDetail({
           )}
         </div>
       </div>
+
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

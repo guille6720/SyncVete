@@ -2,28 +2,31 @@ import { redirect } from 'next/navigation';
 import {
   canReadProfessionals,
   canWriteProfessionals,
-  listProfessionals,
+  listProfessionalsWithSummary,
 } from '@/actions/professionals';
 import { getAssignableStaff } from '@/actions/appointments';
-import { getUserBranches } from '@/actions/settings';
+import { getOrganization, getUserBranches } from '@/actions/settings';
 import { getSeatUsageMeters } from '@/lib/entitlements';
 import { getSessionContext } from '@/actions/auth';
 import { ProfessionalForm } from '@/components/professionals/professional-form';
 import { ProfessionalsList } from '@/components/professionals/professionals-list';
-import { formatMeteredUsage, isQuotaNearLimit } from '@sincvete/shared';
+import { formatMeteredUsage, isQuotaNearLimit, parseOrganizationSettings } from '@sincvete/shared';
 
 export default async function ProfesionalesPage() {
   const canRead = await canReadProfessionals();
   if (!canRead) redirect('/dashboard');
 
   const session = await getSessionContext();
-  const [professionals, canWrite, branches, staff, seats] = await Promise.all([
-    listProfessionals(),
+  const [professionals, canWrite, branches, staff, seats, organization] = await Promise.all([
+    listProfessionalsWithSummary(),
     canWriteProfessionals(),
     getUserBranches(),
     getAssignableStaff(),
     session ? getSeatUsageMeters(session.organizationId).catch(() => []) : Promise.resolve([]),
+    getOrganization(),
   ]);
+
+  const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
 
   const professionalsSeat = seats.find((meter) => meter.featureKey === 'professionals.max');
 
@@ -57,7 +60,7 @@ export default async function ProfesionalesPage() {
 
       <div className="space-y-3">
         <h2 className="text-lg font-semibold">Equipo profesional</h2>
-        <ProfessionalsList professionals={professionals} />
+        <ProfessionalsList professionals={professionals} currency={currency} />
       </div>
     </div>
   );

@@ -100,6 +100,8 @@ export async function getOrganizationSettingsForm(): Promise<
           taxId: settings.taxId ?? '',
           waitingRoomRooms: settings.waitingRoomRooms ?? [],
           waitingRoomMinutesPerPatient: settings.waitingRoomMinutesPerPatient ?? null,
+          settlementPeriodPreset: settings.settlementPeriodPreset,
+          settlementPeriodDays: settings.settlementPeriodDays ?? null,
         },
       },
     };
@@ -126,6 +128,8 @@ export async function updateOrganizationSettings(
       waitingRoomPortalAlertsEnabled: formData.get('waitingRoomPortalAlertsEnabled') ?? '',
       waitingRoomWhatsAppAutoEnabled: formData.get('waitingRoomWhatsAppAutoEnabled') ?? '',
       waitingRoomBoardSoundEnabled: formData.get('waitingRoomBoardSoundEnabled') ?? '',
+      settlementPeriodPreset: formData.get('settlementPeriodPreset') ?? '',
+      settlementPeriodDays: formData.get('settlementPeriodDays') ?? '',
     });
 
     if (!parsed.success) {
@@ -156,6 +160,16 @@ export async function updateOrganizationSettings(
     const waitingRoomBoardSoundEnabled =
       parsed.data.waitingRoomBoardSoundEnabled === 'on' ||
       parsed.data.waitingRoomBoardSoundEnabled === 'true';
+    const settlementPeriodPreset =
+      parsed.data.settlementPeriodPreset === 'biweekly' ||
+      parsed.data.settlementPeriodPreset === 'custom' ||
+      parsed.data.settlementPeriodPreset === 'month'
+        ? parsed.data.settlementPeriodPreset
+        : 'month';
+    const settlementPeriodDays =
+      parsed.data.settlementPeriodDays === '' || parsed.data.settlementPeriodDays == null
+        ? null
+        : parsed.data.settlementPeriodDays;
 
     const supabase = await createServerClient();
     const { error } = await supabase
@@ -173,6 +187,8 @@ export async function updateOrganizationSettings(
           waitingRoomPortalAlertsEnabled,
           waitingRoomWhatsAppAutoEnabled,
           waitingRoomBoardSoundEnabled,
+          settlementPeriodPreset,
+          settlementPeriodDays,
         }) as Json,
       })
       .eq('id', session.organizationId);
@@ -184,6 +200,7 @@ export async function updateOrganizationSettings(
     revalidatePath('/configuracion');
     revalidatePath('/sala-espera');
     revalidatePath('/portal/sala-espera');
+    revalidatePath('/liquidaciones');
     return { success: true };
   } catch (error) {
     return actionError(error);

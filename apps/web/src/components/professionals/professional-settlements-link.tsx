@@ -49,9 +49,16 @@ export function ProfessionalSettlementsLink({
                     <Badge variant={SETTLEMENT_STATUS_VARIANT[settlement.status]}>
                       {SETTLEMENT_STATUS_LABELS[settlement.status]}
                     </Badge>
-                    <span className="font-medium">
-                      {formatMoney(settlement.total_amount, settlement.currency ?? currency)}
-                    </span>
+                    <div className="text-right">
+                      <span className="font-medium">
+                        {formatMoney(settlement.total_amount, settlement.currency ?? currency)}
+                      </span>
+                      {settlement.balance_due > 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          Saldo {formatMoney(settlement.balance_due, settlement.currency ?? currency)}
+                        </p>
+                      ) : null}
+                    </div>
                   </div>
                 </Link>
               </li>

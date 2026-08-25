@@ -37,6 +37,7 @@ interface AppointmentDetailProps {
   consultationId?: string | null;
   waitingRoomStatus?: WaitingRoomStatus | null;
   settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
 const STATUS_ACTIONS: Partial<
@@ -63,6 +64,7 @@ export function AppointmentDetail({
   consultationId = null,
   waitingRoomStatus = null,
   settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
 }: AppointmentDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -224,7 +226,12 @@ export function AppointmentDetail({
         </div>
       </div>
 
-      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

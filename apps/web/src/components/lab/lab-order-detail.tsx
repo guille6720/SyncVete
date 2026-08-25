@@ -32,16 +32,27 @@ import {
   buildWhatsAppComposePath,
   type LabOrderItem,
   type LabOrderListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface LabOrderDetailProps {
   order: LabOrderListRow;
   items: LabOrderItem[];
   canWrite: boolean;
   canSendWhatsApp?: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
-export function LabOrderDetail({ order, items, canWrite, canSendWhatsApp = false }: LabOrderDetailProps) {
+export function LabOrderDetail({
+  order,
+  items,
+  canWrite,
+  canSendWhatsApp = false,
+  settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
+}: LabOrderDetailProps) {
   const router = useRouter();
   const isOpen = order.status === 'solicitada' || order.status === 'en_proceso';
   const canOperate = canWrite && isOpen;
@@ -102,6 +113,13 @@ export function LabOrderDetail({ order, items, canWrite, canSendWhatsApp = false
           )}
         </div>
       </div>
+
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

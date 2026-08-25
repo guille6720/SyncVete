@@ -5,7 +5,7 @@ import { canManageConsultations, getConsultationByAppointment } from '@/actions/
 import { canSendWhatsApp } from '@/actions/whatsapp';
 import { canManageWaitingRoom, canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import {
-  canReadProfessionalSettlements,
+  canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
 import { AppointmentDetail } from '@/components/appointments/appointment-detail';
@@ -19,7 +19,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp, canCheckIn, canReadWr, canReadSettlements] =
+  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp, canCheckIn, canReadWr, settlementAccess] =
     await Promise.all([
       getAppointment(id),
       canManageAppointments(),
@@ -28,15 +28,17 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       canSendWhatsApp(),
       canManageWaitingRoom(),
       canReadWaitingRoom(),
-      canReadProfessionalSettlements(),
+      canReadSettlementSourceClaims(),
     ]);
 
   if (!appointment) notFound();
 
   const settlementClaim =
-    canReadSettlements && appointment.status === 'completada'
+    settlementAccess && appointment.status === 'completada'
       ? await getSettlementClaimForSource('appointment', appointment.id)
       : null;
+  const settlementDetailBasePath =
+    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
 
   let waitingRoomStatus = null;
   if (canReadWr) {
@@ -56,6 +58,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       consultationId={existingConsultation?.id ?? null}
       waitingRoomStatus={waitingRoomStatus}
       settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
     />
   );
 }

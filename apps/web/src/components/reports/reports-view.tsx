@@ -12,6 +12,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react';
+import Link from 'next/link';
 import { ReportsPeriodFilter } from '@/components/reports/reports-period-filter';
 import { ReportsStatGrid } from '@/components/reports/reports-stat-grid';
 import { ReportsBreakdownList } from '@/components/reports/reports-breakdown-list';
@@ -32,6 +33,7 @@ import {
   type WaitingRoomStatus,
   SETTLEMENT_STATUS_LABELS,
   isSettlementStatus,
+  buildLiquidacionesHref,
   type SettlementStatus,
 } from '@sincvete/shared';
 
@@ -46,6 +48,7 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
   const inventory = report.inventory;
   const waitingRoom = report.waitingRoom;
   const professionalsSettlements = report.professionalsSettlements;
+  const periodQs = { periodStart: report.from, periodEnd: report.to };
 
   return (
     <div className="space-y-8">
@@ -223,10 +226,19 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
               {
                 label: 'Saldo pendiente',
                 value: formatMoney(professionalsSettlements.totalBalanceDue, currency),
+                description: 'Ver liquidaciones con saldo',
                 icon: Wallet,
               },
             ]}
           />
+          <p className="text-sm">
+            <Link
+              href={buildLiquidacionesHref({ unpaid: true, ...periodQs })}
+              className="text-primary hover:underline"
+            >
+              Abrir liquidaciones con saldo (período del reporte)
+            </Link>
+          </p>
           <ReportsBreakdownList
             title="Liquidaciones por estado"
             items={professionalsSettlements.byStatus.map((item) => ({
@@ -235,6 +247,11 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
                 : item.status,
               value: formatMoney(item.totalAmount, currency),
               count: item.count,
+              href: isSettlementStatus(item.status)
+                ? item.status === 'approved' || item.status === 'partially_paid'
+                  ? buildLiquidacionesHref({ unpaid: true, ...periodQs })
+                  : buildLiquidacionesHref({ status: item.status, ...periodQs })
+                : undefined,
             }))}
             emptyLabel="No hay liquidaciones en el período."
           />
@@ -243,7 +260,14 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
             items={professionalsSettlements.byProfessional.map((item) => ({
               label: item.professionalName,
               value: formatMoney(item.totalAmount, currency),
+              secondaryValue:
+                item.balanceDue > 0 ? formatMoney(item.balanceDue, currency) : undefined,
               count: item.count,
+              href: buildLiquidacionesHref({
+                professionalId: item.professionalId,
+                unpaid: item.balanceDue > 0,
+                ...periodQs,
+              }),
             }))}
             emptyLabel="No hay liquidaciones por profesional en el período."
           />

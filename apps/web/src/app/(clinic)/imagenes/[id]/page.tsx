@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getClinicalImage, canReadImages, canManageImages } from '@/actions/images';
 import {
-  canReadProfessionalSettlements,
+  canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
 import { ClinicalImageDetail } from '@/components/images/clinical-image-detail';
@@ -15,21 +15,28 @@ export default async function ImagenDetailPage({ params }: ImagenDetailPageProps
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [image, canWrite, canReadSettlements] = await Promise.all([
+  const [image, canWrite, settlementAccess] = await Promise.all([
     getClinicalImage(id),
     canManageImages(),
-    canReadProfessionalSettlements(),
+    canReadSettlementSourceClaims(),
   ]);
 
   if (!image) notFound();
 
   const procedureKinds = new Set(['radiografia', 'ecografia', 'laboratorio']);
   const settlementClaim =
-    canReadSettlements && procedureKinds.has(image.kind)
+    settlementAccess && procedureKinds.has(image.kind)
       ? await getSettlementClaimForSource('procedure', image.id)
       : null;
+  const settlementDetailBasePath =
+    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
 
   return (
-    <ClinicalImageDetail image={image} canWrite={canWrite} settlementClaim={settlementClaim} />
+    <ClinicalImageDetail
+      image={image}
+      canWrite={canWrite}
+      settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
+    />
   );
 }

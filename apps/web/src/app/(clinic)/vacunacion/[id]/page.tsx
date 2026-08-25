@@ -1,5 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
 import { getVaccination, canReadVaccinations, canManageVaccinations } from '@/actions/vaccinations';
+import {
+  canReadSettlementSourceClaims,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
 import { VaccinationDetail } from '@/components/vaccinations/vaccination-detail';
 
 interface VacunacionDetailPageProps {
@@ -11,12 +15,26 @@ export default async function VacunacionDetailPage({ params }: VacunacionDetailP
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [vaccination, canWrite] = await Promise.all([
+  const [vaccination, canWrite, settlementAccess] = await Promise.all([
     getVaccination(id),
     canManageVaccinations(),
+    canReadSettlementSourceClaims(),
   ]);
 
   if (!vaccination) notFound();
 
-  return <VaccinationDetail vaccination={vaccination} canWrite={canWrite} />;
+  const settlementClaim = settlementAccess
+    ? await getSettlementClaimForSource('vaccination', vaccination.id)
+    : null;
+  const settlementDetailBasePath =
+    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
+
+  return (
+    <VaccinationDetail
+      vaccination={vaccination}
+      canWrite={canWrite}
+      settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
+    />
+  );
 }

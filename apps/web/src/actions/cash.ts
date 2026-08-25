@@ -66,6 +66,8 @@ function toMovementRow(row: CashMovementListRow): CashMovementListRow {
     ...row,
     amount: Number(row.amount ?? 0),
     deleted_at: row.deleted_at ?? null,
+    professional_payment_id: row.professional_payment_id ?? null,
+    professional_settlement_id: row.professional_settlement_id ?? null,
   };
 }
 

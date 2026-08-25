@@ -36,12 +36,14 @@ interface SurgeryStayProps {
   surgery: SurgeryListRow;
   canWrite: boolean;
   settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
 export function SurgeryStay({
   surgery,
   canWrite,
   settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
 }: SurgeryStayProps) {
   const router = useRouter();
   const isOpen =
@@ -102,7 +104,12 @@ export function SurgeryStay({
         </div>
       </div>
 
-      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

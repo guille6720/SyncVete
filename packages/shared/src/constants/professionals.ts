@@ -37,11 +37,19 @@ export const COMPENSATION_FREQUENCIES = [
   'per_procedure',
   'per_surgery',
   'per_shift',
+  'per_lab_order',
+  'per_prescription',
+  'per_vaccination',
   'percentage',
   'mixed',
 ] as const;
 
 export type CompensationFrequency = (typeof COMPENSATION_FREQUENCIES)[number];
+
+/** Frequencies offered in the rule form. `mixed` is inert in calculate. */
+export const COMPENSATION_FREQUENCIES_UI = COMPENSATION_FREQUENCIES.filter(
+  (frequency) => frequency !== 'mixed'
+);
 
 export const COMPENSATION_FREQUENCY_LABELS: Record<CompensationFrequency, string> = {
   monthly: 'Mensual',
@@ -54,9 +62,26 @@ export const COMPENSATION_FREQUENCY_LABELS: Record<CompensationFrequency, string
   per_procedure: 'Por procedimiento',
   per_surgery: 'Por cirugía',
   per_shift: 'Por guardia',
+  per_lab_order: 'Por orden de laboratorio',
+  per_prescription: 'Por receta dispensada',
+  per_vaccination: 'Por vacunación',
   percentage: 'Porcentaje',
   mixed: 'Mixto',
 };
+
+export const SETTLEMENT_PERIOD_PRESETS = ['month', 'biweekly', 'custom'] as const;
+
+export type SettlementPeriodPreset = (typeof SETTLEMENT_PERIOD_PRESETS)[number];
+
+export const SETTLEMENT_PERIOD_PRESET_LABELS: Record<SettlementPeriodPreset, string> = {
+  month: 'Mes calendario',
+  biweekly: 'Quincena (1–15 / 16–fin)',
+  custom: 'Últimos N días',
+};
+
+export function isSettlementPeriodPreset(value: string): value is SettlementPeriodPreset {
+  return (SETTLEMENT_PERIOD_PRESETS as readonly string[]).includes(value);
+}
 
 export const SETTLEMENT_STATUSES = [
   'draft',
@@ -103,6 +128,9 @@ export const SETTLEMENT_ITEM_SOURCE_TYPES = [
   'surgery',
   'procedure',
   'shift',
+  'lab_order',
+  'prescription',
+  'vaccination',
   'manual_adjustment',
   'fixed_compensation',
 ] as const;
@@ -115,6 +143,9 @@ export const SETTLEMENT_ITEM_SOURCE_TYPE_LABELS: Record<SettlementItemSourceType
   surgery: 'Cirugía',
   procedure: 'Procedimiento',
   shift: 'Guardia',
+  lab_order: 'Laboratorio',
+  prescription: 'Receta',
+  vaccination: 'Vacunación',
   manual_adjustment: 'Ajuste manual',
   fixed_compensation: 'Compensación fija',
 };

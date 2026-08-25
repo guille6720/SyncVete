@@ -91,6 +91,32 @@ export const calculateSettlementSchema = z
     path: ['periodEnd'],
   });
 
+export const bulkCalculateSettlementsSchema = z
+  .object({
+    periodStart: z.string().date(),
+    periodEnd: z.string().date(),
+    branchId: z.string().uuid().optional().nullable(),
+    professionalIds: z.array(z.string().uuid()).min(1).max(100).optional(),
+  })
+  .refine((v) => v.periodEnd >= v.periodStart, {
+    message: 'period_end debe ser >= period_start',
+    path: ['periodEnd'],
+  });
+
+export const voidProfessionalPaymentSchema = z.object({
+  paymentId: z.string().uuid(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const omitSettlementItemSchema = z.object({
+  itemId: z.string().uuid(),
+  reason: z.string().trim().min(3).max(500),
+});
+
+export const restoreSettlementOmissionSchema = z.object({
+  omissionId: z.string().uuid(),
+});
+
 export const settlementAdjustmentSchema = z.object({
   settlementId: z.string().uuid(),
   adjustmentType: z.enum(SETTLEMENT_ADJUSTMENT_TYPES),
@@ -139,6 +165,26 @@ const bulkPaymentCommonSchema = z.object({
   paidAt: z.string().datetime().optional(),
   reference: z.string().trim().max(120).optional().nullable(),
   notes: z.string().trim().max(500).optional().nullable(),
+  invoiceNumber: z.string().trim().max(80).optional().nullable(),
+  invoiceDate: z.string().date().optional().nullable(),
+  invoiceAmount: moneySchema.optional().nullable(),
+  invoiceAttachmentUrl: z.string().url().max(500).optional().nullable(),
+});
+
+export const settlementNotesSchema = z.object({
+  settlementId: z.string().uuid(),
+  notes: z.string().trim().max(2000).optional().nullable(),
+});
+
+export const deleteSettlementAdjustmentSchema = z.object({
+  adjustmentId: z.string().uuid(),
+});
+
+export const updateSettlementAdjustmentSchema = z.object({
+  adjustmentId: z.string().uuid(),
+  adjustmentType: z.enum(SETTLEMENT_ADJUSTMENT_TYPES),
+  amount: moneySchema.refine((n) => n > 0, 'El monto debe ser positivo'),
+  reason: z.string().trim().min(3).max(500),
 });
 
 export const bulkRegisterProfessionalPaymentsSchema = bulkPaymentCommonSchema.and(
@@ -168,3 +214,5 @@ export type CompensationSchemeCreateInput = z.infer<typeof compensationSchemeCre
 export type CompensationRuleCreateInput = z.infer<typeof compensationRuleCreateSchema>;
 export type CalculateSettlementInput = z.infer<typeof calculateSettlementSchema>;
 export type RegisterProfessionalPaymentInput = z.infer<typeof registerProfessionalPaymentSchema>;
+export type OmitSettlementItemInput = z.infer<typeof omitSettlementItemSchema>;
+export type RestoreSettlementOmissionInput = z.infer<typeof restoreSettlementOmissionSchema>;

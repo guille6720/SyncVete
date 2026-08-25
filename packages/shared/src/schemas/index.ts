@@ -106,6 +106,17 @@ export const organizationSettingsSchema = z.object({
   waitingRoomBoardSoundEnabled: z
     .union([z.literal('on'), z.literal('true'), z.literal(''), z.undefined()])
     .optional(),
+  settlementPeriodPreset: z.enum(['month', 'biweekly', 'custom', '']).optional(),
+  settlementPeriodDays: z
+    .union([
+      z.literal(''),
+      z.coerce
+        .number({ invalid_type_error: 'Días inválidos' })
+        .int('Días inválidos')
+        .min(1, 'Mínimo 1 día')
+        .max(366, 'Máximo 366 días'),
+    ])
+    .optional(),
 });
 
 export const branchSchema = z.object({

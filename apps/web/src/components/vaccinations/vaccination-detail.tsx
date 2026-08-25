@@ -21,14 +21,23 @@ import {
   formatVaccinationDate,
   vaccinationDueStatus,
   type VaccinationListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface VaccinationDetailProps {
   vaccination: VaccinationListRow;
   canWrite: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
-export function VaccinationDetail({ vaccination, canWrite }: VaccinationDetailProps) {
+export function VaccinationDetail({
+  vaccination,
+  canWrite,
+  settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
+}: VaccinationDetailProps) {
   const dueStatus = vaccinationDueStatus(vaccination.next_due_at);
   const action = updateVaccination.bind(null, vaccination.id);
   const [state, formAction, pending] = useActionState(action, null);
@@ -62,6 +71,13 @@ export function VaccinationDetail({ vaccination, canWrite }: VaccinationDetailPr
           )}
         </div>
       </div>
+
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

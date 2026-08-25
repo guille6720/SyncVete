@@ -45,6 +45,10 @@ export interface OrganizationSettings {
   waitingRoomWhatsAppAutoEnabled?: boolean;
   /** Play call/payment chimes on staff board and tablero when Realtime refreshes. */
   waitingRoomBoardSoundEnabled?: boolean;
+  /** Default period for settlement calculate form. */
+  settlementPeriodPreset?: 'month' | 'biweekly' | 'custom';
+  /** Days used when settlementPeriodPreset is custom (also shown as hint for quincena setups). */
+  settlementPeriodDays?: number | null;
 }
 
 export interface Profile {

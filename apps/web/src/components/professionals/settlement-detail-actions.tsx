@@ -26,6 +26,7 @@ interface SettlementDetailActionsProps {
   submitPending: boolean;
   exportOnly?: boolean;
   auditHref?: string | null;
+  paymentsAuditHref?: string | null;
 }
 
 export function SettlementDetailActions({
@@ -38,6 +39,7 @@ export function SettlementDetailActions({
   submitPending,
   exportOnly = false,
   auditHref = null,
+  paymentsAuditHref = null,
 }: SettlementDetailActionsProps) {
   const router = useRouter();
   const printRef = useRef<HTMLDivElement>(null);
@@ -65,6 +67,10 @@ export function SettlementDetailActions({
   }
 
   async function handleRecalculate() {
+    const confirmed = window.confirm(
+      '¿Recalcular esta liquidación? Se regeneran ítems desde las reglas activas; los ajustes manuales se conservan.'
+    );
+    if (!confirmed) return;
     setRecalcMessage(null);
     const result = await runRecalc(() => recalculateSettlementById(settlement.id));
     if (!result) return;
@@ -132,6 +138,11 @@ export function SettlementDetailActions({
         {auditHref ? (
           <Button variant="ghost" size="sm" asChild>
             <Link href={auditHref}>Ver en auditoría</Link>
+          </Button>
+        ) : null}
+        {paymentsAuditHref ? (
+          <Button variant="ghost" size="sm" asChild>
+            <Link href={paymentsAuditHref}>Auditoría de pagos</Link>
           </Button>
         ) : null}
         {exportMessage ? <span className="text-xs text-muted-foreground">{exportMessage}</span> : null}
@@ -212,6 +223,8 @@ export function SettlementDetailActions({
                   <th>Fecha</th>
                   <th>Método</th>
                   <th>Importe</th>
+                  <th>Estado</th>
+                  <th>Anulado</th>
                 </tr>
               </thead>
               <tbody>
@@ -220,6 +233,8 @@ export function SettlementDetailActions({
                     <td>{payment.paid_at.slice(0, 10)}</td>
                     <td>{PAYMENT_METHOD_LABELS[payment.method]}</td>
                     <td>{formatMoney(payment.amount, payment.currency)}</td>
+                    <td>{payment.deleted_at ? 'Anulado' : 'Activo'}</td>
+                    <td>{payment.deleted_at ? payment.deleted_at.slice(0, 16).replace('T', ' ') : '—'}</td>
                   </tr>
                 ))}
               </tbody>

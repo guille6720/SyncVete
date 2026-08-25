@@ -1,7 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { getSurgery, canReadSurgeries, canManageSurgeries } from '@/actions/surgeries';
 import {
-  canReadProfessionalSettlements,
+  canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
 import { SurgeryStay } from '@/components/surgeries/surgery-stay';
@@ -15,18 +15,27 @@ export default async function CirugiaDetailPage({ params }: CirugiaDetailPagePro
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [surgery, canWrite, canReadSettlements] = await Promise.all([
+  const [surgery, canWrite, settlementAccess] = await Promise.all([
     getSurgery(id),
     canManageSurgeries(),
-    canReadProfessionalSettlements(),
+    canReadSettlementSourceClaims(),
   ]);
 
   if (!surgery) notFound();
 
   const settlementClaim =
-    canReadSettlements && surgery.status === 'completada'
+    settlementAccess && surgery.status === 'completada'
       ? await getSettlementClaimForSource('surgery', surgery.id)
       : null;
+  const settlementDetailBasePath =
+    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
 
-  return <SurgeryStay surgery={surgery} canWrite={canWrite} settlementClaim={settlementClaim} />;
+  return (
+    <SurgeryStay
+      surgery={surgery}
+      canWrite={canWrite}
+      settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
+    />
+  );
 }

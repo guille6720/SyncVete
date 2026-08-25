@@ -382,6 +382,45 @@ describe.skipIf(!canRun)('@professionals Phase 1 backend', () => {
     return note.id;
   }
 
+  async function createLabOrder(client: Client, completedAt: string) {
+    const { data, error } = await client
+      .from('lab_orders')
+      .insert({
+        organization_id: orgAId,
+        branch_id: branchAId,
+        patient_id: patientAId,
+        owner_id: ownerAId,
+        ordered_by: userAId,
+        completed_by: userAId,
+        status: 'completada',
+        title: 'Hemograma test',
+        ordered_at: completedAt,
+        completed_at: completedAt,
+      })
+      .select('id')
+      .single();
+    if (error || !data) throw error ?? new Error('lab order create failed');
+    return data.id;
+  }
+
+  async function createVaccination(client: Client, administeredAt: string) {
+    const { data, error } = await client
+      .from('vaccinations')
+      .insert({
+        organization_id: orgAId,
+        branch_id: branchAId,
+        patient_id: patientAId,
+        owner_id: ownerAId,
+        veterinarian_id: userAId,
+        vaccine_name: 'Antirrábica',
+        administered_at: administeredAt,
+      })
+      .select('id')
+      .single();
+    if (error || !data) throw error ?? new Error('vaccination create failed');
+    return data.id;
+  }
+
   async function tryExtendedScheme(
     client: Client,
     rules: Array<{
@@ -824,5 +863,272 @@ describe.skipIf(!canRun)('@professionals Phase 1 backend', () => {
     const detail = await getSettlement(client, settlementId);
     expect(Number(detail.settlement.adjustments_amount)).toBe(2_000);
     expect(Number(detail.settlement.gross_amount)).toBe(15_000);
+  });
+
+  it('27. linked professional can list own settlements', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    await calculate(client, '2026-08-24', '2026-08-24');
+
+    const { data, error } = await client.rpc('list_my_professional_settlements', {
+      p_status: null,
+      p_page: 1,
+      p_page_size: 25,
+    });
+    expect(error).toBeNull();
+    const payload = data as { items?: Array<{ professional_id?: string }>; total?: number };
+    expect(Number(payload.total ?? 0)).toBeGreaterThan(0);
+    expect(payload.items?.every((row) => row.professional_id === professionalAId)).toBe(true);
+  });
+
+  it('28. submit for review emits liquidacion notification', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    const settlementId = await calculate(client, '2026-08-25', '2026-08-25');
+
+    const { error: submitError } = await client.rpc('submit_professional_settlement_for_review', {
+      p_settlement_id: settlementId,
+    });
+    expect(submitError).toBeNull();
+
+    const { data: notifications, error: notifyError } = await service
+      .from('notifications')
+      .select('id, kind, href, related_id')
+      .eq('organization_id', orgAId)
+      .eq('kind', 'liquidacion')
+      .eq('related_id', settlementId);
+    expect(notifyError).toBeNull();
+    expect((notifications ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('29. approve notifies linked professional', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    const settlementId = await calculate(client, '2026-08-26', '2026-08-26');
+
+    const { error: approveError } = await client.rpc('approve_professional_settlement', {
+      p_settlement_id: settlementId,
+    });
+    expect(approveError).toBeNull();
+
+    const { data: notifications, error: notifyError } = await service
+      .from('notifications')
+      .select('id, kind, href, related_id')
+      .eq('organization_id', orgAId)
+      .eq('kind', 'liquidacion')
+      .eq('related_id', settlementId)
+      .ilike('href', '/liquidaciones/mis-liquidaciones/%');
+    expect(notifyError).toBeNull();
+    expect((notifications ?? []).length).toBeGreaterThan(0);
+  });
+
+  it('30. per_lab_order calculation', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createLabOrder(client, '2026-08-27T12:00:00Z');
+    const schemeId = await tryExtendedScheme(client, [
+      { rule_type: 'activity', frequency: 'per_lab_order', amount: 7_500 },
+    ]);
+    if (!schemeId) return;
+
+    const settlementId = await calculate(client, '2026-08-01', '2026-08-31');
+    const detail = await getSettlement(client, settlementId);
+    expect(
+      detail.items.some(
+        (item) => item.source_type === 'lab_order' && Number(item.calculated_amount) === 7_500
+      )
+    ).toBe(true);
+  });
+
+  it('31. per_vaccination calculation', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createVaccination(client, '2026-08-28');
+    const schemeId = await tryExtendedScheme(client, [
+      { rule_type: 'activity', frequency: 'per_vaccination', amount: 5_000 },
+    ]);
+    if (!schemeId) return;
+
+    const settlementId = await calculate(client, '2026-08-01', '2026-08-31');
+    const detail = await getSettlement(client, settlementId);
+    expect(
+      detail.items.some(
+        (item) => item.source_type === 'vaccination' && Number(item.calculated_amount) === 5_000
+      )
+    ).toBe(true);
+  });
+
+  it('32. delete adjustment on draft', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    const settlementId = await calculate(client, '2026-08-29', '2026-08-29');
+    const { data: addResult, error: addError } = await client.rpc(
+      'add_professional_settlement_adjustment',
+      {
+        p_settlement_id: settlementId,
+        p_type: 'bonus',
+        p_amount: 1_500,
+        p_reason: 'Bono temporal',
+      }
+    );
+    expect(addError).toBeNull();
+    const adjustmentId = String(
+      (addResult as { adjustment?: { id?: string } } | null)?.adjustment?.id ?? ''
+    );
+    expect(adjustmentId).toBeTruthy();
+
+    const { error: deleteError } = await client.rpc('delete_professional_settlement_adjustment', {
+      p_adjustment_id: adjustmentId,
+    });
+    expect(deleteError).toBeNull();
+
+    const detail = await getSettlement(client, settlementId);
+    expect(Number(detail.settlement.adjustments_amount)).toBe(0);
+    expect(detail.adjustments).toHaveLength(0);
+  });
+
+  it('33. update settlement notes + portal period filter', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    const settlementId = await calculate(client, '2026-08-30', '2026-08-30');
+
+    const { error: notesError } = await client.rpc('update_professional_settlement_notes', {
+      p_settlement_id: settlementId,
+      p_notes: 'Nota operativa fase 13',
+    });
+    expect(notesError).toBeNull();
+
+    const detail = await getSettlement(client, settlementId);
+    expect(String(detail.settlement.notes)).toBe('Nota operativa fase 13');
+
+    const { data: listed, error: listError } = await client.rpc('list_my_professional_settlements', {
+      p_status: null,
+      p_page: 1,
+      p_page_size: 25,
+      p_period_start: '2026-08-30',
+      p_period_end: '2026-08-30',
+    });
+    expect(listError).toBeNull();
+    const payload = listed as { items?: Array<{ id?: string }>; total?: number };
+    expect(Number(payload.total ?? 0)).toBeGreaterThan(0);
+    expect(payload.items?.some((row) => row.id === settlementId)).toBe(true);
+  });
+
+  it('34. update adjustment recalculates totals', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    const settlementId = await calculate(client, '2026-08-31', '2026-08-31');
+
+    const { data: addResult, error: addError } = await client.rpc(
+      'add_professional_settlement_adjustment',
+      {
+        p_settlement_id: settlementId,
+        p_type: 'bonus',
+        p_amount: 3_000,
+        p_reason: 'Bonus inicial',
+      }
+    );
+    expect(addError).toBeNull();
+    const adjustmentId = String(
+      (addResult as { adjustment?: { id?: string } } | null)?.adjustment?.id ?? ''
+    );
+    expect(adjustmentId).toBeTruthy();
+
+    const { error: updateError } = await client.rpc('update_professional_settlement_adjustment', {
+      p_adjustment_id: adjustmentId,
+      p_type: 'bonus',
+      p_amount: 4_500,
+      p_reason: 'Bonus corregido',
+    });
+    expect(updateError).toBeNull();
+
+    const detail = await getSettlement(client, settlementId);
+    expect(Number(detail.settlement.adjustments_amount)).toBe(4_500);
+    expect(detail.adjustments).toHaveLength(1);
+    expect(String(detail.adjustments[0]?.reason)).toBe('Bonus corregido');
+  });
+
+  it('35. liquidacion notifications are role-filtered', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    const settlementId = await calculate(client, '2026-09-01', '2026-09-01');
+
+    const { error: submitError } = await client.rpc('submit_professional_settlement_for_review', {
+      p_settlement_id: settlementId,
+    });
+    expect(submitError).toBeNull();
+
+    const { data: forApprover, error: approverError } = await client.rpc('search_notifications', {
+      p_kind: 'liquidacion',
+      p_page: 1,
+      p_page_size: 50,
+    });
+    expect(approverError).toBeNull();
+    const approverRows = (forApprover ?? []) as Array<{ related_id?: string; href?: string }>;
+    expect(
+      approverRows.some(
+        (row) =>
+          row.related_id === settlementId &&
+          String(row.href ?? '').startsWith('/liquidaciones/') &&
+          !String(row.href ?? '').includes('/mis-liquidaciones/')
+      )
+    ).toBe(true);
+
+    const readonly = await authed(emailReadonly);
+    const { data: forReadonly, error: readonlyError } = await readonly.rpc('search_notifications', {
+      p_kind: 'liquidacion',
+      p_page: 1,
+      p_page_size: 50,
+    });
+    expect(readonlyError).toBeNull();
+    const readonlyRows = (forReadonly ?? []) as Array<{ related_id?: string }>;
+    expect(readonlyRows.some((row) => row.related_id === settlementId)).toBe(false);
+  });
+
+  it('36. void payment restores balance', async () => {
+    if (!schemaReady) return;
+    const client = await authed(emailA);
+    await createSchemeWithRules(client, [{ rule_type: 'fixed', frequency: 'daily', amount: 10_000 }]);
+    const settlementId = await calculate(client, '2026-09-02', '2026-09-02');
+
+    const { error: approveError } = await client.rpc('approve_professional_settlement', {
+      p_settlement_id: settlementId,
+    });
+    expect(approveError).toBeNull();
+
+    const { data: payResult, error: payError } = await client.rpc('register_professional_payment', {
+      p_settlement_id: settlementId,
+      p_amount: 4_000,
+      p_method: 'transferencia',
+    });
+    expect(payError).toBeNull();
+    const paymentId = String((payResult as { payment?: { id?: string } } | null)?.payment?.id ?? '');
+    expect(paymentId).toBeTruthy();
+
+    const afterPay = await getSettlement(client, settlementId);
+    expect(Number(afterPay.settlement.total_paid)).toBe(4_000);
+    expect(String(afterPay.settlement.status)).toBe('partially_paid');
+
+    const { error: voidError } = await client.rpc('void_professional_payment', {
+      p_payment_id: paymentId,
+      p_reason: 'Pago cargado por error',
+    });
+    expect(voidError).toBeNull();
+
+    const afterVoid = await getSettlement(client, settlementId);
+    expect(Number(afterVoid.settlement.total_paid)).toBe(0);
+    expect(Number(afterVoid.settlement.balance_due)).toBe(Number(afterVoid.settlement.total_amount));
+    expect(String(afterVoid.settlement.status)).toBe('approved');
+    expect(afterVoid.payments.some((p) => String(p.id) === paymentId && Boolean(p.deleted_at))).toBe(
+      true
+    );
+    expect(afterVoid.payments.filter((p) => !p.deleted_at)).toHaveLength(0);
   });
 });

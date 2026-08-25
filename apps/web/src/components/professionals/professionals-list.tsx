@@ -4,14 +4,16 @@ import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import {
   PROFESSIONAL_RELATIONSHIP_LABELS,
-  type Professional,
+  formatMoney,
+  type ProfessionalListRow,
 } from '@sincvete/shared';
 
 interface ProfessionalsListProps {
-  professionals: Professional[];
+  professionals: ProfessionalListRow[];
+  currency?: string;
 }
 
-export function ProfessionalsList({ professionals }: ProfessionalsListProps) {
+export function ProfessionalsList({ professionals, currency = 'ARS' }: ProfessionalsListProps) {
   if (professionals.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
@@ -28,7 +30,7 @@ export function ProfessionalsList({ professionals }: ProfessionalsListProps) {
           href={`/profesionales/${professional.id}`}
           className="flex flex-wrap items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/40"
         >
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="font-medium">
               {professional.last_name}, {professional.first_name}
             </p>
@@ -36,10 +38,36 @@ export function ProfessionalsList({ professionals }: ProfessionalsListProps) {
               {PROFESSIONAL_RELATIONSHIP_LABELS[professional.relationship_type]}
               {professional.specialty ? ` · ${professional.specialty}` : ''}
             </p>
+            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span>
+                Esquema:{' '}
+                {professional.activeSchemeName ? (
+                  <span className="text-foreground">{professional.activeSchemeName}</span>
+                ) : (
+                  'Sin esquema vigente'
+                )}
+              </span>
+              {professional.openBalance > 0 ? (
+                <span>
+                  Saldo:{' '}
+                  <span className="font-medium text-foreground">
+                    {formatMoney(professional.openBalance, currency)}
+                  </span>
+                </span>
+              ) : null}
+              {professional.pendingSettlementCount > 0 ? (
+                <span>{professional.pendingSettlementCount} en borrador/revisión</span>
+              ) : null}
+            </div>
           </div>
-          <Badge variant={professional.is_active ? 'success' : 'default'}>
-            {professional.is_active ? 'Activo' : 'Inactivo'}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            {professional.openBalance > 0 ? (
+              <Badge variant="warning">{formatMoney(professional.openBalance, currency)}</Badge>
+            ) : null}
+            <Badge variant={professional.is_active ? 'success' : 'default'}>
+              {professional.is_active ? 'Activo' : 'Inactivo'}
+            </Badge>
+          </div>
         </Link>
       ))}
     </div>

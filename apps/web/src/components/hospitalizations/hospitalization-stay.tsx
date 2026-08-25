@@ -25,6 +25,7 @@ interface HospitalizationStayProps {
   notes: HospitalizationNote[];
   canWrite: boolean;
   settlementClaimsByNoteId?: Record<string, SettlementSourceClaimInfo>;
+  settlementDetailBasePath?: string;
 }
 
 export function HospitalizationStay({
@@ -32,6 +33,7 @@ export function HospitalizationStay({
   notes,
   canWrite,
   settlementClaimsByNoteId = {},
+  settlementDetailBasePath = '/liquidaciones',
 }: HospitalizationStayProps) {
   const isActive = stay.status === 'internado' || stay.status === 'observacion';
 
@@ -143,6 +145,7 @@ export function HospitalizationStay({
             canWrite={canWrite}
             isActive={isActive}
             settlementClaimsByNoteId={settlementClaimsByNoteId}
+            settlementDetailBasePath={settlementDetailBasePath}
           />
         </CardContent>
       </Card>

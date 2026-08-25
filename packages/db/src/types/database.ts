@@ -141,9 +141,13 @@ export type CompensationFrequency =
   | 'daily'
   | 'hourly'
   | 'per_consultation'
+  | 'per_appointment'
   | 'per_procedure'
   | 'per_surgery'
   | 'per_shift'
+  | 'per_lab_order'
+  | 'per_prescription'
+  | 'per_vaccination'
   | 'percentage'
   | 'mixed';
 
@@ -161,6 +165,9 @@ export type SettlementItemSourceType =
   | 'surgery'
   | 'procedure'
   | 'shift'
+  | 'lab_order'
+  | 'prescription'
+  | 'vaccination'
   | 'manual_adjustment'
   | 'fixed_compensation';
 
@@ -1490,6 +1497,7 @@ export interface Database {
           organization_id: string;
           cash_session_id: string;
           payment_id: string | null;
+          professional_payment_id: string | null;
           recorded_by: string | null;
           kind: CashMovementKind;
           method: PaymentMethod;
@@ -1504,6 +1512,7 @@ export interface Database {
           organization_id: string;
           cash_session_id: string;
           payment_id?: string | null;
+          professional_payment_id?: string | null;
           recorded_by?: string | null;
           kind: CashMovementKind;
           method?: PaymentMethod;
@@ -1518,6 +1527,7 @@ export interface Database {
           organization_id?: string;
           cash_session_id?: string;
           payment_id?: string | null;
+          professional_payment_id?: string | null;
           recorded_by?: string | null;
           kind?: CashMovementKind;
           method?: PaymentMethod;
@@ -6520,6 +6530,8 @@ export interface Database {
           organization_id: string;
           cash_session_id: string;
           payment_id: string | null;
+          professional_payment_id: string | null;
+          professional_settlement_id: string | null;
           recorded_by: string | null;
           kind: CashMovementKind;
           method: PaymentMethod;
@@ -6548,6 +6560,7 @@ export interface Database {
           p_amount: number;
           p_method?: PaymentMethod;
           p_notes?: string | null;
+          p_professional_payment_id?: string | null;
         };
         Returns: Json;
       };
@@ -7609,6 +7622,54 @@ export interface Database {
         };
         Returns: Json;
       };
+      delete_professional_settlement_adjustment: {
+        Args: {
+          p_adjustment_id: string;
+        };
+        Returns: Json;
+      };
+      update_professional_settlement_adjustment: {
+        Args: {
+          p_adjustment_id: string;
+          p_type: SettlementAdjustmentType;
+          p_amount: number;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      void_professional_payment: {
+        Args: {
+          p_payment_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      omit_professional_settlement_item: {
+        Args: {
+          p_item_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      restore_professional_settlement_omission: {
+        Args: {
+          p_omission_id: string;
+        };
+        Returns: Json;
+      };
+      apply_professional_settlement_omissions: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: undefined;
+      };
+      update_professional_settlement_notes: {
+        Args: {
+          p_settlement_id: string;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
       register_professional_payment: {
         Args: {
           p_settlement_id: string;
@@ -7647,6 +7708,8 @@ export interface Database {
           p_status?: SettlementStatus | null;
           p_page?: number;
           p_page_size?: number;
+          p_period_start?: string | null;
+          p_period_end?: string | null;
         };
         Returns: Json;
       };

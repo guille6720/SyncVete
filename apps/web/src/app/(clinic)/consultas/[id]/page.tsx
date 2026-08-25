@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { canManageBilling } from '@/actions/billing';
 import { getClinicalAiStatus } from '@/actions/clinical-ai';
 import {
-  canReadProfessionalSettlements,
+  canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
 
@@ -26,20 +26,22 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
   if (!canRead) redirect('/consultas');
 
   const { id } = await params;
-  const [consultation, canWrite, canWriteBilling, aiStatus, canReadSettlements] = await Promise.all([
+  const [consultation, canWrite, canWriteBilling, aiStatus, settlementAccess] = await Promise.all([
     getConsultation(id),
     canManageConsultations(),
     canManageBilling(),
     getClinicalAiStatus(),
-    canReadProfessionalSettlements(),
+    canReadSettlementSourceClaims(),
   ]);
 
   if (!consultation) notFound();
 
   const settlementClaim =
-    canReadSettlements && consultation.status === 'completada'
+    settlementAccess && consultation.status === 'completada'
       ? await getSettlementClaimForSource('consultation', consultation.id)
       : null;
+  const settlementDetailBasePath =
+    settlementAccess === 'own' ? '/liquidaciones/mis-liquidaciones' : '/liquidaciones';
 
   const isOpen = consultation.status === 'en_curso' || consultation.status === 'en_espera';
 
@@ -70,6 +72,7 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
       canWrite={canWrite}
       canWriteBilling={canWriteBilling}
       settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
     />
   );
 }

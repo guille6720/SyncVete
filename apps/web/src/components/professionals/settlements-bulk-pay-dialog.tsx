@@ -20,6 +20,8 @@ interface SettlementsBulkPayDialogProps {
   selectedSettlements: ProfessionalSettlement[];
   professionals: Professional[];
   currency?: string;
+  openCashSessionId?: string | null;
+  canPostCashEgreso?: boolean;
   onClose: () => void;
   onComplete: () => void;
 }
@@ -38,30 +40,51 @@ export function SettlementsBulkPayDialog({
   selectedSettlements,
   professionals,
   currency = 'ARS',
+  openCashSessionId = null,
+  canPostCashEgreso = false,
   onClose,
   onComplete,
 }: SettlementsBulkPayDialogProps) {
   const [method, setMethod] = useState<string>('transferencia');
+  const [paidAt, setPaidAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [reference, setReference] = useState('');
+  const [notes, setNotes] = useState('');
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState('');
+  const [invoiceAmount, setInvoiceAmount] = useState('');
+  const [invoiceAttachmentUrl, setInvoiceAttachmentUrl] = useState('');
   const [useCustomAmounts, setUseCustomAmounts] = useState(false);
+  const [postCashEgreso, setPostCashEgreso] = useState(false);
   const [amountsById, setAmountsById] = useState<Record<string, string>>({});
   const [message, setMessage] = useState<string | null>(null);
   const [failedRows, setFailedRows] = useState<Array<{ id: string; error: string }>>([]);
+  const [warnings, setWarnings] = useState<Array<{ id: string; message: string }>>([]);
   const [pending, run] = usePendingAction();
 
   useEffect(() => {
     if (!open) return;
     setUseCustomAmounts(false);
     setAmountsById(
-      Object.fromEntries(
-        selectedSettlements.map((row) => [row.id, String(row.balance_due)])
-      )
+      Object.fromEntries(selectedSettlements.map((row) => [row.id, String(row.balance_due)]))
     );
     setMessage(null);
     setFailedRows([]);
+    setWarnings([]);
+    setInvoiceNumber('');
+    setInvoiceDate('');
+    setInvoiceAmount('');
+    setInvoiceAttachmentUrl('');
+    setNotes('');
+    setPaidAt(new Date().toISOString().slice(0, 16));
+    setPostCashEgreso(false);
   }, [open, selectedSettlements]);
 
   if (!open) return null;
+
+  const requiresInvoice = selectedSettlements.some((settlement) => {
+    const professional = professionals.find((row) => row.id === settlement.professional_id);
+    return Boolean(professional?.invoice_required);
+  });
 
   const totalDue = selectedSettlements.reduce((sum, row) => {
     if (useCustomAmounts) {
@@ -71,10 +94,27 @@ export function SettlementsBulkPayDialog({
     return sum + row.balance_due;
   }, 0);
 
+  const showCashOption = canPostCashEgreso && Boolean(openCashSessionId) && method === 'efectivo';
+
   const handlePay = () => {
     setMessage(null);
     setFailedRows([]);
+    setWarnings([]);
     void run(async () => {
+      const paidAtIso = paidAt ? new Date(paidAt).toISOString() : undefined;
+      const common = {
+        method,
+        paidAt: paidAtIso,
+        reference: reference.trim() || null,
+        notes: notes.trim() || null,
+        invoiceNumber: invoiceNumber.trim() || null,
+        invoiceDate: invoiceDate || null,
+        invoiceAmount: invoiceAmount ? Number(invoiceAmount) : null,
+        invoiceAttachmentUrl: invoiceAttachmentUrl.trim() || null,
+        postCashEgreso: showCashOption && postCashEgreso,
+        cashSessionId: showCashOption && postCashEgreso ? openCashSessionId : null,
+      };
+
       if (useCustomAmounts) {
         const payments = selectedSettlements.map((row) => ({
           settlementId: row.id,
@@ -83,8 +123,7 @@ export function SettlementsBulkPayDialog({
         const result = await bulkRegisterProfessionalPayments({
           mode: 'custom',
           payments,
-          method,
-          reference: reference.trim() || null,
+          ...common,
         });
         if (!result?.success || !result.data) {
           throw new Error(result?.error ?? 'No se pudieron registrar los pagos');
@@ -95,8 +134,7 @@ export function SettlementsBulkPayDialog({
       const result = await bulkRegisterProfessionalPayments({
         mode: 'full',
         settlementIds: selectedSettlements.map((row) => row.id),
-        method,
-        reference: reference.trim() || null,
+        ...common,
       });
       if (!result?.success || !result.data) {
         throw new Error(result?.error ?? 'No se pudieron registrar los pagos');
@@ -106,14 +144,17 @@ export function SettlementsBulkPayDialog({
       if (!data) return;
       const fail = data.failed.length;
       setFailedRows(data.failed);
+      setWarnings(data.warnings ?? []);
       setMessage(
         fail > 0
           ? `${data.succeeded.length} pagadas · ${fail} con error`
           : `${data.succeeded.length} liquidacion${data.succeeded.length !== 1 ? 'es' : ''} pagada${data.succeeded.length !== 1 ? 's' : ''}`
       );
-      if (fail === 0) {
+      if (fail === 0 && !(data.warnings && data.warnings.length > 0)) {
         onComplete();
         onClose();
+      } else if (fail === 0) {
+        onComplete();
       }
     });
   };
@@ -180,7 +221,10 @@ export function SettlementsBulkPayDialog({
             <Select
               id="bulk-pay-method"
               value={method}
-              onChange={(e) => setMethod(e.target.value)}
+              onChange={(e) => {
+                setMethod(e.target.value);
+                if (e.target.value !== 'efectivo') setPostCashEgreso(false);
+              }}
             >
               {PAYMENT_METHODS.map((item) => (
                 <option key={item} value={item}>
@@ -188,6 +232,15 @@ export function SettlementsBulkPayDialog({
                 </option>
               ))}
             </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="bulk-pay-paid-at">Fecha de pago</Label>
+            <Input
+              id="bulk-pay-paid-at"
+              type="datetime-local"
+              value={paidAt}
+              onChange={(e) => setPaidAt(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="bulk-pay-reference">Referencia (opcional)</Label>
@@ -198,6 +251,84 @@ export function SettlementsBulkPayDialog({
               placeholder="CBU, lote, comprobante..."
             />
           </div>
+          <div className="space-y-2">
+            <Label htmlFor="bulk-pay-notes">Notas (opcional)</Label>
+            <Input
+              id="bulk-pay-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Observación del lote"
+              maxLength={500}
+            />
+          </div>
+          {showCashOption ? (
+            <label className="flex items-start gap-2 rounded-md border bg-muted/20 px-3 py-2 text-sm">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={postCashEgreso}
+                onChange={(e) => setPostCashEgreso(e.target.checked)}
+              />
+              <span>
+                Registrar egreso en la caja abierta por cada pago. No revierte automáticamente si
+                anulás el pago después.
+              </span>
+            </label>
+          ) : canPostCashEgreso && method === 'efectivo' && !openCashSessionId ? (
+            <p className="text-xs text-muted-foreground">
+              No hay caja abierta en esta sucursal para registrar egreso.
+            </p>
+          ) : null}
+          {requiresInvoice ? (
+            <div className="space-y-3 rounded-md border p-3">
+              <p className="text-xs text-muted-foreground">
+                Algunos profesionales requieren factura — los datos se aplican a todos los pagos
+                del lote.
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-pay-invoice-number">Nº factura</Label>
+                  <Input
+                    id="bulk-pay-invoice-number"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                    placeholder="0001-00001234"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bulk-pay-invoice-date">Fecha factura</Label>
+                  <Input
+                    id="bulk-pay-invoice-date"
+                    type="date"
+                    value={invoiceDate}
+                    onChange={(e) => setInvoiceDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bulk-pay-invoice-amount">Importe factura</Label>
+                <Input
+                  id="bulk-pay-invoice-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={invoiceAmount}
+                  onChange={(e) => setInvoiceAmount(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bulk-pay-invoice-url">URL adjunto factura</Label>
+                <Input
+                  id="bulk-pay-invoice-url"
+                  type="url"
+                  value={invoiceAttachmentUrl}
+                  onChange={(e) => setInvoiceAttachmentUrl(e.target.value)}
+                  placeholder="https://..."
+                  maxLength={500}
+                />
+              </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-5 flex flex-wrap justify-end gap-2">
@@ -212,6 +343,13 @@ export function SettlementsBulkPayDialog({
           </Button>
         </div>
         {message ? <p className="mt-3 text-xs text-muted-foreground">{message}</p> : null}
+        {warnings.length > 0 ? (
+          <ul className="mt-2 space-y-1 text-xs text-amber-700 dark:text-amber-400">
+            {warnings.map((row) => (
+              <li key={`${row.id}-${row.message}`}>{row.message}</li>
+            ))}
+          </ul>
+        ) : null}
         {failedRows.length > 0 ? (
           <ul className="mt-2 space-y-1 text-xs text-destructive">
             {failedRows.map((row) => {

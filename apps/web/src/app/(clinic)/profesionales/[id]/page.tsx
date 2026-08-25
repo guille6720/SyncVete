@@ -11,8 +11,10 @@ import {
   canReadProfessionals,
   canWriteProfessionals,
   getProfessional,
+  getProfessionalSettlementSummary,
   listProfessionalBranches,
 } from '@/actions/professionals';
+import { ProfessionalSummaryStrip } from '@/components/professionals/professional-summary-strip';
 import { getAssignableStaff } from '@/actions/appointments';
 import { getOrganization, getUserBranches } from '@/actions/settings';
 import { CompensationPanel } from '@/components/professionals/compensation-panel';
@@ -32,7 +34,7 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
   const professional = await getProfessional(id);
   if (!professional) notFound();
 
-  const [branches, professionalBranches, staff, canWrite, canReadComp, canWriteComp, canReadSettlements, organization] =
+  const [branches, professionalBranches, staff, canWrite, canReadComp, canWriteComp, canReadSettlements, organization, settlementSummary] =
     await Promise.all([
       getUserBranches(),
       listProfessionalBranches(id),
@@ -42,6 +44,9 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
       canWriteProfessionalCompensation(),
       canReadProfessionalSettlements(),
       getOrganization(),
+      canReadProfessionalSettlements().then((allowed) =>
+        allowed ? getProfessionalSettlementSummary(id) : null
+      ),
     ]);
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
@@ -74,6 +79,15 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
           {professional.specialty ? ` · ${professional.specialty}` : ''}
         </p>
       </div>
+
+      {settlementSummary ? (
+        <ProfessionalSummaryStrip
+          professionalId={id}
+          summary={settlementSummary}
+          currency={currency}
+          canCalculate={canWriteComp}
+        />
+      ) : null}
 
       {canWrite && (
         <ProfessionalForm

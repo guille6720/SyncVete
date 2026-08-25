@@ -30,6 +30,8 @@ interface SettlementsHistoryProps {
   professionals: Professional[];
   branches?: BranchOption[];
   initialStatus?: string;
+  initialPendingReview?: boolean;
+  initialUnpaid?: boolean;
   initialProfessionalId?: string;
   initialPeriodStart?: string;
   initialPeriodEnd?: string;
@@ -38,6 +40,8 @@ interface SettlementsHistoryProps {
   canBulkApprove?: boolean;
   canBulkSubmit?: boolean;
   canBulkPay?: boolean;
+  openCashSessionId?: string | null;
+  canPostCashEgreso?: boolean;
   readOnly?: boolean;
   detailBasePath?: string;
 }
@@ -52,6 +56,8 @@ export function SettlementsHistory({
   professionals,
   branches = [],
   initialStatus = '',
+  initialPendingReview = false,
+  initialUnpaid = false,
   initialProfessionalId = '',
   initialPeriodStart = '',
   initialPeriodEnd = '',
@@ -60,6 +66,8 @@ export function SettlementsHistory({
   canBulkApprove = false,
   canBulkSubmit = false,
   canBulkPay = false,
+  openCashSessionId = null,
+  canPostCashEgreso = false,
   readOnly = false,
   detailBasePath = '/liquidaciones',
 }: SettlementsHistoryProps) {
@@ -124,6 +132,41 @@ export function SettlementsHistory({
   const showBulk =
     !readOnly && (canBulkApprove || canBulkSubmit || canBulkPay) && selectableIds.length > 0;
 
+  const statusSelectValue = initialUnpaid
+    ? '__unpaid__'
+    : initialPendingReview
+      ? '__pending_review__'
+      : initialStatus;
+
+  const handleStatusChange = (value: string) => {
+    if (value === '__pending_review__') {
+      updateParams({ status: null, pendingReview: '1', unpaid: null });
+      return;
+    }
+    if (value === '__unpaid__') {
+      updateParams({ status: null, pendingReview: null, unpaid: '1' });
+      return;
+    }
+    updateParams({ status: value || null, pendingReview: null, unpaid: null });
+  };
+
+  const statusFilter = (
+    <Select
+      value={statusSelectValue}
+      onChange={(e) => handleStatusChange(e.target.value)}
+      className="w-full sm:w-56"
+    >
+      <option value="">Todos los estados</option>
+      <option value="__pending_review__">Borrador / revisión</option>
+      <option value="__unpaid__">Con saldo / por pagar</option>
+      {SETTLEMENT_STATUSES.map((status) => (
+        <option key={status} value={status}>
+          {SETTLEMENT_STATUS_LABELS[status]}
+        </option>
+      ))}
+    </Select>
+  );
+
   return (
     <div className="space-y-4">
       <div>
@@ -150,11 +193,13 @@ export function SettlementsHistory({
             ))}
           </Select>
           <Select
-            value={initialStatus}
-            onChange={(e) => updateParams({ status: e.target.value || null })}
+            value={statusSelectValue}
+            onChange={(e) => handleStatusChange(e.target.value)}
             className="w-full"
           >
             <option value="">Todos los estados</option>
+            <option value="__pending_review__">Borrador / revisión</option>
+            <option value="__unpaid__">Con saldo / por pagar</option>
             {SETTLEMENT_STATUSES.map((status) => (
               <option key={status} value={status}>
                 {SETTLEMENT_STATUS_LABELS[status]}
@@ -191,18 +236,23 @@ export function SettlementsHistory({
           />
         </div>
       ) : (
-        <Select
-          value={initialStatus}
-          onChange={(e) => updateParams({ status: e.target.value || null })}
-          className="w-full sm:w-56"
-        >
-          <option value="">Todos los estados</option>
-          {SETTLEMENT_STATUSES.map((status) => (
-            <option key={status} value={status}>
-              {SETTLEMENT_STATUS_LABELS[status]}
-            </option>
-          ))}
-        </Select>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {statusFilter}
+          <Input
+            type="date"
+            value={initialPeriodStart}
+            onChange={(e) => updateParams({ periodStart: e.target.value || null })}
+            aria-label="Período desde"
+            className="w-full"
+          />
+          <Input
+            type="date"
+            value={initialPeriodEnd}
+            onChange={(e) => updateParams({ periodEnd: e.target.value || null })}
+            aria-label="Período hasta"
+            className="w-full"
+          />
+        </div>
       )}
 
       {showBulk ? (
@@ -223,6 +273,8 @@ export function SettlementsHistory({
             canSubmitForReview={canBulkSubmit}
             canPay={canBulkPay}
             currency={currency}
+            openCashSessionId={openCashSessionId}
+            canPostCashEgreso={canPostCashEgreso}
             onClear={() => setSelectedIds([])}
             onComplete={() => router.refresh()}
           />
@@ -271,9 +323,20 @@ export function SettlementsHistory({
                   <Badge variant={SETTLEMENT_STATUS_VARIANT[status]}>
                     {SETTLEMENT_STATUS_LABELS[status]}
                   </Badge>
-                  <span className="text-sm font-medium">
-                    {formatMoney(settlement.total_amount, settlement.currency ?? currency)}
-                  </span>
+                  <div className="text-right text-sm">
+                    <p className="font-medium">
+                      {formatMoney(settlement.total_amount, settlement.currency ?? currency)}
+                    </p>
+                    {settlement.balance_due > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Saldo {formatMoney(settlement.balance_due, settlement.currency ?? currency)}
+                      </p>
+                    ) : settlement.total_paid > 0 ? (
+                      <p className="text-xs text-muted-foreground">
+                        Pagado {formatMoney(settlement.total_paid, settlement.currency ?? currency)}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               </div>
             );

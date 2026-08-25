@@ -75,6 +75,12 @@ export function getSettlementItemSourceHref(
       return `/consultas/${sourceId}`;
     case 'surgery':
       return `/cirugias/${sourceId}`;
+    case 'lab_order':
+      return `/laboratorio/${sourceId}`;
+    case 'prescription':
+      return `/farmacia/${sourceId}`;
+    case 'vaccination':
+      return `/vacunacion/${sourceId}`;
     default:
       return null;
   }
@@ -148,4 +154,117 @@ export function buildSettlementsReportCsv(
     ]),
   ];
   return buildCsv(rows);
+}
+
+function toDateOnly(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export type SettlementPeriodKind = 'month' | 'last_month' | 'biweekly' | 'custom';
+
+/** Resolve a settlement period range for calculate form defaults / presets. */
+export function resolveSettlementPeriodRange(input?: {
+  kind?: SettlementPeriodKind | null;
+  periodDays?: number | null;
+  referenceDate?: Date;
+}): { start: string; end: string } {
+  const ref = input?.referenceDate ? new Date(input.referenceDate) : new Date();
+  const kind = input?.kind ?? 'month';
+  const periodDays =
+    input?.periodDays != null && Number.isFinite(input.periodDays) && input.periodDays > 0
+      ? Math.min(366, Math.round(input.periodDays))
+      : 14;
+
+  if (kind === 'last_month') {
+    const start = new Date(ref.getFullYear(), ref.getMonth() - 1, 1);
+    const end = new Date(ref.getFullYear(), ref.getMonth(), 0);
+    return { start: toDateOnly(start), end: toDateOnly(end) };
+  }
+
+  if (kind === 'biweekly') {
+    if (ref.getDate() <= 15) {
+      const start = new Date(ref.getFullYear(), ref.getMonth(), 1);
+      const end = new Date(ref.getFullYear(), ref.getMonth(), 15);
+      return { start: toDateOnly(start), end: toDateOnly(end) };
+    }
+    const start = new Date(ref.getFullYear(), ref.getMonth(), 16);
+    const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+    return { start: toDateOnly(start), end: toDateOnly(end) };
+  }
+
+  if (kind === 'custom') {
+    const end = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+    const start = new Date(end);
+    start.setDate(start.getDate() - (periodDays - 1));
+    return { start: toDateOnly(start), end: toDateOnly(end) };
+  }
+
+  const start = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const end = new Date(ref.getFullYear(), ref.getMonth() + 1, 0);
+  return { start: toDateOnly(start), end: toDateOnly(end) };
+}
+
+/** Map org settlement preset to calculate period kind. */
+export function settlementPresetToPeriodKind(
+  preset: string | null | undefined
+): SettlementPeriodKind {
+  if (preset === 'biweekly') return 'biweekly';
+  if (preset === 'custom') return 'custom';
+  return 'month';
+}
+
+/** Build /liquidaciones query string for deep links. */
+export function buildLiquidacionesHref(params: {
+  status?: string | null;
+  unpaid?: boolean;
+  pendingReview?: boolean;
+  professionalId?: string | null;
+  periodStart?: string | null;
+  periodEnd?: string | null;
+  basePath?: string;
+}): string {
+  const q = new URLSearchParams();
+  if (params.unpaid) q.set('unpaid', '1');
+  else if (params.pendingReview) q.set('pendingReview', '1');
+  else if (params.status) q.set('status', params.status);
+  if (params.professionalId) q.set('professionalId', params.professionalId);
+  if (params.periodStart) q.set('periodStart', params.periodStart);
+  if (params.periodEnd) q.set('periodEnd', params.periodEnd);
+  const query = q.toString();
+  const base = params.basePath ?? '/liquidaciones';
+  return query ? `${base}?${query}` : base;
+}
+
+/** Cash-movement notes that can be parsed back to a settlement detail link. */
+export function buildProfessionalPaymentCashNote(input: {
+  settlementId: string;
+  paymentId?: string | null;
+  professionalName?: string | null;
+}): string {
+  const parts = [
+    'Liquidación profesional',
+    input.professionalName?.trim() || null,
+    `/liquidaciones/${input.settlementId}`,
+    input.paymentId ? `pago ${input.paymentId.slice(0, 8)}` : null,
+  ].filter(Boolean);
+  return parts.join(' · ').slice(0, 500);
+}
+
+/** Extract /liquidaciones/{uuid} from cash notes (soft trail, no FK). */
+export function extractSettlementHrefFromCashNote(
+  notes: string | null | undefined
+): string | null {
+  if (!notes) return null;
+  const match = notes.match(/\/liquidaciones\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+  return match ? match[0] : null;
+}
+
+/** Current calendar month range (local) for dashboard deep links. */
+export function currentMonthPeriodRange(referenceDate = new Date()): { start: string; end: string } {
+  const start = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+  const end = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0);
+  return { start: toDateOnly(start), end: toDateOnly(end) };
 }

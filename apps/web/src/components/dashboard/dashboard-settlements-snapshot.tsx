@@ -6,6 +6,8 @@ import {
   formatMoney,
   SETTLEMENT_STATUS_LABELS,
   isSettlementStatus,
+  buildLiquidacionesHref,
+  currentMonthPeriodRange,
   type SettlementStatus,
   type SettlementsSummary,
 } from '@sincvete/shared';
@@ -31,6 +33,12 @@ export function DashboardSettlementsSnapshot({ summary }: DashboardSettlementsSn
     summary.totalBalanceDue > 0;
 
   const statusTotal = summary.byStatus.reduce((sum, item) => sum + item.count, 0);
+  const monthRange = currentMonthPeriodRange();
+  const paidThisMonthHref = buildLiquidacionesHref({
+    status: 'paid',
+    periodStart: monthRange.start,
+    periodEnd: monthRange.end,
+  });
 
   return (
     <section className="rounded-xl border border-violet-200/70 bg-card/95 p-5 text-card-foreground shadow-sm backdrop-blur-sm dark:border-violet-800">
@@ -54,12 +62,25 @@ export function DashboardSettlementsSnapshot({ summary }: DashboardSettlementsSn
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Metric label="En revisión" value={String(summary.pendingReviewCount)} />
-        <Metric label="Por pagar" value={String(summary.approvedUnpaidCount)} />
-        <Metric label="Saldo pendiente" value={formatMoney(summary.totalBalanceDue, summary.currency)} />
+        <Metric
+          label="En revisión"
+          value={String(summary.pendingReviewCount)}
+          href="/liquidaciones?pendingReview=1"
+        />
+        <Metric
+          label="Por pagar"
+          value={String(summary.approvedUnpaidCount)}
+          href="/liquidaciones?unpaid=1"
+        />
+        <Metric
+          label="Saldo pendiente"
+          value={formatMoney(summary.totalBalanceDue, summary.currency)}
+          href="/liquidaciones?unpaid=1"
+        />
         <Metric
           label="Pagado este mes"
           value={formatMoney(summary.paidThisMonth, summary.currency)}
+          href={paidThisMonthHref}
         />
       </div>
 
@@ -73,26 +94,51 @@ export function DashboardSettlementsSnapshot({ summary }: DashboardSettlementsSn
               const pct = (item.count / statusTotal) * 100;
               if (pct <= 0) return null;
               const status = isSettlementStatus(item.status) ? item.status : null;
+              const barClass = `h-full w-full ${status ? STATUS_BAR_COLORS[status] ?? 'bg-muted-foreground/40' : 'bg-muted-foreground/40'}`;
+              const title = `${status ? SETTLEMENT_STATUS_LABELS[status] : item.status}: ${item.count}`;
+
+              if (status) {
+                return (
+                  <Link
+                    key={item.status}
+                    href={`/liquidaciones?status=${status}`}
+                    className="h-full"
+                    style={{ width: `${pct}%` }}
+                    title={title}
+                  >
+                    <div className={barClass} />
+                  </Link>
+                );
+              }
+
               return (
-                <div
-                  key={item.status}
-                  className={`h-full ${status ? STATUS_BAR_COLORS[status] ?? 'bg-muted-foreground/40' : 'bg-muted-foreground/40'}`}
-                  style={{ width: `${pct}%` }}
-                  title={`${status ? SETTLEMENT_STATUS_LABELS[status] : item.status}: ${item.count}`}
-                />
+                <div key={item.status} className="h-full" style={{ width: `${pct}%` }} title={title}>
+                  <div className={barClass} />
+                </div>
               );
             })}
           </div>
           <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
             {summary.byStatus.map((item) => {
               const status = isSettlementStatus(item.status) ? item.status : null;
-              return (
-                <span key={item.status} className="inline-flex items-center gap-1.5">
+              const label = (
+                <span className="inline-flex items-center gap-1.5">
                   <span
                     className={`inline-block h-2 w-2 rounded-full ${status ? STATUS_BAR_COLORS[status] ?? 'bg-muted-foreground/40' : 'bg-muted-foreground/40'}`}
                   />
                   {status ? SETTLEMENT_STATUS_LABELS[status] : item.status} ({item.count})
                 </span>
+              );
+              return status ? (
+                <Link
+                  key={item.status}
+                  href={`/liquidaciones?status=${status}`}
+                  className="transition-colors hover:text-foreground"
+                >
+                  {label}
+                </Link>
+              ) : (
+                <span key={item.status}>{label}</span>
               );
             })}
           </div>
@@ -102,11 +148,18 @@ export function DashboardSettlementsSnapshot({ summary }: DashboardSettlementsSn
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border bg-muted/30 px-3 py-2.5">
+function Metric({ label, value, href }: { label: string; value: string; href?: string }) {
+  const content = (
+    <div className="rounded-lg border bg-muted/30 px-3 py-2.5 transition-colors hover:bg-muted/50">
       <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       <p className="mt-0.5 text-xl font-semibold tabular-nums">{value}</p>
     </div>
+  );
+
+  if (!href) return content;
+  return (
+    <Link href={href} className="block">
+      {content}
+    </Link>
   );
 }

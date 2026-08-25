@@ -25,6 +25,7 @@ interface HospitalizationNotesProps {
   canWrite: boolean;
   isActive: boolean;
   settlementClaimsByNoteId?: Record<string, SettlementSourceClaimInfo>;
+  settlementDetailBasePath?: string;
 }
 
 export function HospitalizationNotes({
@@ -33,6 +34,7 @@ export function HospitalizationNotes({
   canWrite,
   isActive,
   settlementClaimsByNoteId = {},
+  settlementDetailBasePath = '/liquidaciones',
 }: HospitalizationNotesProps) {
   return (
     <div className="space-y-4">
@@ -65,6 +67,7 @@ export function HospitalizationNotes({
                 <SettlementSourceBadge
                   claim={settlementClaimsByNoteId[note.id]}
                   compact
+                  detailHref={`${settlementDetailBasePath}/${settlementClaimsByNoteId[note.id].settlementId}`}
                 />
               ) : null}
             </div>

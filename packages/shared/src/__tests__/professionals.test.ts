@@ -13,9 +13,21 @@ import {
   calculateSettlementSchema,
   settlementAdjustmentSchema,
   registerProfessionalPaymentSchema,
+  updateSettlementAdjustmentSchema,
+  bulkCalculateSettlementsSchema,
+  voidProfessionalPaymentSchema,
+  omitSettlementItemSchema,
+  restoreSettlementOmissionSchema,
   getSettlementItemSourceHref,
+  resolveSettlementPeriodRange,
+  settlementPresetToPeriodKind,
+  COMPENSATION_FREQUENCIES_UI,
   buildCsv,
   buildSettlementsReportCsv,
+  buildLiquidacionesHref,
+  buildProfessionalPaymentCashNote,
+  extractSettlementHrefFromCashNote,
+  currentMonthPeriodRange,
   SETTLEMENT_ITEM_SOURCE_TYPE_LABELS,
   SETTLEMENT_ADJUSTMENT_TYPE_LABELS,
   SETTLEMENT_STATUS_LABELS,
@@ -98,6 +110,71 @@ describe('professionals schemas', () => {
     expect(parsed.success).toBe(true);
   });
 
+  it('validates settlement adjustment updates', () => {
+    const parsed = updateSettlementAdjustmentSchema.safeParse({
+      adjustmentId: '00000000-0000-4000-8000-000000000002',
+      adjustmentType: 'deduction',
+      amount: 1500,
+      reason: 'Corrección de monto',
+    });
+    expect(parsed.success).toBe(true);
+    expect(
+      updateSettlementAdjustmentSchema.safeParse({
+        adjustmentId: '00000000-0000-4000-8000-000000000002',
+        adjustmentType: 'bonus',
+        amount: 0,
+        reason: 'x',
+      }).success
+    ).toBe(false);
+  });
+
+  it('validates bulk calculate and void payment schemas', () => {
+    expect(
+      bulkCalculateSettlementsSchema.safeParse({
+        periodStart: '2026-08-01',
+        periodEnd: '2026-08-31',
+      }).success
+    ).toBe(true);
+    expect(
+      bulkCalculateSettlementsSchema.safeParse({
+        periodStart: '2026-08-31',
+        periodEnd: '2026-08-01',
+      }).success
+    ).toBe(false);
+    expect(
+      voidProfessionalPaymentSchema.safeParse({
+        paymentId: '00000000-0000-4000-8000-000000000003',
+        reason: 'Pago duplicado',
+      }).success
+    ).toBe(true);
+    expect(
+      voidProfessionalPaymentSchema.safeParse({
+        paymentId: '00000000-0000-4000-8000-000000000003',
+        reason: 'no',
+      }).success
+    ).toBe(false);
+  });
+
+  it('validates omit / restore settlement item schemas', () => {
+    expect(
+      omitSettlementItemSchema.safeParse({
+        itemId: '00000000-0000-4000-8000-000000000004',
+        reason: 'No corresponde',
+      }).success
+    ).toBe(true);
+    expect(
+      omitSettlementItemSchema.safeParse({
+        itemId: '00000000-0000-4000-8000-000000000004',
+        reason: 'x',
+      }).success
+    ).toBe(false);
+    expect(
+      restoreSettlementOmissionSchema.safeParse({
+        omissionId: '00000000-0000-4000-8000-000000000005',
+      }).success
+    ).toBe(true);
+  });
+
   it('validates professional payment method reuse', () => {
     const parsed = registerProfessionalPaymentSchema.safeParse({
       settlementId: '00000000-0000-4000-8000-000000000001',
@@ -173,8 +250,72 @@ describe('professionals money helpers', () => {
     expect(getSettlementItemSourceHref('surgery', 'xyz')).toBe('/cirugias/xyz');
     expect(getSettlementItemSourceHref('appointment', 'turno')).toBe('/agenda/turno');
     expect(getSettlementItemSourceHref('procedure', 'img1')).toBe('/imagenes/img1');
+    expect(getSettlementItemSourceHref('lab_order', 'lab1')).toBe('/laboratorio/lab1');
+    expect(getSettlementItemSourceHref('prescription', 'rx1')).toBe('/farmacia/rx1');
+    expect(getSettlementItemSourceHref('vaccination', 'vac1')).toBe('/vacunacion/vac1');
     expect(getSettlementItemSourceHref('fixed_compensation', 'abc')).toBeNull();
     expect(getSettlementItemSourceHref('consultation', null)).toBeNull();
+  });
+
+  it('resolves settlement period presets', () => {
+    const ref = new Date(2026, 7, 20); // Aug 20, 2026
+    expect(resolveSettlementPeriodRange({ kind: 'month', referenceDate: ref })).toEqual({
+      start: '2026-08-01',
+      end: '2026-08-31',
+    });
+    expect(resolveSettlementPeriodRange({ kind: 'last_month', referenceDate: ref })).toEqual({
+      start: '2026-07-01',
+      end: '2026-07-31',
+    });
+    expect(resolveSettlementPeriodRange({ kind: 'biweekly', referenceDate: ref })).toEqual({
+      start: '2026-08-16',
+      end: '2026-08-31',
+    });
+    expect(
+      resolveSettlementPeriodRange({ kind: 'biweekly', referenceDate: new Date(2026, 7, 10) })
+    ).toEqual({
+      start: '2026-08-01',
+      end: '2026-08-15',
+    });
+    expect(
+      resolveSettlementPeriodRange({ kind: 'custom', periodDays: 7, referenceDate: ref })
+    ).toEqual({
+      start: '2026-08-14',
+      end: '2026-08-20',
+    });
+    expect(settlementPresetToPeriodKind('biweekly')).toBe('biweekly');
+    expect(settlementPresetToPeriodKind(undefined)).toBe('month');
+  });
+
+  it('excludes inert mixed frequency from UI list', () => {
+    expect(COMPENSATION_FREQUENCIES_UI).not.toContain('mixed');
+    expect(COMPENSATION_FREQUENCIES_UI).toContain('per_lab_order');
+  });
+
+  it('builds liquidaciones deep links and cash note trail', () => {
+    expect(
+      buildLiquidacionesHref({
+        unpaid: true,
+        periodStart: '2026-08-01',
+        periodEnd: '2026-08-31',
+      })
+    ).toBe('/liquidaciones?unpaid=1&periodStart=2026-08-01&periodEnd=2026-08-31');
+    expect(
+      buildProfessionalPaymentCashNote({
+        settlementId: '00000000-0000-4000-8000-000000000099',
+        paymentId: '11111111-1111-4111-8111-111111111111',
+        professionalName: 'Pérez, Ana',
+      })
+    ).toContain('/liquidaciones/00000000-0000-4000-8000-000000000099');
+    expect(
+      extractSettlementHrefFromCashNote(
+        'Liquidación profesional · /liquidaciones/00000000-0000-4000-8000-000000000099 · pago 11111111'
+      )
+    ).toBe('/liquidaciones/00000000-0000-4000-8000-000000000099');
+    expect(currentMonthPeriodRange(new Date(2026, 7, 20))).toEqual({
+      start: '2026-08-01',
+      end: '2026-08-31',
+    });
   });
 
   it('exposes readable labels for UI', () => {

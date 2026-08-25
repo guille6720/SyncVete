@@ -7,6 +7,8 @@ import {
   type ActionResult,
   type Professional,
   type ProfessionalBranch,
+  type ProfessionalListRow,
+  type ProfessionalSettlementSummary,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
 import {
@@ -105,6 +107,122 @@ export async function listProfessionals(input: { activeOnly?: boolean } = {}): P
   const { data, error } = await query;
   if (error) throw error;
   return (data ?? []).map((row) => mapProfessional(row as Record<string, unknown>));
+}
+
+export async function listProfessionalsWithSummary(): Promise<ProfessionalListRow[]> {
+  const professionals = await listProfessionals();
+  if (professionals.length === 0) return [];
+
+  const supabase = await createServerClient();
+  const professionalIds = professionals.map((row) => row.id);
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }] =
+    await Promise.all([
+      supabase
+        .from('professional_settlements')
+        .select('professional_id, balance_due, status')
+        .in('professional_id', professionalIds)
+        .is('deleted_at', null),
+      supabase
+        .from('professional_compensation_schemes')
+        .select('professional_id, name, is_active, valid_from, valid_to')
+        .in('professional_id', professionalIds)
+        .is('deleted_at', null)
+        .eq('is_active', true),
+    ]);
+  if (settlementsError) throw settlementsError;
+  if (schemesError) throw schemesError;
+
+  const openBalanceByPro = new Map<string, number>();
+  const pendingCountByPro = new Map<string, number>();
+  for (const row of settlements ?? []) {
+    const proId = String(row.professional_id);
+    const status = String(row.status);
+    if (status === 'draft' || status === 'review') {
+      pendingCountByPro.set(proId, (pendingCountByPro.get(proId) ?? 0) + 1);
+    }
+    if (
+      (status === 'approved' || status === 'partially_paid') &&
+      Number(row.balance_due ?? 0) > 0
+    ) {
+      openBalanceByPro.set(
+        proId,
+        (openBalanceByPro.get(proId) ?? 0) + Number(row.balance_due ?? 0)
+      );
+    }
+  }
+
+  const schemeNameByPro = new Map<string, string>();
+  for (const row of schemes ?? []) {
+    const proId = String(row.professional_id);
+    const validFrom = String(row.valid_from);
+    const validTo = row.valid_to ? String(row.valid_to) : null;
+    if (validFrom <= today && (!validTo || validTo >= today)) {
+      schemeNameByPro.set(proId, String(row.name));
+    }
+  }
+
+  return professionals.map((professional) => ({
+    ...professional,
+    openBalance: Math.round((openBalanceByPro.get(professional.id) ?? 0) * 100) / 100,
+    pendingSettlementCount: pendingCountByPro.get(professional.id) ?? 0,
+    activeSchemeName: schemeNameByPro.get(professional.id) ?? null,
+  }));
+}
+
+export async function getProfessionalSettlementSummary(
+  professionalId: string
+): Promise<ProfessionalSettlementSummary> {
+  await requirePermissionAndFeature('professionals:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
+  const supabase = await createServerClient();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }] =
+    await Promise.all([
+      supabase
+        .from('professional_settlements')
+        .select('balance_due, status')
+        .eq('professional_id', professionalId)
+        .is('deleted_at', null),
+      supabase
+        .from('professional_compensation_schemes')
+        .select('name, is_active, valid_from, valid_to')
+        .eq('professional_id', professionalId)
+        .is('deleted_at', null)
+        .eq('is_active', true),
+    ]);
+  if (settlementsError) throw settlementsError;
+  if (schemesError) throw schemesError;
+
+  let openBalance = 0;
+  let pendingSettlementCount = 0;
+  for (const row of settlements ?? []) {
+    const status = String(row.status);
+    if (status === 'draft' || status === 'review') pendingSettlementCount += 1;
+    if (
+      (status === 'approved' || status === 'partially_paid') &&
+      Number(row.balance_due ?? 0) > 0
+    ) {
+      openBalance += Number(row.balance_due ?? 0);
+    }
+  }
+
+  let activeSchemeName: string | null = null;
+  for (const row of schemes ?? []) {
+    const validFrom = String(row.valid_from);
+    const validTo = row.valid_to ? String(row.valid_to) : null;
+    if (validFrom <= today && (!validTo || validTo >= today)) {
+      activeSchemeName = String(row.name);
+      break;
+    }
+  }
+
+  return {
+    openBalance: Math.round(openBalance * 100) / 100,
+    pendingSettlementCount,
+    activeSchemeName,
+  };
 }
 
 export async function getProfessional(id: string): Promise<Professional | null> {

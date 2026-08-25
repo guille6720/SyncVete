@@ -25,6 +25,7 @@ interface ConsultationDetailProps {
   canWrite: boolean;
   canWriteBilling?: boolean;
   settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
 export function ConsultationDetail({
@@ -32,6 +33,7 @@ export function ConsultationDetail({
   canWrite,
   canWriteBilling = false,
   settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
 }: ConsultationDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -144,7 +146,12 @@ export function ConsultationDetail({
         </div>
       </div>
 
-      {settlementClaim ? <SettlementSourceBadge claim={settlementClaim} /> : null}
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>

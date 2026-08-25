@@ -147,12 +147,28 @@ export interface ProfessionalPayment {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  /** Present when a cash egreso is hard-linked to this payment. */
+  cash_session_id?: string | null;
+  cash_movement_id?: string | null;
+}
+
+export interface ProfessionalSettlementItemOmission {
+  id: string;
+  organization_id: string;
+  settlement_id: string;
+  source_type: SettlementItemSourceType;
+  source_id: string;
+  reason: string;
+  created_by: string;
+  created_at: string;
+  deleted_at: string | null;
 }
 
 export interface ProfessionalSettlementDetail extends ProfessionalSettlement {
   items: ProfessionalSettlementItem[];
   adjustments: ProfessionalSettlementAdjustment[];
   payments: ProfessionalPayment[];
+  omissions: ProfessionalSettlementItemOmission[];
 }
 
 export interface CalculateSettlementResult {
@@ -175,4 +191,36 @@ export interface SettlementSourceClaimInfo {
 export interface BulkSettlementActionResult {
   succeeded: string[];
   failed: Array<{ id: string; error: string }>;
+}
+
+export interface BulkCalculateSettlementsResult {
+  succeeded: Array<{ professionalId: string; settlementId: string }>;
+  failed: Array<{ professionalId: string; error: string }>;
+}
+
+export interface ProfessionalSettlementSummary {
+  openBalance: number;
+  pendingSettlementCount: number;
+  activeSchemeName: string | null;
+}
+
+export interface ProfessionalListRow extends Professional, ProfessionalSettlementSummary {}
+
+export interface SettlementDuplicateClaimWarning {
+  itemDescription: string;
+  sourceType: SettlementItemSourceType;
+  sourceId: string;
+  conflictingSettlementId: string;
+  conflictingStatus: SettlementStatus;
+  conflictingPeriodStart: string;
+  conflictingPeriodEnd: string;
+}
+
+export interface MySettlementsSummary {
+  openBalance: number;
+  pendingReviewCount: number;
+  approvedUnpaidCount: number;
+  lastPaymentAmount: number | null;
+  lastPaymentDate: string | null;
+  currency: string;
 }
