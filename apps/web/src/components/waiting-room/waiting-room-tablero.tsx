@@ -28,6 +28,7 @@ interface WaitingRoomTableroProps {
   branchOptions?: Array<{ id: string; name: string }>;
   sessionBranchId?: string | null;
   initialBranchFilter?: WaitingRoomBoardFilters['branchId'];
+  receptionHref?: string;
   dateNav: ReactNode;
 }
 
@@ -45,6 +46,7 @@ export function WaitingRoomTablero({
   branchOptions = [],
   sessionBranchId = null,
   initialBranchFilter,
+  receptionHref = '/sala-espera',
   dateNav,
 }: WaitingRoomTableroProps) {
   const [entries, setEntries] = useState(initialEntries);
@@ -106,7 +108,7 @@ export function WaitingRoomTablero({
               <WaitingRoomStaffSoundToggle enabled={boardSoundEnabled} variant="dark" />
             )}
             <Link
-              href="/sala-espera"
+              href={receptionHref}
               className="text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
             >
               Volver a recepción

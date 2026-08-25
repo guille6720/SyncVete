@@ -82,14 +82,19 @@ async function DashboardSettlementsSection({
   entitledHrefs: string[] | null;
 }) {
   if (!isClinicPathEntitled('/liquidaciones', entitledHrefs)) return null;
-  const canRead = await canReadProfessionalSettlements();
-  if (!canRead) return null;
+  try {
+    const canRead = await canReadProfessionalSettlements();
+    if (!canRead) return null;
 
-  const organization = await getOrganization();
-  const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
-  const summary = await getSettlementsSummary(currency);
+    const organization = await getOrganization();
+    const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
+    const summary = await getSettlementsSummary(currency);
 
-  return <DashboardSettlementsSnapshot summary={summary} />;
+    return <DashboardSettlementsSnapshot summary={summary} />;
+  } catch (error) {
+    console.error('[dashboard] settlements snapshot unavailable', error);
+    return null;
+  }
 }
 
 /** Live waiting-room snapshot — only when feature + permission allow. */

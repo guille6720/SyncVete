@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { withListReturn } from '@/lib/list-return';
 import {
   PRESCRIPTION_STATUSES,
   PRESCRIPTION_STATUS_LABELS,
@@ -23,12 +24,14 @@ interface PrescriptionsHistoryProps {
   data: PaginatedResult<PrescriptionListRow>;
   initialSearch?: string;
   initialStatus?: string;
+  branchName?: string | null;
 }
 
 export function PrescriptionsHistory({
   data,
   initialSearch = '',
   initialStatus = '',
+  branchName = null,
 }: PrescriptionsHistoryProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -69,7 +72,11 @@ export function PrescriptionsHistory({
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Historial</h2>
-        <p className="text-sm text-muted-foreground">Recetas de la clínica</p>
+        <p className="text-sm text-muted-foreground">
+          {branchName
+            ? `Recetas de la sucursal ${branchName}`
+            : 'Recetas de la sucursal de tu sesión'}
+        </p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -98,7 +105,9 @@ export function PrescriptionsHistory({
 
       {data.data.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No hay recetas en el historial.
+          {initialSearch || initialStatus
+            ? 'No hay recetas con esos filtros en esta sucursal.'
+            : 'No hay recetas en el historial de esta sucursal.'}
         </div>
       ) : (
         <>
@@ -106,7 +115,7 @@ export function PrescriptionsHistory({
             {data.data.map((prescription) => (
               <Link
                 key={prescription.id}
-                href={`/farmacia/${prescription.id}`}
+                href={withListReturn(`/farmacia/${prescription.id}`, searchParams)}
                 className="block rounded-lg border p-4 transition-colors hover:bg-muted/20"
               >
                 <div className="flex flex-wrap items-center gap-2">

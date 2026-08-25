@@ -54,8 +54,15 @@ export function ProfessionalForm({
     router.refresh();
   }, [state, mode, router]);
 
+  useEffect(() => {
+    if (mode !== 'create') return;
+    if (typeof window === 'undefined') return;
+    if (window.location.hash !== '#nuevo') return;
+    document.getElementById('nuevo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [mode]);
+
   return (
-    <Card>
+    <Card id={mode === 'create' ? 'nuevo' : undefined}>
       <CardHeader>
         <CardTitle>{mode === 'create' ? 'Nuevo profesional' : 'Editar profesional'}</CardTitle>
         <CardDescription>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { withListReturn } from '@/lib/list-return';
 import {
   INVENTORY_PRODUCT_CATEGORY_LABELS,
   INVENTORY_UNIT_LABELS,
@@ -13,13 +14,18 @@ import {
 interface InventoryLowStockBoardProps {
   items: InventoryProductListRow[];
   canWrite: boolean;
+  listQuery?: string;
 }
 
 function formatQty(value: number): string {
   return Number(value).toLocaleString('es-AR', { maximumFractionDigits: 3 });
 }
 
-export function InventoryLowStockBoard({ items, canWrite }: InventoryLowStockBoardProps) {
+export function InventoryLowStockBoard({
+  items,
+  canWrite,
+  listQuery = '',
+}: InventoryLowStockBoardProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -31,7 +37,7 @@ export function InventoryLowStockBoard({ items, canWrite }: InventoryLowStockBoa
         </div>
         {canWrite && (
           <Button asChild>
-            <Link href="/inventario/nuevo">
+            <Link href={withListReturn('/inventario/nuevo', listQuery)}>
               <Plus className="mr-2 h-4 w-4" />
               Nuevo producto
             </Link>
@@ -44,7 +50,7 @@ export function InventoryLowStockBoard({ items, canWrite }: InventoryLowStockBoa
           <p className="text-muted-foreground">No hay productos con stock bajo.</p>
           {canWrite && (
             <Button asChild className="mt-4">
-              <Link href="/inventario/nuevo">Agregar producto</Link>
+              <Link href={withListReturn('/inventario/nuevo', listQuery)}>Agregar producto</Link>
             </Button>
           )}
         </div>
@@ -53,7 +59,7 @@ export function InventoryLowStockBoard({ items, canWrite }: InventoryLowStockBoa
           {items.map((product) => (
             <Link
               key={product.id}
-              href={`/inventario/${product.id}`}
+              href={withListReturn(`/inventario/${product.id}`, listQuery)}
               className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/20"
             >
               <div className="min-w-0 flex-1">

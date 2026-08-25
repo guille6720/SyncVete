@@ -518,50 +518,62 @@ COMMENT ON TABLE public.professional_settlement_source_claims IS
 -- ─────────────────────────────────────────────
 -- Triggers: updated_at + audit
 -- ─────────────────────────────────────────────
+DROP TRIGGER IF EXISTS trg_professionals_updated_at ON public.professionals;
 CREATE TRIGGER trg_professionals_updated_at
   BEFORE UPDATE ON public.professionals
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_audit_professionals ON public.professionals;
 CREATE TRIGGER trg_audit_professionals
   AFTER INSERT OR UPDATE OR DELETE ON public.professionals
   FOR EACH ROW EXECUTE FUNCTION public.audit_log_changes();
 
+DROP TRIGGER IF EXISTS trg_professional_branches_updated_at ON public.professional_branches;
 CREATE TRIGGER trg_professional_branches_updated_at
   BEFORE UPDATE ON public.professional_branches
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_audit_professional_branches ON public.professional_branches;
 CREATE TRIGGER trg_audit_professional_branches
   AFTER INSERT OR UPDATE OR DELETE ON public.professional_branches
   FOR EACH ROW EXECUTE FUNCTION public.audit_log_changes();
 
+DROP TRIGGER IF EXISTS trg_professional_compensation_schemes_updated_at ON public.professional_compensation_schemes;
 CREATE TRIGGER trg_professional_compensation_schemes_updated_at
   BEFORE UPDATE ON public.professional_compensation_schemes
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_audit_professional_compensation_schemes ON public.professional_compensation_schemes;
 CREATE TRIGGER trg_audit_professional_compensation_schemes
   AFTER INSERT OR UPDATE OR DELETE ON public.professional_compensation_schemes
   FOR EACH ROW EXECUTE FUNCTION public.audit_log_changes();
 
+DROP TRIGGER IF EXISTS trg_professional_compensation_rules_updated_at ON public.professional_compensation_rules;
 CREATE TRIGGER trg_professional_compensation_rules_updated_at
   BEFORE UPDATE ON public.professional_compensation_rules
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_audit_professional_compensation_rules ON public.professional_compensation_rules;
 CREATE TRIGGER trg_audit_professional_compensation_rules
   AFTER INSERT OR UPDATE OR DELETE ON public.professional_compensation_rules
   FOR EACH ROW EXECUTE FUNCTION public.audit_log_changes();
 
+DROP TRIGGER IF EXISTS trg_professional_settlements_updated_at ON public.professional_settlements;
 CREATE TRIGGER trg_professional_settlements_updated_at
   BEFORE UPDATE ON public.professional_settlements
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_audit_professional_settlements ON public.professional_settlements;
 CREATE TRIGGER trg_audit_professional_settlements
   AFTER INSERT OR UPDATE OR DELETE ON public.professional_settlements
   FOR EACH ROW EXECUTE FUNCTION public.audit_log_changes();
 
+DROP TRIGGER IF EXISTS trg_professional_payments_updated_at ON public.professional_payments;
 CREATE TRIGGER trg_professional_payments_updated_at
   BEFORE UPDATE ON public.professional_payments
   FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+DROP TRIGGER IF EXISTS trg_audit_professional_payments ON public.professional_payments;
 CREATE TRIGGER trg_audit_professional_payments
   AFTER INSERT OR UPDATE OR DELETE ON public.professional_payments
   FOR EACH ROW EXECUTE FUNCTION public.audit_log_changes();
@@ -592,10 +604,12 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_prevent_locked_professional_settlement_items_update ON public.professional_settlement_items;
 CREATE TRIGGER trg_prevent_locked_professional_settlement_items_update
   BEFORE UPDATE ON public.professional_settlement_items
   FOR EACH ROW EXECUTE FUNCTION public.prevent_locked_professional_settlement_item_mutation();
 
+DROP TRIGGER IF EXISTS trg_prevent_locked_professional_settlement_items_delete ON public.professional_settlement_items;
 CREATE TRIGGER trg_prevent_locked_professional_settlement_items_delete
   BEFORE DELETE ON public.professional_settlement_items
   FOR EACH ROW EXECUTE FUNCTION public.prevent_locked_professional_settlement_item_mutation();
@@ -625,10 +639,12 @@ BEGIN
 END;
 $$;
 
+DROP TRIGGER IF EXISTS trg_prevent_locked_professional_settlement_adjustments_update ON public.professional_settlement_adjustments;
 CREATE TRIGGER trg_prevent_locked_professional_settlement_adjustments_update
   BEFORE UPDATE ON public.professional_settlement_adjustments
   FOR EACH ROW EXECUTE FUNCTION public.prevent_locked_professional_settlement_adjustment_mutation();
 
+DROP TRIGGER IF EXISTS trg_prevent_locked_professional_settlement_adjustments_delete ON public.professional_settlement_adjustments;
 CREATE TRIGGER trg_prevent_locked_professional_settlement_adjustments_delete
   BEFORE DELETE ON public.professional_settlement_adjustments
   FOR EACH ROW EXECUTE FUNCTION public.prevent_locked_professional_settlement_adjustment_mutation();

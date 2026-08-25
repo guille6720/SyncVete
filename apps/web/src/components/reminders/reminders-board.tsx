@@ -7,6 +7,7 @@ import { sendReminder, skipReminder } from '@/actions/reminders';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_TYPE_LABELS,
@@ -28,6 +29,7 @@ import {
 interface RemindersBoardProps {
   board: ReminderBoard;
   canSend: boolean;
+  branchName?: string | null;
 }
 
 function entityHref(item: ReminderItem): string {
@@ -159,7 +161,7 @@ function ReminderSection({
       </CardHeader>
       <CardContent className="space-y-2">
         {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No hay avisos pendientes.</p>
+          <p className="text-sm text-muted-foreground">No hay avisos pendientes en esta sucursal.</p>
         ) : (
           items.map((item) => (
             <ReminderRow
@@ -178,12 +180,13 @@ function ReminderSection({
   );
 }
 
-export function RemindersBoard({ board, canSend }: RemindersBoardProps) {
+export function RemindersBoard({ board, canSend, branchName = null }: RemindersBoardProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [errorKey, setErrorKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [skipItem, setSkipItem] = useState<ReminderItem | null>(null);
 
   const run = (item: ReminderItem, action: 'send' | 'skip') => {
     const key = `${item.reminder_type}:${item.related_id}`;
@@ -219,7 +222,22 @@ export function RemindersBoard({ board, canSend }: RemindersBoardProps) {
   };
 
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
+    <div className="space-y-4">
+      <ConfirmDialog
+        open={Boolean(skipItem)}
+        title="Omitir recordatorio"
+        description="¿Omitir este aviso? No volverá a aparecer en la cola pendiente."
+        confirmLabel="Omitir"
+        variant="destructive"
+        onClose={() => setSkipItem(null)}
+        onConfirm={() => {
+          if (skipItem) run(skipItem, 'skip');
+        }}
+      />
+      {branchName ? (
+        <p className="text-sm text-muted-foreground">Cola de la sucursal {branchName}</p>
+      ) : null}
+      <div className="grid gap-4 xl:grid-cols-3">
       <ReminderSection
         type="appointment"
         items={board.appointments}
@@ -229,7 +247,7 @@ export function RemindersBoard({ board, canSend }: RemindersBoardProps) {
         errorKey={errorKey}
         error={error}
         onSend={(item) => run(item, 'send')}
-        onSkip={(item) => run(item, 'skip')}
+        onSkip={(item) => setSkipItem(item)}
       />
       <ReminderSection
         type="vaccination"
@@ -240,7 +258,7 @@ export function RemindersBoard({ board, canSend }: RemindersBoardProps) {
         errorKey={errorKey}
         error={error}
         onSend={(item) => run(item, 'send')}
-        onSkip={(item) => run(item, 'skip')}
+        onSkip={(item) => setSkipItem(item)}
       />
       <ReminderSection
         type="invoice"
@@ -251,8 +269,9 @@ export function RemindersBoard({ board, canSend }: RemindersBoardProps) {
         errorKey={errorKey}
         error={error}
         onSend={(item) => run(item, 'send')}
-        onSkip={(item) => run(item, 'skip')}
+        onSkip={(item) => setSkipItem(item)}
       />
+      </div>
     </div>
   );
 }

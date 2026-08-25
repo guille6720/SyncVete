@@ -306,7 +306,13 @@ export async function getProfessionalForCurrentUser(): Promise<Professional | nu
     .is('deleted_at', null)
     .eq('is_active', true)
     .maybeSingle();
-  if (error) throw error;
+  if (error) {
+    // Schema not migrated yet — treat as no linked professional (do not crash clinic shell).
+    if (/schema cache|does not exist|Could not find the (table|function)/i.test(error.message)) {
+      return null;
+    }
+    throw error;
+  }
   return data ? mapProfessional(data as Record<string, unknown>) : null;
 }
 

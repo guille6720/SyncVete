@@ -1,7 +1,15 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import {
   DndContext,
@@ -35,6 +43,7 @@ import { startConsultationFromAppointment } from '@/actions/consultations';
 import { WaitingRoomCheckInQrButton } from '@/components/waiting-room/waiting-room-check-in-qr-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
@@ -66,6 +75,15 @@ import {
   type WaitingRoomStatus,
 } from '@sincvete/shared';
 
+type BoardConfirmState = {
+  title: string;
+  description: string;
+  confirmLabel?: string;
+  variant?: 'default' | 'destructive';
+  onConfirm: () => void;
+  onCancel?: () => void;
+};
+
 interface WaitingRoomBoardProps {
   entries: WaitingRoomListRow[];
   checkInCandidates: AppointmentListRow[];
@@ -85,7 +103,22 @@ interface WaitingRoomBoardProps {
   listBranchId?: string | 'all';
 }
 
-export function WaitingRoomBoard({
+/** Suspense boundary for useSearchParams (required by Next.js App Router). */
+export function WaitingRoomBoard(props: WaitingRoomBoardProps) {
+  return (
+    <Suspense
+      fallback={
+        <div className="rounded-lg border bg-card/40 p-8 text-sm text-muted-foreground">
+          Cargando cola…
+        </div>
+      }
+    >
+      <WaitingRoomBoardInner {...props} />
+    </Suspense>
+  );
+}
+
+function WaitingRoomBoardInner({
   entries: initialEntries,
   checkInCandidates,
   canWrite,
@@ -108,6 +141,7 @@ export function WaitingRoomBoard({
   const [entries, setEntries] = useState(() => sortWaitingRoomQueue(initialEntries));
   const [reordering, setReordering] = useState(false);
   const [now, setNow] = useState(() => new Date());
+  const [alertDialog, setAlertDialog] = useState<string | null>(null);
   const [filters, setFilters] = useState<WaitingRoomBoardFilters>(
     initialFilters ?? {
       query: '',
@@ -237,7 +271,7 @@ export function WaitingRoomBoard({
       setReordering(false);
       if (!result.success) {
         setEntries(previous);
-        alert(result.error ?? 'No se pudo reordenar la cola');
+        setAlertDialog(result.error ?? 'No se pudo reordenar la cola');
         return;
       }
       router.refresh();
@@ -246,6 +280,14 @@ export function WaitingRoomBoard({
 
   return (
     <div className="space-y-8">
+      <ConfirmDialog
+        open={Boolean(alertDialog)}
+        mode="alert"
+        title="No se pudo completar"
+        description={alertDialog ?? ''}
+        onClose={() => setAlertDialog(null)}
+      />
+
       {boardSoundEnabled && isToday && (
         <div className="flex justify-end">
           <WaitingRoomStaffSoundToggle enabled={boardSoundEnabled} />
@@ -484,6 +526,9 @@ function WaitingRoomRow({
   const [editingNotes, setEditingNotes] = useState(false);
   const [roomDraft, setRoomDraft] = useState(entry.room ?? '');
   const [notesDraft, setNotesDraft] = useState(entry.internal_notes ?? '');
+  const [alertDialog, setAlertDialog] = useState<string | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<BoardConfirmState | null>(null);
+  const confirmOutcomeRef = useRef<'confirm' | 'cancel' | null>(null);
   const nextStatus = WAITING_ROOM_TRANSITIONS[entry.waiting_room_status];
   const nextLabel =
     nextStatus && entry.waiting_room_status !== 'completed'
@@ -510,6 +555,14 @@ function WaitingRoomRow({
     setNotesDraft(entry.internal_notes ?? '');
   }, [entry.internal_notes]);
 
+  const closeConfirmDialog = () => {
+    const outcome = confirmOutcomeRef.current;
+    confirmOutcomeRef.current = null;
+    const onCancel = confirmDialog?.onCancel;
+    setConfirmDialog(null);
+    if (outcome !== 'confirm') onCancel?.();
+  };
+
   const commitAdvance = (room?: string) => {
     if (!nextStatus) return;
     void runPending(async () => {
@@ -519,64 +572,66 @@ function WaitingRoomRow({
         room,
       });
       if (!result.success) {
-        alert(result.error ?? 'No se pudo actualizar el estado');
+        setAlertDialog(result.error ?? 'No se pudo actualizar el estado');
         return;
       }
 
       setCalling(false);
 
       if (nextStatus === 'called' && canSendWhatsApp) {
+        const href = waitingRoomWhatsAppHref(entry, {
+          room: room ?? result.data?.room,
+          template: 'sala_espera_llamado',
+        });
         if (whatsAppAutoEnabled) {
-          router.push(
-            waitingRoomWhatsAppHref(entry, {
-              room: room ?? result.data?.room,
-              template: 'sala_espera_llamado',
-            })
-          );
+          router.push(href);
           return;
         }
-        const notify = window.confirm('¿Avisar al tutor por WhatsApp?');
-        if (notify) {
-          router.push(
-            waitingRoomWhatsAppHref(entry, {
-              room: room ?? result.data?.room,
-              template: 'sala_espera_llamado',
-            })
-          );
-          return;
-        }
+        setConfirmDialog({
+          title: 'Avisar por WhatsApp',
+          description: '¿Avisar al tutor por WhatsApp?',
+          confirmLabel: 'Avisar',
+          onConfirm: () => router.push(href),
+          onCancel: () => router.refresh(),
+        });
+        return;
       }
 
       if (nextStatus === 'payment_pending' && canSendWhatsApp) {
+        const href = waitingRoomWhatsAppHref(entry, {
+          template: 'sala_espera_pago',
+        });
         if (whatsAppAutoEnabled) {
-          router.push(
-            waitingRoomWhatsAppHref(entry, {
-              template: 'sala_espera_pago',
-            })
-          );
+          router.push(href);
           return;
         }
-        const notify = window.confirm('¿Avisar al tutor por WhatsApp para pasar por recepción?');
-        if (notify) {
-          router.push(
-            waitingRoomWhatsAppHref(entry, {
-              template: 'sala_espera_pago',
-            })
-          );
-          return;
-        }
+        setConfirmDialog({
+          title: 'Avisar por WhatsApp',
+          description: '¿Avisar al tutor por WhatsApp para pasar por recepción?',
+          confirmLabel: 'Avisar',
+          onConfirm: () => router.push(href),
+          onCancel: () => router.refresh(),
+        });
+        return;
       }
 
       if (nextStatus === 'in_consultation' && canStartConsultation) {
-        const start = window.confirm('¿Abrir la consulta clínica ahora?');
-        if (start) {
-          const consultation = await startConsultationFromAppointment(entry.appointment_id);
-          if (consultation && !consultation.success) {
-            alert(consultation.error ?? 'No se pudo iniciar la consulta');
-            router.refresh();
-          }
-          return;
-        }
+        setConfirmDialog({
+          title: 'Abrir consulta',
+          description: '¿Abrir la consulta clínica ahora?',
+          confirmLabel: 'Abrir consulta',
+          onConfirm: () => {
+            void (async () => {
+              const consultation = await startConsultationFromAppointment(entry.appointment_id);
+              if (consultation && !consultation.success) {
+                setAlertDialog(consultation.error ?? 'No se pudo iniciar la consulta');
+                router.refresh();
+              }
+            })();
+          },
+          onCancel: () => router.refresh(),
+        });
+        return;
       }
 
       router.refresh();
@@ -600,7 +655,7 @@ function WaitingRoomRow({
         priority: entry.priority + 10,
       });
       if (!result.success) {
-        alert(result.error ?? 'No se pudo priorizar');
+        setAlertDialog(result.error ?? 'No se pudo priorizar');
         return;
       }
       router.refresh();
@@ -608,21 +663,26 @@ function WaitingRoomRow({
   };
 
   const removeFromQueue = (markAusente: boolean) => {
-    const message = markAusente
-      ? '¿Quitar de la cola y marcar la cita como ausente?'
-      : '¿Quitar de la sala de espera sin marcar ausente?';
-    if (!window.confirm(message)) return;
-
-    void runPending(async () => {
-      const result = await removeWaitingRoomEntry({
-        entryId: entry.waiting_room_entry_id,
-        markAusente,
-      });
-      if (!result.success) {
-        alert(result.error ?? 'No se pudo quitar de la cola');
-        return;
-      }
-      router.refresh();
+    setConfirmDialog({
+      title: markAusente ? 'Marcar ausente' : 'Quitar de la cola',
+      description: markAusente
+        ? '¿Quitar de la cola y marcar la cita como ausente?'
+        : '¿Quitar de la sala de espera sin marcar ausente?',
+      confirmLabel: markAusente ? 'Marcar ausente' : 'Quitar',
+      variant: 'destructive',
+      onConfirm: () => {
+        void runPending(async () => {
+          const result = await removeWaitingRoomEntry({
+            entryId: entry.waiting_room_entry_id,
+            markAusente,
+          });
+          if (!result.success) {
+            setAlertDialog(result.error ?? 'No se pudo quitar de la cola');
+            return;
+          }
+          router.refresh();
+        });
+      },
     });
   };
 
@@ -633,7 +693,7 @@ function WaitingRoomRow({
         notes: notesDraft,
       });
       if (!result.success) {
-        alert(result.error ?? 'No se pudo guardar la nota');
+        setAlertDialog(result.error ?? 'No se pudo guardar la nota');
         return;
       }
       setEditingNotes(false);
@@ -643,6 +703,25 @@ function WaitingRoomRow({
 
   return (
     <div className="space-y-3 rounded-lg border bg-card p-4">
+      <ConfirmDialog
+        open={Boolean(alertDialog)}
+        mode="alert"
+        title="No se pudo completar"
+        description={alertDialog ?? ''}
+        onClose={() => setAlertDialog(null)}
+      />
+      <ConfirmDialog
+        open={Boolean(confirmDialog)}
+        title={confirmDialog?.title ?? ''}
+        description={confirmDialog?.description ?? ''}
+        confirmLabel={confirmDialog?.confirmLabel}
+        variant={confirmDialog?.variant}
+        onClose={closeConfirmDialog}
+        onConfirm={() => {
+          confirmOutcomeRef.current = 'confirm';
+          confirmDialog?.onConfirm();
+        }}
+      />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 gap-2">
           {dragHandle}
@@ -833,12 +912,13 @@ function WaitingRoomRow({
 function CheckInCandidateRow({ appointment }: { appointment: AppointmentListRow }) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
+  const [alertDialog, setAlertDialog] = useState<string | null>(null);
 
   const handleCheckIn = () => {
     void runPending(async () => {
       const result = await checkInAppointment(appointment.id);
       if (!result.success) {
-        alert(result.error ?? 'No se pudo hacer check-in');
+        setAlertDialog(result.error ?? 'No se pudo hacer check-in');
         return;
       }
       router.refresh();
@@ -847,6 +927,13 @@ function CheckInCandidateRow({ appointment }: { appointment: AppointmentListRow 
 
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-4">
+      <ConfirmDialog
+        open={Boolean(alertDialog)}
+        mode="alert"
+        title="No se pudo completar"
+        description={alertDialog ?? ''}
+        onClose={() => setAlertDialog(null)}
+      />
       <div>
         <p className="font-medium">
           {formatAppointmentTime(appointment.starts_at)} · {SPECIES_EMOJI[appointment.patient_species]}{' '}

@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { withListReturn } from '@/lib/list-return';
 import {
   INVOICE_STATUSES,
   INVOICE_STATUS_LABELS,
@@ -24,12 +25,14 @@ interface InvoicesHistoryProps {
   data: PaginatedResult<InvoiceListRow>;
   initialSearch?: string;
   initialStatus?: string;
+  branchName?: string | null;
 }
 
 export function InvoicesHistory({
   data,
   initialSearch = '',
   initialStatus = '',
+  branchName = null,
 }: InvoicesHistoryProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -70,7 +73,11 @@ export function InvoicesHistory({
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Historial</h2>
-        <p className="text-sm text-muted-foreground">Facturas de la clínica</p>
+        <p className="text-sm text-muted-foreground">
+          {branchName
+            ? `Facturas de la sucursal ${branchName}`
+            : 'Facturas de la sucursal de tu sesión'}
+        </p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -99,7 +106,9 @@ export function InvoicesHistory({
 
       {data.data.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No hay facturas en el historial.
+          {initialSearch || initialStatus
+            ? 'No hay facturas con esos filtros en esta sucursal.'
+            : 'No hay facturas en el historial de esta sucursal.'}
         </div>
       ) : (
         <>
@@ -107,7 +116,7 @@ export function InvoicesHistory({
             {data.data.map((invoice) => (
               <Link
                 key={invoice.id}
-                href={`/facturacion/${invoice.id}`}
+                href={withListReturn(`/facturacion/${invoice.id}`, searchParams)}
                 className="block rounded-lg border p-4 transition-colors hover:bg-muted/20"
               >
                 <div className="flex flex-wrap items-center gap-2">

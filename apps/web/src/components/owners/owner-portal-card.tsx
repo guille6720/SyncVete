@@ -6,6 +6,7 @@ import { inviteOwnerToPortal, revokeOwnerPortalAccess } from '@/actions/portal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   PORTAL_ACCESS_STATUS_LABELS,
   PORTAL_ACCESS_STATUS_VARIANT,
@@ -33,11 +34,14 @@ export function OwnerPortalCard({
   const [error, setError] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
   const access = status?.status ?? 'inactive';
 
   const handleInvite = async () => {
     setPending(true);
     setError(null);
+    setCopyMessage(null);
     const result = await inviteOwnerToPortal(ownerId);
     setPending(false);
     if (!result.success || !result.data) {
@@ -51,11 +55,16 @@ export function OwnerPortalCard({
 
   const handleCopy = async () => {
     if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
+    setCopyMessage(null);
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopyMessage('Enlace copiado.');
+    } catch {
+      setCopyMessage('No se pudo copiar el enlace.');
+    }
   };
 
   const handleRevoke = async () => {
-    if (!confirm('¿Revocar el acceso al portal de este propietario?')) return;
     setPending(true);
     setError(null);
     const result = await revokeOwnerPortalAccess(ownerId);
@@ -65,11 +74,23 @@ export function OwnerPortalCard({
       return;
     }
     setInviteUrl(null);
+    setCopyMessage(null);
     router.refresh();
   };
 
   return (
     <Card>
+      <ConfirmDialog
+        open={revokeOpen}
+        title="Revocar acceso al portal"
+        description="¿Revocar el acceso al portal de este propietario?"
+        confirmLabel="Revocar"
+        variant="destructive"
+        onClose={() => setRevokeOpen(false)}
+        onConfirm={() => {
+          void handleRevoke();
+        }}
+      />
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="text-lg">Portal del tutor</CardTitle>
@@ -94,9 +115,20 @@ export function OwnerPortalCard({
           <div className="space-y-2 rounded-md border bg-muted/40 p-3">
             <p className="text-xs font-medium text-muted-foreground">Enlace de activación</p>
             <p className="break-all text-sm">{inviteUrl}</p>
-            <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+            <Button type="button" variant="outline" size="sm" onClick={() => void handleCopy()}>
               Copiar enlace
             </Button>
+            {copyMessage && (
+              <p
+                className={
+                  copyMessage.includes('No se pudo')
+                    ? 'text-sm text-destructive'
+                    : 'text-sm text-muted-foreground'
+                }
+              >
+                {copyMessage}
+              </p>
+            )}
           </div>
         )}
         {!portalEnabled && (
@@ -111,7 +143,7 @@ export function OwnerPortalCard({
               <Button
                 type="button"
                 size="sm"
-                onClick={handleInvite}
+                onClick={() => void handleInvite()}
                 disabled={pending || !ownerEmail || !portalEnabled}
               >
                 {access === 'invited' ? 'Reenviar invitación' : 'Invitar al portal'}
@@ -122,7 +154,7 @@ export function OwnerPortalCard({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleRevoke}
+                onClick={() => setRevokeOpen(true)}
                 disabled={pending}
               >
                 Revocar acceso

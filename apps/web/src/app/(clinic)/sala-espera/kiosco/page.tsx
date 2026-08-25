@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import {
+  buildWaitingRoomSurfaceHref,
   filterAppointmentsByWaitingRoomBranch,
   formatDateParam,
   getWeekStartDate,
@@ -60,6 +61,16 @@ export default async function SalaEsperaKioscoPage({ searchParams }: SalaEsperaK
     branches
   );
 
+  const wrBranchParam =
+    boardFilters.branchId === 'all'
+      ? 'all'
+      : typeof boardFilters.branchId === 'string'
+        ? boardFilters.branchId
+        : undefined;
+  const receptionHref = buildWaitingRoomSurfaceHref('/sala-espera', {
+    wrBranch: wrBranchParam,
+  });
+
   return (
     <WaitingRoomKiosk
       initialCandidates={candidates}
@@ -70,6 +81,7 @@ export default async function SalaEsperaKioscoPage({ searchParams }: SalaEsperaK
       branchOptions={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
       sessionBranchId={session.branchId}
       initialBranchFilter={boardFilters.branchId}
+      receptionHref={receptionHref}
     />
   );
 }

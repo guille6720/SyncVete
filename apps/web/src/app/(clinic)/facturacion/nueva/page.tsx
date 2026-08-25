@@ -8,10 +8,15 @@ import { getPatient } from '@/actions/patients';
 import { getOrganization, getUserBranches } from '@/actions/settings';
 import { InvoiceForm } from '@/components/billing/invoice-form';
 import { Button } from '@/components/ui/button';
+import { resolveListHref } from '@/lib/list-return';
 import { parseOrganizationSettings } from '@sincvete/shared';
 
 interface NuevaFacturaPageProps {
-  searchParams: Promise<{ patientId?: string; consultationId?: string }>;
+  searchParams: Promise<{
+    patientId?: string;
+    consultationId?: string;
+    return?: string;
+  }>;
 }
 
 export default async function NuevaFacturaPage({ searchParams }: NuevaFacturaPageProps) {
@@ -20,6 +25,7 @@ export default async function NuevaFacturaPage({ searchParams }: NuevaFacturaPag
 
   const params = await searchParams;
   const session = await getSessionContext();
+  const listHref = resolveListHref('/facturacion', params.return);
 
   let patient = null;
   let owner = null;
@@ -34,7 +40,7 @@ export default async function NuevaFacturaPage({ searchParams }: NuevaFacturaPag
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" asChild>
-        <Link href="/facturacion">
+        <Link href={listHref}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver a facturación
         </Link>
@@ -48,6 +54,7 @@ export default async function NuevaFacturaPage({ searchParams }: NuevaFacturaPag
         defaultOwnerName={owner?.full_name}
         defaultConsultationId={params.consultationId}
         currency={currency}
+        listHref={listHref}
       />
     </div>
   );

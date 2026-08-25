@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { withListReturn } from '@/lib/list-return';
 import {
   CASH_SESSION_STATUSES,
   CASH_SESSION_STATUS_LABELS,
@@ -20,12 +21,14 @@ interface CashSessionsHistoryProps {
   data: PaginatedResult<CashSessionListRow>;
   initialStatus?: string;
   currency?: string;
+  branchName?: string | null;
 }
 
 export function CashSessionsHistory({
   data,
   initialStatus = '',
   currency = 'ARS',
+  branchName = null,
 }: CashSessionsHistoryProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -50,7 +53,11 @@ export function CashSessionsHistory({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Historial de cajas</h2>
-          <p className="text-sm text-muted-foreground">Aperturas y cierres de la sucursal</p>
+          <p className="text-sm text-muted-foreground">
+            {branchName
+              ? `Aperturas y cierres · ${branchName}`
+              : 'Aperturas y cierres de la sucursal de tu sesión'}
+          </p>
         </div>
         <Select
           value={initialStatus}
@@ -68,7 +75,9 @@ export function CashSessionsHistory({
 
       {data.data.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No hay turnos de caja en el historial.
+          {initialStatus
+            ? 'No hay turnos de caja con ese filtro en esta sucursal.'
+            : 'No hay turnos de caja en el historial de esta sucursal.'}
         </div>
       ) : (
         <>
@@ -76,7 +85,7 @@ export function CashSessionsHistory({
             {data.data.map((session) => (
               <Link
                 key={session.id}
-                href={`/caja/${session.id}`}
+                href={withListReturn(`/caja/${session.id}`, searchParams)}
                 className="block rounded-lg border p-4 transition-colors hover:bg-muted/20"
               >
                 <div className="flex flex-wrap items-center gap-2">

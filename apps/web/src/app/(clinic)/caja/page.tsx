@@ -40,12 +40,17 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
   const movements = openSession ? await listCashMovements(openSession.id) : [];
+  const branchName =
+    branches.find((branch) => branch.id === session?.branchId)?.name ?? null;
 
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Caja</h1>
-        <p className="text-muted-foreground">Apertura, cobros del turno y cierre de efectivo</p>
+        <p className="text-muted-foreground">
+          Apertura, cobros del turno y cierre de efectivo
+          {branchName ? ` · ${branchName}` : ''}
+        </p>
       </div>
 
       {openSession ? (
@@ -59,7 +64,8 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
         <CashOpenForm branches={branches} defaultBranchId={session?.branchId} />
       ) : (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No hay una caja abierta.
+          No hay una caja abierta
+          {branchName ? ` en ${branchName}` : ' en esta sucursal'}.
         </div>
       )}
 
@@ -68,6 +74,7 @@ export default async function CajaPage({ searchParams }: CajaPageProps) {
           data={history}
           initialStatus={status ?? ''}
           currency={currency}
+          branchName={branchName}
         />
       </Suspense>
     </div>

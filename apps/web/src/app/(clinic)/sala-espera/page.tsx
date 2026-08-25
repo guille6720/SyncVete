@@ -12,6 +12,7 @@ import {
   addDaysIso,
   appendWaitingRoomBoardFilterParams,
   buildWaitingRoomSurfaceHref,
+  filterAppointmentsByWaitingRoomBranch,
   formatDateParam,
   formatDashboardDate,
   getWeekStartDate,
@@ -114,8 +115,12 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
       : entries;
 
   const checkedInIds = new Set(entries.map((row) => row.appointment_id));
+  const branchAppointments = filterAppointmentsByWaitingRoomBranch(
+    weekAppointments,
+    listBranchId
+  );
   const checkInCandidates = isToday
-    ? weekAppointments.filter((appointment) => {
+    ? branchAppointments.filter((appointment) => {
         if (checkedInIds.has(appointment.id)) return false;
         const day = formatDateParam(new Date(appointment.starts_at));
         if (day !== today) return false;

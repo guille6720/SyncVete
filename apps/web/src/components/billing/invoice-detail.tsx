@@ -14,6 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -39,6 +40,7 @@ interface InvoiceDetailProps {
   payments: PaymentListRow[];
   canWrite: boolean;
   canSendWhatsApp?: boolean;
+  listHref?: string;
 }
 
 interface LineItem {
@@ -47,7 +49,14 @@ interface LineItem {
   unitPrice: string;
 }
 
-export function InvoiceDetail({ invoice, items, payments, canWrite, canSendWhatsApp = false }: InvoiceDetailProps) {
+export function InvoiceDetail({
+  invoice,
+  items,
+  payments,
+  canWrite,
+  canSendWhatsApp = false,
+  listHref = '/facturacion',
+}: InvoiceDetailProps) {
   const router = useRouter();
   const isDraft = invoice.status === 'borrador';
   const canOperate = canWrite && isDraft;
@@ -66,27 +75,69 @@ export function InvoiceDetail({ invoice, items, payments, canWrite, canSendWhats
       unitPrice: String(item.unit_price),
     }))
   );
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [voidConfirmOpen, setVoidConfirmOpen] = useState(false);
+  const [voidPending, setVoidPending] = useState(false);
+  const [issuePending, setIssuePending] = useState(false);
 
   const draftTotal = lineItems.reduce((sum, item) => {
     return sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0);
   }, 0);
 
   const handleIssue = async () => {
-    const result = await issueInvoiceAction(invoice.id);
-    if (result.success) router.refresh();
+    setActionError(null);
+    setIssuePending(true);
+    try {
+      const result = await issueInvoiceAction(invoice.id);
+      if (!result.success) {
+        setActionError(result.error ?? 'No se pudo emitir la factura');
+        return;
+      }
+      router.refresh();
+    } finally {
+      setIssuePending(false);
+    }
   };
 
   const handleVoid = async () => {
-    if (!confirm('¿Anular esta factura?')) return;
-    const result = await voidInvoiceAction(invoice.id);
-    if (result.success) router.refresh();
+    setActionError(null);
+    setVoidPending(true);
+    try {
+      const result = await voidInvoiceAction(invoice.id);
+      if (!result.success) {
+        setActionError(result.error ?? 'No se pudo anular la factura');
+        return;
+      }
+      router.refresh();
+    } finally {
+      setVoidPending(false);
+    }
   };
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        open={voidConfirmOpen}
+        title="Anular factura"
+        description="¿Anular esta factura? Esta acción no se puede deshacer."
+        confirmLabel="Anular"
+        variant="destructive"
+        onClose={() => setVoidConfirmOpen(false)}
+        onConfirm={() => {
+          void handleVoid();
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(actionError)}
+        mode="alert"
+        title="No se pudo completar"
+        description={actionError ?? ''}
+        onClose={() => setActionError(null)}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/facturacion">
+          <Link href={listHref}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a facturación
           </Link>
@@ -322,11 +373,22 @@ export function InvoiceDetail({ invoice, items, payments, canWrite, canSendWhats
                 <Button type="submit" variant="outline" disabled={updatePending}>
                   {updatePending ? 'Guardando...' : 'Guardar'}
                 </Button>
-                <Button type="button" disabled={updatePending} onClick={handleIssue}>
+                <Button
+                  type="button"
+                  disabled={updatePending || issuePending}
+                  isPending={issuePending}
+                  onClick={() => void handleIssue()}
+                >
                   Emitir
                 </Button>
                 {canVoid && (
-                  <Button type="button" variant="destructive" onClick={handleVoid}>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={updatePending || voidPending}
+                    isPending={voidPending}
+                    onClick={() => setVoidConfirmOpen(true)}
+                  >
                     Anular
                   </Button>
                 )}
@@ -384,7 +446,13 @@ export function InvoiceDetail({ invoice, items, payments, canWrite, canSendWhats
                   {payPending ? 'Registrando...' : 'Cobrar'}
                 </Button>
                 {canVoid && (
-                  <Button type="button" variant="destructive" onClick={handleVoid}>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={voidPending}
+                    isPending={voidPending}
+                    onClick={() => setVoidConfirmOpen(true)}
+                  >
                     Anular factura
                   </Button>
                 )}

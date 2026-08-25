@@ -58,8 +58,15 @@ export function PortalWaitingRoomAlerts() {
 
   const dismiss = () => {
     const ids = alerts.map((a) => a.id);
+    const previous = alerts;
     setAlerts([]);
-    void markOwnerPortalAlertsRead(ids);
+    void (async () => {
+      const result = await markOwnerPortalAlertsRead(ids);
+      if (!result.success) {
+        setAlerts(previous);
+        console.error('[portal alerts] dismiss failed', result.error);
+      }
+    })();
   };
 
   return (

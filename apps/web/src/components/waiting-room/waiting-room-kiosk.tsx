@@ -33,6 +33,7 @@ interface WaitingRoomKioskProps {
   branchOptions?: Array<{ id: string; name: string }>;
   sessionBranchId?: string | null;
   initialBranchFilter?: string | 'all' | null;
+  receptionHref?: string;
 }
 
 type KioskView =
@@ -55,6 +56,7 @@ export function WaitingRoomKiosk({
   branchOptions = [],
   sessionBranchId = null,
   initialBranchFilter,
+  receptionHref = '/sala-espera',
 }: WaitingRoomKioskProps) {
   const [candidates, setCandidates] = useState(initialCandidates);
   const [query, setQuery] = useState('');
@@ -202,7 +204,7 @@ export function WaitingRoomKiosk({
         <div className="text-right">
           <p className="font-display text-4xl font-semibold tabular-nums md:text-6xl">{clock}</p>
           <Link
-            href="/sala-espera"
+            href={receptionHref}
             className="mt-2 inline-block text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
           >
             Volver a recepción

@@ -9,6 +9,8 @@
   --color-foreground: var(--sv-foreground);
   --color-card: var(--sv-card);
   --color-card-foreground: var(--sv-card-foreground);
+  --color-popover: var(--sv-card);
+  --color-popover-foreground: var(--sv-card-foreground);
   --color-primary: var(--sv-primary);
   --color-primary-foreground: var(--sv-primary-foreground);
   --color-secondary: var(--sv-secondary);

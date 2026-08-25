@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -13,6 +13,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -34,6 +35,7 @@ interface InventoryProductDetailProps {
   product: InventoryProductListRow;
   movements: InventoryMovementListRow[];
   canWrite: boolean;
+  listHref?: string;
 }
 
 function formatQty(value: number): string {
@@ -49,24 +51,56 @@ export function InventoryProductDetail({
   product,
   movements,
   canWrite,
+  listHref = '/inventario',
 }: InventoryProductDetailProps) {
   const router = useRouter();
   const updateAction = updateInventoryProduct.bind(null, product.id);
   const movementAction = recordInventoryMovementAction.bind(null, product.id);
   const [updateState, updateFormAction, updatePending] = useActionState(updateAction, null);
   const [movementState, movementFormAction, movementPending] = useActionState(movementAction, null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deletePending, setDeletePending] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const handleDelete = async () => {
-    if (!confirm('¿Eliminar este producto del inventario?')) return;
-    const result = await softDeleteInventoryProduct(product.id);
-    if (result.success) router.push('/inventario');
+    setActionError(null);
+    setDeletePending(true);
+    try {
+      const result = await softDeleteInventoryProduct(product.id);
+      if (!result.success) {
+        setActionError(result.error ?? 'No se pudo eliminar el producto');
+        return;
+      }
+      router.push(listHref);
+    } finally {
+      setDeletePending(false);
+    }
   };
 
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        open={deleteConfirmOpen}
+        title="Eliminar producto"
+        description="¿Eliminar este producto del inventario?"
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onClose={() => setDeleteConfirmOpen(false)}
+        onConfirm={() => {
+          void handleDelete();
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(actionError)}
+        mode="alert"
+        title="No se pudo completar"
+        description={actionError ?? ''}
+        onClose={() => setActionError(null)}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/inventario">
+          <Link href={listHref}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a inventario
           </Link>
@@ -199,7 +233,13 @@ export function InventoryProductDetail({
                   <Button type="submit" disabled={updatePending}>
                     {updatePending ? 'Guardando...' : 'Guardar'}
                   </Button>
-                  <Button type="button" variant="destructive" onClick={handleDelete}>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={deletePending}
+                    isPending={deletePending}
+                    onClick={() => setDeleteConfirmOpen(true)}
+                  >
                     Eliminar
                   </Button>
                 </div>

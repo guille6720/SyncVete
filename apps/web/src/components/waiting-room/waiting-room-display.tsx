@@ -30,6 +30,7 @@ interface WaitingRoomDisplayProps {
   branchOptions?: Array<{ id: string; name: string }>;
   sessionBranchId?: string | null;
   initialBranchFilter?: string | 'all' | null;
+  receptionHref?: string;
 }
 
 export function WaitingRoomDisplay({
@@ -41,6 +42,7 @@ export function WaitingRoomDisplay({
   branchOptions = [],
   sessionBranchId = null,
   initialBranchFilter,
+  receptionHref = '/sala-espera',
 }: WaitingRoomDisplayProps) {
   const [entries, setEntries] = useState(initialEntries);
   const [clock, setClock] = useState(() => formatClock(new Date()));
@@ -173,7 +175,7 @@ export function WaitingRoomDisplay({
               {muted ? 'Silencio' : 'Sonido'}
             </button>
             <Link
-              href="/sala-espera"
+              href={receptionHref}
               className="text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
             >
               Volver a recepción

@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, UserRound } from 'lucide-react';
 import {
   addDaysIso,
   buildWaitingRoomSurfaceHref,
+  filterAppointmentsByWaitingRoomBranch,
   formatDateParam,
   formatDashboardDate,
   getWeekStartDate,
@@ -76,8 +77,12 @@ export default async function SalaEsperaTableroPage({ searchParams }: SalaEspera
       : entries;
 
   const checkedInIds = new Set(entries.map((row) => row.appointment_id));
+  const branchAppointments = filterAppointmentsByWaitingRoomBranch(
+    weekAppointments,
+    listBranchId
+  );
   const pendingCheckInCount = isToday
-    ? weekAppointments.filter((appointment) => {
+    ? branchAppointments.filter((appointment) => {
         if (checkedInIds.has(appointment.id)) return false;
         const day = formatDateParam(new Date(appointment.starts_at));
         if (day !== today) return false;
@@ -98,6 +103,10 @@ export default async function SalaEsperaTableroPage({ searchParams }: SalaEspera
     branches
   );
 
+  const receptionHref = buildWaitingRoomSurfaceHref('/sala-espera', {
+    wrBranch: wrBranchParam,
+  });
+
   return (
     <WaitingRoomTablero
       initialEntries={visibleEntries}
@@ -113,6 +122,7 @@ export default async function SalaEsperaTableroPage({ searchParams }: SalaEspera
       branchOptions={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
       sessionBranchId={session.branchId}
       initialBranchFilter={boardFilters.branchId}
+      receptionHref={receptionHref}
       dateNav={
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button

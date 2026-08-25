@@ -1,5 +1,11 @@
 import { redirect } from 'next/navigation';
-import { formatDateParam, parseWaitingRoomBoardFilters, resolveWaitingRoomBranchLabel, resolveWaitingRoomListBranchId } from '@sincvete/shared';
+import {
+  buildWaitingRoomSurfaceHref,
+  formatDateParam,
+  parseWaitingRoomBoardFilters,
+  resolveWaitingRoomBranchLabel,
+  resolveWaitingRoomListBranchId,
+} from '@sincvete/shared';
 import { getSessionContext } from '@/lib/session';
 import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import { getOrganization, getUserBranches } from '@/actions/settings';
@@ -33,6 +39,16 @@ export default async function SalaEsperaPantallaPage({ searchParams }: SalaEsper
     branches
   );
 
+  const wrBranchParam =
+    boardFilters.branchId === 'all'
+      ? 'all'
+      : typeof boardFilters.branchId === 'string'
+        ? boardFilters.branchId
+        : undefined;
+  const receptionHref = buildWaitingRoomSurfaceHref('/sala-espera', {
+    wrBranch: wrBranchParam,
+  });
+
   return (
     <WaitingRoomDisplay
       initialEntries={entries}
@@ -43,6 +59,7 @@ export default async function SalaEsperaPantallaPage({ searchParams }: SalaEsper
       branchOptions={branches.map((branch) => ({ id: branch.id, name: branch.name }))}
       sessionBranchId={session.branchId}
       initialBranchFilter={boardFilters.branchId}
+      receptionHref={receptionHref}
     />
   );
 }

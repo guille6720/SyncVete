@@ -9,6 +9,10 @@ import { dispensePrescription, voidPrescription } from '@/actions/pharmacy';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
 import {
   PRESCRIPTION_STATUS_LABELS,
@@ -28,6 +32,7 @@ interface PrescriptionDetailProps {
   canWrite: boolean;
   settlementClaim?: SettlementSourceClaimInfo | null;
   settlementDetailBasePath?: string;
+  listHref?: string;
 }
 
 export function PrescriptionDetail({
@@ -36,9 +41,12 @@ export function PrescriptionDetail({
   canWrite,
   settlementClaim = null,
   settlementDetailBasePath = '/liquidaciones',
+  listHref = '/farmacia',
 }: PrescriptionDetailProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [voidOpen, setVoidOpen] = useState(false);
+  const [voidReason, setVoidReason] = useState('');
   const [pending, runPending] = usePendingAction();
   const canOperate = canWrite && prescription.status === 'activa';
 
@@ -52,21 +60,76 @@ export function PrescriptionDetail({
   };
 
   const handleVoid = () => {
-    if (!confirm('¿Anular esta receta? No se podrá dispensar.')) return;
-    const reason = window.prompt('Motivo (opcional)') ?? undefined;
     void runPending(async () => {
       setError(null);
-      const result = await voidPrescription(prescription.id, reason);
-      if (result.success) router.refresh();
-      else setError(result.error ?? 'No se pudo anular');
+      const result = await voidPrescription(prescription.id, voidReason.trim() || undefined);
+      if (result.success) {
+        setVoidOpen(false);
+        setVoidReason('');
+        router.refresh();
+      } else {
+        setError(result.error ?? 'No se pudo anular');
+      }
     });
   };
 
   return (
     <div className="space-y-4">
+      <ModalShell
+        open={voidOpen}
+        titleId="void-prescription-title"
+        title="Anular receta"
+        description="No se podrá dispensar. El motivo es opcional."
+        onClose={() => {
+          if (pending) return;
+          setVoidOpen(false);
+          setVoidReason('');
+        }}
+      >
+        <div className="mt-4 space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="voidReason">Motivo</Label>
+            <Input
+              id="voidReason"
+              value={voidReason}
+              onChange={(event) => setVoidReason(event.target.value)}
+              placeholder="Opcional"
+            />
+          </div>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={pending}
+              onClick={() => {
+                setVoidOpen(false);
+                setVoidReason('');
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              isPending={pending}
+              onClick={handleVoid}
+            >
+              Anular
+            </Button>
+          </div>
+        </div>
+      </ModalShell>
+      <ConfirmDialog
+        open={Boolean(error)}
+        mode="alert"
+        title="No se pudo completar"
+        description={error ?? ''}
+        onClose={() => setError(null)}
+      />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/farmacia">
+          <Link href={listHref}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a farmacia
           </Link>
@@ -174,12 +237,15 @@ export function PrescriptionDetail({
           <Button onClick={handleDispense} isPending={pending}>
             {pending ? 'Dispensando...' : 'Dispensar'}
           </Button>
-          <Button variant="destructive" onClick={handleVoid} isPending={pending}>
-            {pending ? 'Anulando...' : 'Anular'}
+          <Button
+            variant="destructive"
+            disabled={pending}
+            onClick={() => setVoidOpen(true)}
+          >
+            Anular
           </Button>
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
   );
 }

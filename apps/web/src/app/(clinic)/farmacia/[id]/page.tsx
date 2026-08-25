@@ -6,16 +6,22 @@ import {
 } from '@/actions/professional-settlements';
 import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { PrescriptionDetail } from '@/components/pharmacy/prescription-detail';
+import { resolveListHref } from '@/lib/list-return';
 
 interface FarmaciaDetailPageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ return?: string }>;
 }
 
-export default async function FarmaciaDetailPage({ params }: FarmaciaDetailPageProps) {
+export default async function FarmaciaDetailPage({
+  params,
+  searchParams,
+}: FarmaciaDetailPageProps) {
   const canRead = await canReadPharmacy();
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
+  const query = await searchParams;
   const [data, canWrite, settlementAccess] = await Promise.all([
     getPrescription(id),
     canManagePharmacy(),
@@ -37,6 +43,7 @@ export default async function FarmaciaDetailPage({ params }: FarmaciaDetailPageP
       canWrite={canWrite}
       settlementClaim={settlementClaim}
       settlementDetailBasePath={settlementDetailBasePath}
+      listHref={resolveListHref('/farmacia', query.return)}
     />
   );
 }

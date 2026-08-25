@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { withListReturn } from '@/lib/list-return';
 import {
   INVENTORY_PRODUCT_CATEGORIES,
   INVENTORY_PRODUCT_CATEGORY_LABELS,
@@ -22,6 +23,7 @@ interface InventoryListProps {
   initialSearch?: string;
   initialCategory?: string;
   initialLowStock?: boolean;
+  branchName?: string | null;
 }
 
 function formatQty(value: number): string {
@@ -33,6 +35,7 @@ export function InventoryList({
   initialSearch = '',
   initialCategory = '',
   initialLowStock = false,
+  branchName = null,
 }: InventoryListProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -81,7 +84,11 @@ export function InventoryList({
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Catálogo</h2>
-        <p className="text-sm text-muted-foreground">Productos de la sucursal activa</p>
+        <p className="text-sm text-muted-foreground">
+          {branchName
+            ? `Productos de la sucursal ${branchName}`
+            : 'Productos de la sucursal de tu sesión'}
+        </p>
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -117,7 +124,9 @@ export function InventoryList({
 
       {data.data.length === 0 ? (
         <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No hay productos en el inventario.
+          {initialSearch || initialCategory || initialLowStock
+            ? 'No hay productos con esos filtros en esta sucursal.'
+            : 'No hay productos en el inventario de esta sucursal.'}
         </div>
       ) : (
         <>
@@ -125,7 +134,7 @@ export function InventoryList({
             {data.data.map((product) => (
               <Link
                 key={product.id}
-                href={`/inventario/${product.id}`}
+                href={withListReturn(`/inventario/${product.id}`, searchParams)}
                 className="block rounded-lg border p-4 transition-colors hover:bg-muted/20"
               >
                 <div className="flex flex-wrap items-center gap-2">

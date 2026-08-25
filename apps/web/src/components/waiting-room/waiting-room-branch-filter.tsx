@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { Select } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
@@ -13,7 +14,7 @@ interface WaitingRoomBranchFilterProps {
   className?: string;
 }
 
-export function WaitingRoomBranchFilter({
+function WaitingRoomBranchFilterInner({
   branchOptions,
   sessionBranchId,
   branchFilter,
@@ -72,5 +73,14 @@ export function WaitingRoomBranchFilter({
         ))}
       </Select>
     </label>
+  );
+}
+
+/** Suspense boundary for useSearchParams (required by Next.js App Router). */
+export function WaitingRoomBranchFilter(props: WaitingRoomBranchFilterProps) {
+  return (
+    <Suspense fallback={null}>
+      <WaitingRoomBranchFilterInner {...props} />
+    </Suspense>
   );
 }

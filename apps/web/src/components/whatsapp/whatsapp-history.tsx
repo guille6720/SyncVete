@@ -55,7 +55,9 @@ export function WhatsAppHistory({ data, initialSearch = '' }: WhatsAppHistoryPro
     <div className="space-y-4">
       <div>
         <h2 className="text-lg font-semibold">Historial</h2>
-        <p className="text-sm text-muted-foreground">Mensajes abiertos hacia WhatsApp</p>
+        <p className="text-sm text-muted-foreground">
+          Mensajes abiertos hacia WhatsApp · toda la organización
+        </p>
       </div>
 
       <div className="relative max-w-md">
@@ -69,7 +71,11 @@ export function WhatsAppHistory({ data, initialSearch = '' }: WhatsAppHistoryPro
       </div>
 
       {data.data.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Todavía no hay mensajes registrados.</p>
+        <p className="text-sm text-muted-foreground">
+          {initialSearch
+            ? 'No hay mensajes con esa búsqueda.'
+            : 'Todavía no hay mensajes registrados.'}
+        </p>
       ) : (
         <div className="space-y-3">
           {data.data.map((row) => (
