@@ -42,10 +42,18 @@ export function WaitingRoomOpsDashboard({
   listBranchId,
 }: WaitingRoomOpsDashboardProps) {
   const [entries, setEntries] = useState(initialEntries);
+  // Defer live clock until mount to avoid SSR/client hydration mismatches on wait metrics.
+  const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
     setEntries(initialEntries);
   }, [initialEntries]);
+
+  useEffect(() => {
+    setNow(new Date());
+    const id = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const filterEntries = useCallback(
     (rows: WaitingRoomListRow[]) =>
@@ -69,10 +77,21 @@ export function WaitingRoomOpsDashboard({
     void refresh();
   });
 
-  const summary = useMemo(
-    () => buildWaitingRoomDashboard(entries, { pendingCheckInCount }),
-    [entries, pendingCheckInCount]
-  );
+  const summary = useMemo(() => {
+    const computed = buildWaitingRoomDashboard(entries, {
+      pendingCheckInCount,
+      // Stable clock until mount so SSR and first client paint match.
+      now: now ?? new Date(0),
+    });
+    if (now) return computed;
+    return {
+      ...computed,
+      avgWaitMinutes: null,
+      longestWaitMinutes: null,
+      longestWaitPatientName: null,
+    };
+  }, [entries, now, pendingCheckInCount]);
+
 
   const totalForBars = Math.max(summary.totalToday, 1);
   const dark = variant === 'dark';

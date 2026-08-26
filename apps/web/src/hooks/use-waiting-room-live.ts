@@ -16,8 +16,9 @@ export function useWaitingRoomLive(onChange: () => void, enabled = true) {
 
     const notify = () => onChangeRef.current();
     const supabase = createBrowserClient();
+    // Unique topic per mount — board + ops dashboard both subscribe on /sala-espera.
     const channel = supabase
-      .channel('waiting-room-live')
+      .channel(`waiting-room-live-${Math.random().toString(36).slice(2, 10)}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'waiting_room_entries' },

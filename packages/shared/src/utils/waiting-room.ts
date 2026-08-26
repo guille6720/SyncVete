@@ -42,7 +42,7 @@ export interface WaitingRoomBoardFilters {
 }
 
 function normalizeWaitingRoomSearch(text: string): string {
-  return text
+  return String(text ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
@@ -307,7 +307,7 @@ export function compareWaitingRoomQueue(
   if (posA == null && posB != null) return 1;
   if (posA != null && posB == null) return -1;
   if (posA != null && posB != null && posA !== posB) return posA - posB;
-  return a.checked_in_at.localeCompare(b.checked_in_at);
+  return String(a.checked_in_at ?? '').localeCompare(String(b.checked_in_at ?? ''));
 }
 
 export function sortWaitingRoomQueue<T extends Pick<WaitingRoomListRow, 'priority' | 'queue_position' | 'checked_in_at'>>(

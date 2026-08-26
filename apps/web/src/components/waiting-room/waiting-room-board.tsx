@@ -140,7 +140,8 @@ function WaitingRoomBoardInner({
   const searchParams = useSearchParams();
   const [entries, setEntries] = useState(() => sortWaitingRoomQueue(initialEntries));
   const [reordering, setReordering] = useState(false);
-  const [now, setNow] = useState(() => new Date());
+  // Defer live clock until mount to avoid SSR/client hydration mismatches on wait times.
+  const [now, setNow] = useState<Date | null>(null);
   const [alertDialog, setAlertDialog] = useState<string | null>(null);
   const [filters, setFilters] = useState<WaitingRoomBoardFilters>(
     initialFilters ?? {
@@ -156,6 +157,7 @@ function WaitingRoomBoardInner({
   }, [initialEntries]);
 
   useEffect(() => {
+    setNow(new Date());
     const id = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(id);
   }, []);
@@ -457,7 +459,7 @@ function SortableWaitingRoomRow({
   isToday: boolean;
   roomPresets: string[];
   sortable: boolean;
-  now: Date;
+  now: Date | null;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: entry.waiting_room_entry_id,
@@ -518,7 +520,7 @@ function WaitingRoomRow({
   isToday: boolean;
   roomPresets?: string[];
   dragHandle?: ReactNode;
-  now: Date;
+  now: Date | null;
 }) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -544,6 +546,7 @@ function WaitingRoomRow({
   const actionsEnabled = canWrite && isToday && entry.waiting_room_status !== 'completed';
   const noteText = entry.internal_notes?.trim() || '';
   const showLiveWait =
+    now != null &&
     isToday &&
     entry.waiting_room_status !== 'completed' &&
     Boolean(entry.checked_in_at);
