@@ -131,8 +131,9 @@ export function SuperadminManual() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold tracking-tight">7. Cómo se vuelve Superadmin</h2>
         <p>
-          No es un rol de clínica. El email tiene que estar en <code>SUPERADMIN_EMAILS</code> o en
-          la tabla <code>platform_admins</code>. Equipo nunca otorga Superadmin.
+          No es un rol de clínica. El email tiene que estar en <code>SUPERADMIN_EMAILS</code>
+          (allowlist exclusiva). La tabla <code>platform_admins</code> solo autoriza los RPCs
+          después del bootstrap. Equipo nunca otorga Superadmin.
         </p>
       </section>
     </article>

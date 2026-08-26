@@ -230,6 +230,24 @@ export function parseSuperadminEmails(raw: string | undefined | null): string[] 
     .filter(Boolean);
 }
 
+/**
+ * Session Superadmin gate.
+ * When SUPERADMIN_EMAILS is set, it is the exclusive allowlist (DB rows alone are not enough).
+ * When unset/empty, fall back to platform_admins membership (local/dev convenience).
+ */
+export function resolvePlatformAdminAccess(params: {
+  email: string | undefined | null;
+  allowlistRaw: string | undefined | null;
+  isDbPlatformAdmin: boolean;
+}): boolean {
+  const allow = parseSuperadminEmails(params.allowlistRaw);
+  const email = params.email?.trim().toLowerCase() ?? '';
+  if (allow.length > 0) {
+    return Boolean(email && allow.includes(email));
+  }
+  return params.isDbPlatformAdmin === true;
+}
+
 export function isMeteredFeatureKey(value: string): boolean {
   return (METERED_FEATURE_KEYS as readonly string[]).includes(value);
 }

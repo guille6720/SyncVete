@@ -1,23 +1,13 @@
 import { cache } from 'react';
 import {
   getPermissionsForRole,
-  parseSuperadminEmails,
+  resolvePlatformAdminAccess,
   type Permission,
   type Role,
   type SessionContext,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
 import { readServerEnv } from '@/lib/server-env';
-
-async function resolveIsPlatformAdmin(params: {
-  email: string | undefined;
-  rpc: () => Promise<boolean>;
-}): Promise<boolean> {
-  const allow = parseSuperadminEmails(readServerEnv('SUPERADMIN_EMAILS'));
-  const email = params.email?.trim().toLowerCase() ?? '';
-  if (email && allow.includes(email)) return true;
-  return params.rpc();
-}
 
 /**
  * Request-scoped session loader. Deduplicates auth.getUser + profile + memberships
@@ -32,13 +22,13 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
 
   if (!user) return null;
 
-  const isPlatformAdmin = await resolveIsPlatformAdmin({
+  const { data: isDbPlatformAdmin, error: platformAdminError } = await supabase.rpc(
+    'is_platform_admin'
+  );
+  const isPlatformAdmin = resolvePlatformAdminAccess({
     email: user.email,
-    rpc: async () => {
-      const { data, error } = await supabase.rpc('is_platform_admin');
-      if (error) return false;
-      return data === true;
-    },
+    allowlistRaw: readServerEnv('SUPERADMIN_EMAILS'),
+    isDbPlatformAdmin: !platformAdminError && isDbPlatformAdmin === true,
   });
 
   const { data: profile } = await supabase
