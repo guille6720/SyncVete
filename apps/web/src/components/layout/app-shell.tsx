@@ -9,27 +9,16 @@ import { BranchSelector } from '@/components/layout/branch-selector';
 import { ClinicSidebarNav } from '@/components/layout/clinic-sidebar-nav';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { APP_NAME, ROLE_LABELS, formatMeteredUsage, isClinicPathEntitled, type Role } from '@sincvete/shared';
+import { APP_NAME, ROLE_LABELS, isClinicPathEntitled, type Role } from '@sincvete/shared';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
 import { ThemeControls } from '@/components/theme/theme-controls';
 import { AppUpdateBanner } from '@/components/layout/app-update-banner';
 import { InstallAppButton } from '@/components/pwa/install-app-button';
 import { CommandPalette, CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
-import type { ClinicCommercialBanner } from '@/lib/entitlements';
 
 /** Prefer hover/focus Next.js prefetch; avoid mounting a storm of heavy modules. */
 const IDLE_PREFETCH_HREFS = ['/dashboard', '/agenda'] as const;
-
-function quotaUsageText(banner: ClinicCommercialBanner): string {
-  if (banner.quotaUsed == null || banner.quotaLimit == null) return '';
-  return ` (${formatMeteredUsage({
-    featureKey: banner.quotaFeatureKey ?? '',
-    label: banner.quotaLabel ?? '',
-    used: banner.quotaUsed,
-    limit: banner.quotaLimit,
-  })})`;
-}
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -41,7 +30,8 @@ interface AppShellProps {
   unreadNotifications?: number;
   isPlatformAdmin?: boolean;
   entitledHrefs?: string[] | null;
-  billingBanner?: ClinicCommercialBanner | null;
+  /** Streamed commercial banner (non-critical). Prefer over blocking layout awaits. */
+  billingBannerSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
 }
 
@@ -55,7 +45,7 @@ export function AppShell({
   unreadNotifications = 0,
   isPlatformAdmin = false,
   entitledHrefs = null,
-  billingBanner = null,
+  billingBannerSlot = null,
   showMySettlementsNav = false,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -241,85 +231,7 @@ export function AppShell({
         </header>
 
         <main className="safe-area-bottom flex-1 overflow-x-auto p-4 md:p-6">
-          {billingBanner ? (
-            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-50">
-              {billingBanner.kind === 'trial' ? (
-                <p>
-                  Estás en trial{billingBanner.planName ? ` (${billingBanner.planName})` : ''}.
-                  {billingBanner.trialEndsAt
-                    ? ` Vence el ${new Date(billingBanner.trialEndsAt).toLocaleDateString('es-AR')}.`
-                    : ''}{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Elegí un plan
-                  </Link>
-                </p>
-              ) : billingBanner.kind === 'past_due' ? (
-                <p>
-                  Hay un pago pendiente{billingBanner.planName ? ` de ${billingBanner.planName}` : ''}. La
-                  clínica sigue operativa.{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Actualizar plan
-                  </Link>
-                </p>
-              ) : billingBanner.kind === 'checkout_pending' ? (
-                <p>
-                  Estamos confirmando tu pago. No inicies otro hasta que se acredite.{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Ver plan
-                  </Link>
-                </p>
-              ) : billingBanner.kind === 'plan_ending' ? (
-                <p>
-                  Tu plan{billingBanner.planName ? ` ${billingBanner.planName}` : ''} vence
-                  {billingBanner.endsAt
-                    ? ` el ${new Date(billingBanner.endsAt).toLocaleDateString('es-AR')}`
-                    : ' pronto'}
-                  . Renovalo para no perder el acceso.{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Renovar plan
-                  </Link>
-                </p>
-              ) : billingBanner.kind === 'addon_ending' ? (
-                <p>
-                  El extra{billingBanner.addonName ? ` ${billingBanner.addonName}` : ''} vence
-                  {billingBanner.endsAt
-                    ? ` el ${new Date(billingBanner.endsAt).toLocaleDateString('es-AR')}`
-                    : ' pronto'}
-                  . Renovalo para no perder el módulo.{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Renovar extra
-                  </Link>
-                </p>
-              ) : billingBanner.kind === 'quota_over' ? (
-                <p>
-                  Superaste el cupo
-                  {billingBanner.quotaLabel ? ` de ${billingBanner.quotaLabel}` : ''}
-                  {quotaUsageText(billingBanner)}. Subí de plan o reducí el uso.{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Ver plan
-                  </Link>
-                </p>
-              ) : billingBanner.kind === 'quota_near' ? (
-                <p>
-                  El cupo
-                  {billingBanner.quotaLabel ? ` de ${billingBanner.quotaLabel}` : ''} está cerca del
-                  límite
-                  {quotaUsageText(billingBanner)}.{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Ver plan
-                  </Link>
-                </p>
-              ) : (
-                <p>
-                  Tu plan venció{billingBanner.planName ? ` (${billingBanner.planName})` : ''}. Elegí uno
-                  para seguir usando los módulos.{' '}
-                  <Link href="/configuracion?tab=plan" className="font-medium underline underline-offset-4">
-                    Ver planes
-                  </Link>
-                </p>
-              )}
-            </div>
-          ) : null}
+          {billingBannerSlot}
           {children}
         </main>
       </div>

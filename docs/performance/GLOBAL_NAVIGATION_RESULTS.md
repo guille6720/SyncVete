@@ -11,11 +11,11 @@
 
 | Transition | Backend RTTs before (est.) | Backend RTTs after (est.) | Perceived behavior after | Remaining bottleneck |
 |---|---|---|---|---|
-| Dashboard → Agenda | 11–13 + prefetch storm peers | **~7–9** | Shell stable; Agenda shell + dynamic | Layout still awaits commercial banner |
-| Agenda → Patients | 11–13 | **~7–9** | Page title immediate; list streams | `listPatients` query |
-| Patients → Clinical History | 11–13 | **~7–9** | Title + Suspense stream | `listClinicalEntries` |
-| Clinical History → Consultations | 11–13 | **~7–9** | Queue first; history streams | Queue + history queries |
-| Consultations → Waiting Room | 11–13 | **~7–9** | Parallel perms/config | Dual list fetches |
+| Dashboard → Agenda | 11–13 + prefetch storm peers | **~6–8** | Shell stable; Agenda shell + dynamic | Module data queries |
+| Agenda → Patients | 11–13 | **~6–8** | Page title immediate; list streams | `listPatients` query |
+| Patients → Clinical History | 11–13 | **~6–8** | Title + Suspense stream | `listClinicalEntries` |
+| Clinical History → Consultations | 11–13 | **~6–8** | Queue first; history streams | Queue + history queries |
+| Consultations → Waiting Room | 11–13 | **~6–8** | Parallel perms/config | Dual list fetches |
 
 **Eliminated / reduced per navigation (typical):**
 
@@ -25,6 +25,7 @@
 | Session: 3 sequential queries → 1 `get_session_bootstrap` RPC | **~2** |
 | Entitlement banner: sequential checkout/closed/addons → `Promise.all` | **~1–2** |
 | Prefetch storm (7 modules) → idle 2 light routes | **N competing RSC trees** |
+| Commercial banner deferred behind Suspense (not in layout critical await) | **1–3** off TTFB for module HTML |
 
 **Net:** about **4–6 backend round-trips** removed from the critical path, plus removal of speculative multi-module SSR competition.
 
@@ -61,7 +62,8 @@
 
 ## Application shell
 
-- `(clinic)/layout.tsx` unchanged structure — shell persists across module navigations; `loading.tsx` replaces children only.
+- `(clinic)/layout.tsx` awaits **critical** entitled hrefs only; commercial banner streams via Suspense (`ClinicBillingBannerSlot`) and does not block module children.
+- Shell persists across module navigations; `loading.tsx` replaces children only.
 - Pending href styling retained for immediate click feedback.
 
 ## Agenda
@@ -124,9 +126,8 @@
 Warnings:
 
 1. Estimates only — confirm with Staging Preview + Network/Server-Timing.
-2. Clinic layout still awaits commercial banner before first paint of module children.
-3. Middleware `getUser` + RSC `getUser` still both run (required for cookie refresh vs React tree); not fully collapsed.
-4. Migrations + cron must be applied manually on Staging before full benefit.
+2. Middleware `getUser` + RSC `getUser` still both run (required for cookie refresh vs React tree); not fully collapsed.
+3. Migrations + cron must be applied manually on Staging before full benefit.
 
 ## SECURITY VERDICT
 
