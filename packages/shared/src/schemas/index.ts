@@ -1061,7 +1061,7 @@ export const invoiceUpdateSchema = z.object({
 
 export const paymentSchema = z.object({
   amount: z.coerce.number().positive('El importe debe ser mayor a 0'),
-  method: z.enum(['efectivo', 'transferencia', 'tarjeta', 'mercadopago', 'otro']).default('efectivo'),
+  method: z.enum(PAYMENT_METHODS).default('efectivo'),
   reference: optionalShortText(80),
   notes: optionalClinicalText,
 });
@@ -1248,9 +1248,7 @@ export const cashSessionCloseSchema = z.object({
 export const cashMovementSchema = z.object({
   kind: z.enum(['ingreso', 'egreso', 'retiro']),
   amount: z.coerce.number().positive('El importe debe ser mayor a 0'),
-  method: z
-    .enum(['efectivo', 'transferencia', 'tarjeta', 'mercadopago', 'otro'])
-    .default('efectivo'),
+  method: z.enum(PAYMENT_METHODS).default('efectivo'),
   notes: optionalShortText(1000),
 });
 

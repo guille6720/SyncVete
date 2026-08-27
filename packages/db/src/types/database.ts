@@ -150,6 +150,7 @@ export type PaymentMethod =
   | 'transferencia'
   | 'tarjeta'
   | 'mercadopago'
+  | 'gratuito'
   | 'otro';
 
 export type ProfessionalRelationshipType = 'employee' | 'independent' | 'partner' | 'other';

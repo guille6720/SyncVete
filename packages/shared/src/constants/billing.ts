@@ -29,6 +29,7 @@ export const PAYMENT_METHODS = [
   'transferencia',
   'tarjeta',
   'mercadopago',
+  'gratuito',
   'otro',
 ] as const;
 
@@ -39,6 +40,7 @@ export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   transferencia: 'Transferencia',
   tarjeta: 'Tarjeta',
   mercadopago: 'Mercado Pago',
+  gratuito: 'Gratuito',
   otro: 'Otro',
 };
 
