@@ -50,18 +50,23 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   return { success: false, error: 'Ocurrió un error inesperado' };
 }
 
-function rpcErrorMessage(error: { message?: string } | null, fallback: string): string {
+function rpcErrorMessage(error: { message?: string; code?: string; details?: string } | null, fallback: string): string {
   const message = error?.message?.trim();
   if (!message) return fallback;
   const cleaned = message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
+  if (cleaned.includes('Horario no disponible') || cleaned.includes('Horario inválido')) {
+    return cleaned;
+  }
+  // Schema drift (Preview UI + Production DB without new columns)
   if (
-    cleaned.includes('Horario no disponible') ||
-    cleaned.includes('Horario inválido') ||
-    cleaned.length > 0
+    /column .* does not exist/i.test(cleaned) ||
+    /Could not find the/i.test(cleaned) ||
+    error?.code === 'PGRST204'
   ) {
-    if (cleaned.includes('Horario no disponible') || cleaned.includes('Horario inválido')) {
-      return cleaned;
-    }
+    return 'La base de datos no tiene el esquema de agenda actualizado. Pedile al equipo que aplique la migración en este entorno.';
+  }
+  if (cleaned.length > 0 && cleaned.length < 220) {
+    return cleaned;
   }
   return fallback;
 }
@@ -275,6 +280,7 @@ export async function createAppointment(
       .single();
 
     if (error) {
+      console.error('[createAppointment]', error);
       return {
         success: false,
         error: rpcErrorMessage(error, 'No se pudo crear la cita'),
