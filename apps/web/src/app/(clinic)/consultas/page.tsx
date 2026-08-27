@@ -15,11 +15,35 @@ interface ConsultasPageProps {
   searchParams: Promise<{ page?: string; search?: string; status?: string }>;
 }
 
+async function ConsultationsHistorySection({
+  page,
+  search,
+  status,
+}: {
+  page: number;
+  search: string;
+  status: ConsultationStatus | undefined;
+}) {
+  const history = await listConsultations({
+    page,
+    pageSize: 25,
+    search: search || undefined,
+    status,
+  });
+
+  return (
+    <ConsultationsHistory
+      data={history}
+      initialSearch={search}
+      initialStatus={status ?? ''}
+    />
+  );
+}
+
 export default async function ConsultasPage({ searchParams }: ConsultasPageProps) {
-  const canRead = await canReadConsultations();
+  const [canRead, params] = await Promise.all([canReadConsultations(), searchParams]);
   if (!canRead) redirect('/dashboard');
 
-  const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
   const search = params.search?.trim() ?? '';
   const statusParam = params.status?.trim() ?? '';
@@ -33,15 +57,6 @@ export default async function ConsultasPage({ searchParams }: ConsultasPageProps
     canReadConsultationHistory(),
   ]);
 
-  const history = canHistory
-    ? await listConsultations({
-        page,
-        pageSize: 25,
-        search: search || undefined,
-        status,
-      })
-    : null;
-
   return (
     <div className="space-y-8">
       <div>
@@ -51,15 +66,11 @@ export default async function ConsultasPage({ searchParams }: ConsultasPageProps
 
       <ConsultationsQueue items={queue} canWrite={canWrite} canReadHistory={canHistory} />
 
-      {history && (
+      {canHistory ? (
         <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando historial...</div>}>
-          <ConsultationsHistory
-            data={history}
-            initialSearch={search}
-            initialStatus={status ?? ''}
-          />
+          <ConsultationsHistorySection page={page} search={search} status={status} />
         </Suspense>
-      )}
+      ) : null}
     </div>
   );
 }

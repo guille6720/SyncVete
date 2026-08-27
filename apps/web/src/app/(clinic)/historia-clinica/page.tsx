@@ -9,6 +9,34 @@ interface HistoriaClinicaPageProps {
   searchParams: Promise<{ page?: string; search?: string; type?: string }>;
 }
 
+async function ClinicalHistorySection({
+  page,
+  search,
+  entryType,
+  canWrite,
+}: {
+  page: number;
+  search: string;
+  entryType: ClinicalEntryType | undefined;
+  canWrite: boolean;
+}) {
+  const data = await listClinicalEntries({
+    page,
+    pageSize: CLINICAL_HISTORY_PAGE_SIZE,
+    search: search || undefined,
+    entryType,
+  });
+
+  return (
+    <ClinicalEntriesList
+      data={data}
+      canWrite={canWrite}
+      initialSearch={search}
+      initialEntryType={entryType ?? ''}
+    />
+  );
+}
+
 export default async function HistoriaClinicaPage({ searchParams }: HistoriaClinicaPageProps) {
   const [session, params] = await Promise.all([getSessionContext(), searchParams]);
   if (!session?.permissions.includes('clinical:read')) redirect('/dashboard');
@@ -20,13 +48,6 @@ export default async function HistoriaClinicaPage({ searchParams }: HistoriaClin
     ? (typeParam as ClinicalEntryType)
     : undefined;
 
-  const data = await listClinicalEntries({
-    page,
-    pageSize: CLINICAL_HISTORY_PAGE_SIZE,
-    search: search || undefined,
-    entryType,
-  });
-
   return (
     <div className="space-y-6">
       <div>
@@ -34,12 +55,14 @@ export default async function HistoriaClinicaPage({ searchParams }: HistoriaClin
         <p className="text-muted-foreground">Registro longitudinal de atenciones y evolución</p>
       </div>
 
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
-        <ClinicalEntriesList
-          data={data}
+      <Suspense
+        fallback={<div className="text-sm text-muted-foreground">Cargando historia clínica…</div>}
+      >
+        <ClinicalHistorySection
+          page={page}
+          search={search}
+          entryType={entryType}
           canWrite={session.permissions.includes('clinical:write')}
-          initialSearch={search}
-          initialEntryType={entryType ?? ''}
         />
       </Suspense>
     </div>

@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CalendarClock, ClipboardList, Plus, Search } from 'lucide-react';
+import { CalendarClock, ClipboardList, Plus, Search, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,7 +115,6 @@ export function AppointmentsAgenda({
   initialQuery = '',
 }: AppointmentsAgendaProps) {
   const pathname = usePathname();
-  const [pending, startTransition] = useTransition();
   const [calendarPending, setCalendarPending] = useState(false);
   const [queryDraft, setQueryDraft] = useState(initialQuery);
   const [selected, setSelected] = useState<AppointmentListRow | null>(null);
@@ -272,18 +271,16 @@ export function AppointmentsAgenda({
       query: patch.query ?? query,
     };
 
-    // Immediate UI response (<100ms perceived).
-    startTransition(() => {
-      setSelectedDate(next.selectedDate);
-      setWeekStart(next.weekStart);
-      setMonth(next.month);
-      setView(next.view);
-      setStatus(next.status);
-      setAssignedUserId(next.assignedUserId);
-      setBranchId(next.branchId);
-      setQuery(next.query);
-      if (patch.query !== undefined) setQueryDraft(next.query);
-    });
+    // Immediate control feedback — never defer selected state behind transitions.
+    setSelectedDate(next.selectedDate);
+    setWeekStart(next.weekStart);
+    setMonth(next.month);
+    setView(next.view);
+    setStatus(next.status);
+    setAssignedUserId(next.assignedUserId);
+    setBranchId(next.branchId);
+    setQuery(next.query);
+    if (patch.query !== undefined) setQueryDraft(next.query);
 
     syncUrl(next);
     void fetchDynamic(next);
@@ -377,7 +374,12 @@ export function AppointmentsAgenda({
     applyState({ query: queryDraft.trim() });
   };
 
-  const isBusy = pending || calendarPending;
+  const clearSearch = () => {
+    setQueryDraft('');
+    applyState({ query: '' });
+  };
+
+  const isBusy = calendarPending;
 
   return (
     <div className="space-y-4">
@@ -391,12 +393,24 @@ export function AppointmentsAgenda({
                 onChange={(e) => setQueryDraft(e.target.value)}
                 placeholder="Buscar paciente o tutor..."
                 className="pl-8"
-                aria-label="Buscar citas"
+                aria-label="Buscar turnos"
               />
             </div>
             <Button type="submit" variant="outline" disabled={isBusy}>
               Buscar
             </Button>
+            {(query || queryDraft) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={clearSearch}
+                disabled={isBusy}
+                aria-label="Limpiar búsqueda"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
           </form>
 
           <Select
@@ -454,6 +468,7 @@ export function AppointmentsAgenda({
               <button
                 key={option.value}
                 type="button"
+                aria-pressed={view === option.value}
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                   view === option.value
@@ -482,7 +497,7 @@ export function AppointmentsAgenda({
             <Button asChild>
               <Link href={`/agenda/nueva?date=${selectedDate}`}>
                 <Plus className="mr-2 h-4 w-4" />
-                Nueva cita
+                Nuevo turno
               </Link>
             </Button>
           )}
@@ -528,9 +543,11 @@ export function AppointmentsAgenda({
           month={month}
           staff={staff}
           canWrite={canWrite}
+          query={query}
           waitingRoomByAppointment={waitingRoomByAppointment}
           onSelectAppointment={setSelected}
           onNavigate={applyState}
+          onClearSearch={clearSearch}
         />
       </div>
 

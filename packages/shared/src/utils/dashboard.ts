@@ -33,12 +33,27 @@ export function formatDashboardDate(dateInput: string | Date): string {
   const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
   if (Number.isNaN(date.getTime())) return '—';
 
-  return new Intl.DateTimeFormat(APP_LOCALE, {
+  const parts = new Intl.DateTimeFormat(APP_LOCALE, {
     timeZone: APP_TIMEZONE,
-    day: '2-digit',
+    day: 'numeric',
     month: 'short',
     year: 'numeric',
-  }).format(date);
+  }).formatToParts(date);
+
+  const day = parts.find((part) => part.type === 'day')?.value ?? '';
+  const monthRaw = parts.find((part) => part.type === 'month')?.value ?? '';
+  const year = parts.find((part) => part.type === 'year')?.value ?? '';
+  const month = monthRaw.replace(/\.$/, '').toLocaleLowerCase(APP_LOCALE);
+  if (!day || !month || !year) {
+    return new Intl.DateTimeFormat(APP_LOCALE, {
+      timeZone: APP_TIMEZONE,
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    }).format(date);
+  }
+  // Natural Spanish (avoid CSS capitalize → "De Ago De")
+  return `${Number(day)} de ${month}. de ${year}`;
 }
 
 export function formatDashboardDateTime(dateInput: string | Date): string {

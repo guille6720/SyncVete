@@ -141,7 +141,7 @@ export default async function SalaEsperaTableroPage({ searchParams }: SalaEspera
               <ChevronLeft className="h-4 w-4" />
             </Link>
           </Button>
-          <p className="min-w-[10rem] text-center text-sm font-medium capitalize text-slate-200">
+          <p className="min-w-[10rem] text-center text-sm font-medium text-slate-200">
             {formatDashboardDate(`${selectedDate}T12:00:00-03:00`)}
             {isToday ? ' · Hoy' : ''}
             {mineOnly ? ' · Mi cola' : ''}

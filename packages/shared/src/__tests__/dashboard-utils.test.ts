@@ -7,10 +7,12 @@ import {
 } from '../utils/dashboard';
 
 describe('dashboard utils', () => {
-  it('formats dashboard dates in es-AR', () => {
-    const formatted = formatDashboardDate('2024-08-15T12:00:00.000Z');
-    expect(formatted).toMatch(/15/);
-    expect(formatted).toMatch(/2024/);
+  it('formats dashboard dates in natural Spanish (lowercase de)', () => {
+    const formatted = formatDashboardDate('2026-08-27T15:00:00.000Z');
+    expect(formatted).toMatch(/27/);
+    expect(formatted).toMatch(/2026/);
+    expect(formatted).toMatch(/ de /);
+    expect(formatted).not.toMatch(/\bDe\b/);
   });
 
   it('formats dashboard date time', () => {

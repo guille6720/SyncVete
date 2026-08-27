@@ -53,7 +53,7 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Agenda</h1>
-        <p className="text-muted-foreground">Calendario de citas para recepción</p>
+        <p className="text-muted-foreground">Calendario de turnos para recepción</p>
       </div>
 
       <AppointmentsAgenda

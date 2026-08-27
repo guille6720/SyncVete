@@ -19,7 +19,6 @@ import {
   getWeekDays,
   getWeekStartDate,
   groupAppointmentsByAssignee,
-  shiftAgendaMonth,
   type AppointmentListRow,
   type AssignableStaffMember,
   type PaymentMethod,
@@ -37,9 +36,11 @@ interface AppointmentsCalendarViewsProps {
   month: string;
   staff: AssignableStaffMember[];
   canWrite: boolean;
+  query?: string;
   waitingRoomByAppointment?: Record<string, WaitingRoomStatus>;
   onSelectAppointment: (appointment: AppointmentListRow) => void;
   onNavigate: (patch: AgendaNavigatePatch) => void;
+  onClearSearch?: () => void;
 }
 
 const DAY_HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 08–20
@@ -159,11 +160,14 @@ export function AppointmentsCalendarViews({
   month,
   staff,
   canWrite,
+  query = '',
   waitingRoomByAppointment,
   onSelectAppointment,
   onNavigate,
+  onClearSearch,
 }: AppointmentsCalendarViewsProps) {
   const today = formatDateParam(new Date());
+  const searchActive = query.trim().length > 0;
 
   if (view === 'day') {
     const dayAppointments = appointments
@@ -178,12 +182,20 @@ export function AppointmentsCalendarViews({
     if (dayAppointments.length === 0) {
       return (
         <div className="rounded-lg border border-dashed p-10 text-center">
-          <p className="text-muted-foreground">No hay citas para este día.</p>
-          {canWrite && (
-            <Button asChild className="mt-4">
-              <Link href={`/agenda/nueva?date=${selectedDate}`}>Agendar cita</Link>
+          <p className="text-muted-foreground">
+            {searchActive
+              ? 'No encontramos turnos para esta búsqueda.'
+              : 'No hay turnos para este día.'}
+          </p>
+          {searchActive && onClearSearch ? (
+            <Button type="button" variant="outline" className="mt-4" onClick={onClearSearch}>
+              Limpiar búsqueda
             </Button>
-          )}
+          ) : canWrite ? (
+            <Button asChild className="mt-4">
+              <Link href={`/agenda/nueva?date=${selectedDate}`}>Agendar turno</Link>
+            </Button>
+          ) : null}
         </div>
       );
     }
@@ -347,44 +359,20 @@ export function AppointmentsCalendarViews({
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(year, monthNum - 1, 1, 12)));
-  const prevMonth = shiftAgendaMonth(month, -1);
-  const nextMonth = shiftAgendaMonth(month, 1);
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          onClick={() =>
-            onNavigate({
-              month: prevMonth,
-              selectedDate: `${prevMonth}-01`,
-              weekStart: getWeekStartDate(`${prevMonth}-01`),
-              view: 'month',
-            })
-          }
-        >
-          Anterior
-        </Button>
-        <p className="text-sm font-semibold capitalize">{monthLabel}</p>
-        <Button
-          variant="outline"
-          size="sm"
-          type="button"
-          onClick={() =>
-            onNavigate({
-              month: nextMonth,
-              selectedDate: `${nextMonth}-01`,
-              weekStart: getWeekStartDate(`${nextMonth}-01`),
-              view: 'month',
-            })
-          }
-        >
-          Siguiente
-        </Button>
-      </div>
+      <p className="text-center text-sm font-semibold first-letter:uppercase">{monthLabel}</p>
+      {searchActive && appointments.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-8 text-center">
+          <p className="text-muted-foreground">No encontramos turnos para esta búsqueda.</p>
+          {onClearSearch ? (
+            <Button type="button" variant="outline" className="mt-4" onClick={onClearSearch}>
+              Limpiar búsqueda
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium uppercase text-muted-foreground sm:gap-2">
         {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((label) => (
           <div key={label} className="py-1">
