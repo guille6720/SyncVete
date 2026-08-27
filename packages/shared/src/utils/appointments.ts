@@ -207,3 +207,98 @@ export function groupAppointmentsByAssignee<
   }
   return grouped;
 }
+
+export type AgendaViewMode = 'day' | 'week' | 'month';
+
+export function parseAgendaViewMode(value?: string | null): AgendaViewMode {
+  if (value === 'week' || value === 'month' || value === 'day') return value;
+  return 'day';
+}
+
+/** Shift a YYYY-MM-DD calendar day by N days (UTC noon anchor). */
+export function shiftAgendaDay(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function shiftAgendaWeek(weekStart: string, weeks: number): string {
+  return shiftAgendaDay(weekStart, weeks * 7);
+}
+
+export function shiftAgendaMonth(month: string, delta: number): string {
+  const [year, m] = month.split('-').map(Number);
+  const date = new Date(Date.UTC(year, m - 1 + delta, 1, 12));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function agendaMonthBounds(month: string): { from: string; to: string } {
+  const [year, m] = month.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, m, 0)).getUTCDate();
+  return {
+    from: `${month}-01`,
+    to: `${month}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
+export interface AgendaQueryState {
+  selectedDate: string;
+  weekStart: string;
+  month: string;
+  view: AgendaViewMode;
+  status?: string;
+  assignedUserId?: string;
+  branchId?: string;
+  query?: string;
+}
+
+export interface AgendaCalendarRange {
+  from: string;
+  to: string;
+  weekStart: string;
+  selectedDate: string;
+  month: string;
+  view: AgendaViewMode;
+}
+
+/** Resolve the appointment fetch window for day / week / month views. */
+export function resolveAgendaCalendarRange(input: {
+  date?: string | null;
+  week?: string | null;
+  month?: string | null;
+  view?: string | null;
+}): AgendaCalendarRange {
+  const selectedDate = parseDateParam(input.date ?? undefined);
+  const weekStart = input.week && DATE_PARAM_REGEX.test(input.week)
+    ? input.week
+    : getWeekStartDate(selectedDate);
+  const month =
+    input.month && /^\d{4}-\d{2}$/.test(input.month)
+      ? input.month
+      : selectedDate.slice(0, 7);
+  const view = parseAgendaViewMode(input.view);
+
+  if (view === 'day') {
+    return { from: selectedDate, to: selectedDate, weekStart, selectedDate, month, view };
+  }
+  if (view === 'month') {
+    const bounds = agendaMonthBounds(month);
+    return {
+      from: bounds.from,
+      to: bounds.to,
+      weekStart,
+      selectedDate,
+      month,
+      view,
+    };
+  }
+  return {
+    from: weekStart,
+    to: shiftAgendaDay(weekStart, 6),
+    weekStart,
+    selectedDate,
+    month,
+    view,
+  };
+}
