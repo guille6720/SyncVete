@@ -238,11 +238,24 @@ export function AppointmentSidePanel({
               <Badge variant={APPOINTMENT_STATUS_VARIANT[appointment.status]}>
                 {APPOINTMENT_STATUS_LABELS[appointment.status]}
               </Badge>
-              {waitingRoomStatus && (
-                <Badge variant={WAITING_ROOM_STATUS_VARIANT[waitingRoomStatus]}>
-                  SE · {WAITING_ROOM_STATUS_LABELS[waitingRoomStatus]}
+              {paymentLabel && (
+                <Badge
+                  variant={
+                    appointment.expected_payment_method === 'gratuito' ? 'success' : 'default'
+                  }
+                >
+                  {paymentLabel}
                 </Badge>
               )}
+              {waitingRoomStatus &&
+                !(
+                  appointment.expected_payment_method === 'gratuito' &&
+                  waitingRoomStatus === 'payment_pending'
+                ) && (
+                  <Badge variant={WAITING_ROOM_STATUS_VARIANT[waitingRoomStatus]}>
+                    SE · {WAITING_ROOM_STATUS_LABELS[waitingRoomStatus]}
+                  </Badge>
+                )}
             </div>
 
             <dl className="grid gap-3 text-sm">

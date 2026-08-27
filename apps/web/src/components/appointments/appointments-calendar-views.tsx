@@ -8,6 +8,7 @@ import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_VARIANT,
   APPOINTMENT_TYPE_LABELS,
+  PAYMENT_METHOD_LABELS,
   SPECIES_EMOJI,
   WAITING_ROOM_STATUS_LABELS,
   WAITING_ROOM_STATUS_VARIANT,
@@ -21,6 +22,7 @@ import {
   shiftAgendaMonth,
   type AppointmentListRow,
   type AssignableStaffMember,
+  type PaymentMethod,
   type WaitingRoomStatus,
 } from '@sincvete/shared';
 import type { AgendaNavigatePatch } from '@/components/appointments/agenda-types';
@@ -86,6 +88,16 @@ function AppointmentCard({
   onSelect: () => void;
   compact?: boolean;
 }) {
+  const paymentMethod =
+    appointment.expected_payment_method &&
+    appointment.expected_payment_method in PAYMENT_METHOD_LABELS
+      ? (appointment.expected_payment_method as PaymentMethod)
+      : null;
+  const isFree = paymentMethod === 'gratuito';
+  // Free appointments should not keep showing waiting-room "Pago pendiente".
+  const showWaitingRoom =
+    Boolean(waitingRoomStatus) && !(isFree && waitingRoomStatus === 'payment_pending');
+
   return (
     <button
       type="button"
@@ -108,7 +120,12 @@ function AppointmentCard({
         <Badge variant={APPOINTMENT_STATUS_VARIANT[appointment.status]} className="text-[10px]">
           {APPOINTMENT_STATUS_LABELS[appointment.status]}
         </Badge>
-        {waitingRoomStatus && (
+        {paymentMethod && (
+          <Badge variant={isFree ? 'success' : 'default'} className="text-[10px]">
+            {PAYMENT_METHOD_LABELS[paymentMethod]}
+          </Badge>
+        )}
+        {showWaitingRoom && waitingRoomStatus && (
           <Badge variant={WAITING_ROOM_STATUS_VARIANT[waitingRoomStatus]} className="text-[10px]">
             SE · {WAITING_ROOM_STATUS_LABELS[waitingRoomStatus]}
           </Badge>

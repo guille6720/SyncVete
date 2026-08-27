@@ -133,6 +133,40 @@ function appointmentWritePayload(data: {
   };
 }
 
+/**
+ * When expected payment is free, close a stuck waiting-room "payment_pending"
+ * so Agenda no longer shows "Pago pendiente".
+ */
+async function completeWaitingRoomIfPaymentFree(appointmentId: string) {
+  try {
+    const session = await getSessionContext();
+    if (!session?.permissions.includes('waiting_room:write')) return;
+
+    const supabase = await createServerClient();
+    const { data: entry, error } = await supabase
+      .from('waiting_room_entries')
+      .select('id, status')
+      .eq('appointment_id', appointmentId)
+      .is('deleted_at', null)
+      .maybeSingle();
+
+    if (error || !entry || entry.status !== 'payment_pending') return;
+
+    const { error: updateError } = await supabase.rpc('update_waiting_room_status', {
+      p_entry_id: entry.id,
+      p_new_status: 'completed',
+      p_room: null,
+    });
+    if (updateError) {
+      console.error('completeWaitingRoomIfPaymentFree', updateError);
+      return;
+    }
+    revalidateWaitingRoomSurfaces(appointmentId);
+  } catch (error) {
+    console.error('completeWaitingRoomIfPaymentFree', error);
+  }
+}
+
 async function enqueueReminderJobsSoft(appointmentId: string) {
   try {
     const supabase = await createServerClient();
@@ -348,6 +382,10 @@ export async function updateAppointment(
       };
     }
 
+    if (parsed.data.expectedPaymentMethod === 'gratuito') {
+      await completeWaitingRoomIfPaymentFree(appointmentId);
+    }
+
     revalidateAgenda(appointmentId);
     return { success: true };
   } catch (error) {
@@ -450,13 +488,24 @@ export async function deleteAppointment(appointmentId: string): Promise<ActionRe
     await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
     const supabase = await createServerClient();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('appointments')
       .update({ deleted_at: new Date().toISOString() })
-      .eq('id', appointmentId);
+      .eq('id', appointmentId)
+      .is('deleted_at', null)
+      .select('id');
 
     if (error) {
-      return { success: false, error: 'No se pudo eliminar la cita' };
+      return {
+        success: false,
+        error: rpcErrorMessage(error, 'No se pudo eliminar la cita'),
+      };
+    }
+    if (!data?.length) {
+      return {
+        success: false,
+        error: 'No se pudo eliminar la cita. Puede que ya esté eliminada o no tengas permiso.',
+      };
     }
 
     revalidateAgenda();
