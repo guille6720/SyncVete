@@ -1,9 +1,9 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { CalendarClock, ClipboardList, Plus, Search } from 'lucide-react';
-import { useRouter, usePathname, useSearchParams } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -14,36 +14,36 @@ import {
   type AgendaViewMode,
 } from '@/components/appointments/appointments-calendar-views';
 import { AppointmentsWeekNav } from '@/components/appointments/appointments-week-nav';
+import { getAgendaDynamicData } from '@/actions/agenda-data';
+import type {
+  AgendaDynamicData,
+  AgendaShellData,
+} from '@/components/appointments/agenda-types';
 import {
   APPOINTMENT_STATUSES,
   APPOINTMENT_STATUS_LABELS,
   formatDateParam,
   formatDayLabel,
+  getWeekStartDate,
+  resolveAgendaCalendarRange,
+  shiftAgendaDay,
+  shiftAgendaWeek,
   type AppointmentListRow,
-  type AssignableStaffMember,
   type WaitingRoomStatus,
 } from '@sincvete/shared';
 import { cn } from '@/lib/utils';
 
 interface AppointmentsAgendaProps {
-  appointments: AppointmentListRow[];
-  weekStart: string;
-  selectedDate: string;
-  month: string;
-  view: AgendaViewMode;
-  canWrite: boolean;
-  staff: AssignableStaffMember[];
-  branches: Array<{ id: string; name: string }>;
+  shell: AgendaShellData;
+  initialDynamic: AgendaDynamicData;
+  initialSelectedDate: string;
+  initialWeekStart: string;
+  initialMonth: string;
+  initialView: AgendaViewMode;
   initialStatus?: string;
   initialAssignedUserId?: string;
   initialBranchId?: string;
   initialQuery?: string;
-  waitingRoomByAppointment?: Record<string, WaitingRoomStatus>;
-  waitingRoomWaitingCount?: number;
-  canStartConsultation?: boolean;
-  canCheckInWaitingRoom?: boolean;
-  canBilling?: boolean;
-  canVaccination?: boolean;
 }
 
 function getDayKey(isoDate: string): string {
@@ -56,32 +56,97 @@ const VIEW_OPTIONS: { value: AgendaViewMode; label: string }[] = [
   { value: 'month', label: 'Mes' },
 ];
 
+function buildAgendaSearch(
+  state: {
+    selectedDate: string;
+    weekStart: string;
+    month: string;
+    view: AgendaViewMode;
+    status: string;
+    assignedUserId: string;
+    branchId: string;
+    query: string;
+  }
+): string {
+  const params = new URLSearchParams();
+  params.set('date', state.selectedDate);
+  params.set('week', state.weekStart);
+  params.set('month', state.month);
+  params.set('view', state.view);
+  if (state.status) params.set('status', state.status);
+  if (state.assignedUserId) params.set('assigned', state.assignedUserId);
+  if (state.branchId) params.set('branch', state.branchId);
+  if (state.query) params.set('q', state.query);
+  return params.toString();
+}
+
+function dynamicCacheKey(input: {
+  from: string;
+  to: string;
+  selectedDate: string;
+  branchId?: string;
+  status?: string;
+  assignedUserId?: string;
+  query?: string;
+  includeWaitingRoom: boolean;
+}): string {
+  return [
+    input.from,
+    input.to,
+    input.selectedDate,
+    input.branchId ?? '',
+    input.status ?? '',
+    input.assignedUserId ?? '',
+    input.query ?? '',
+    input.includeWaitingRoom ? '1' : '0',
+  ].join('|');
+}
+
 export function AppointmentsAgenda({
-  appointments,
-  weekStart,
-  selectedDate,
-  month,
-  view,
-  canWrite,
-  staff,
-  branches,
+  shell,
+  initialDynamic,
+  initialSelectedDate,
+  initialWeekStart,
+  initialMonth,
+  initialView,
   initialStatus = '',
   initialAssignedUserId = '',
   initialBranchId = '',
   initialQuery = '',
-  waitingRoomByAppointment,
-  waitingRoomWaitingCount,
-  canStartConsultation = false,
-  canCheckInWaitingRoom = false,
-  canBilling = false,
-  canVaccination = false,
 }: AppointmentsAgendaProps) {
-  const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();
+  const [calendarPending, setCalendarPending] = useState(false);
   const [queryDraft, setQueryDraft] = useState(initialQuery);
   const [selected, setSelected] = useState<AppointmentListRow | null>(null);
+
+  const [selectedDate, setSelectedDate] = useState(initialSelectedDate);
+  const [weekStart, setWeekStart] = useState(initialWeekStart);
+  const [month, setMonth] = useState(initialMonth);
+  const [view, setView] = useState<AgendaViewMode>(initialView);
+  const [status, setStatus] = useState(initialStatus);
+  const [assignedUserId, setAssignedUserId] = useState(initialAssignedUserId);
+  const [branchId, setBranchId] = useState(initialBranchId);
+  const [query, setQuery] = useState(initialQuery);
+  const [dynamic, setDynamic] = useState<AgendaDynamicData>(initialDynamic);
+
+  const requestIdRef = useRef(0);
+  const cacheRef = useRef<Map<string, AgendaDynamicData>>(new Map());
+
+  const {
+    canWrite,
+    staff,
+    branches,
+    canStartConsultation,
+    canCheckInWaitingRoom,
+    canBilling,
+    canVaccination,
+    canReadWaitingRoom,
+  } = shell;
+
+  const appointments = dynamic.appointments;
+  const waitingRoomByAppointment = dynamic.waitingRoomByAppointment;
+  const waitingRoomWaitingCount = dynamic.waitingRoomWaitingCount;
 
   const countsByDay = useMemo(
     () =>
@@ -102,21 +167,217 @@ export function AppointmentsAgenda({
     ? waitingRoomByAppointment?.[selected.id] ?? null
     : null;
 
-  const pushParams = (patch: Record<string, string | null>) => {
-    const params = new URLSearchParams(searchParams.toString());
-    for (const [key, value] of Object.entries(patch)) {
-      if (value === null || value === '') params.delete(key);
-      else params.set(key, value);
-    }
-    startTransition(() => {
-      router.push(`${pathname}?${params.toString()}`);
-    });
+  const syncUrl = (next: {
+    selectedDate: string;
+    weekStart: string;
+    month: string;
+    view: AgendaViewMode;
+    status: string;
+    assignedUserId: string;
+    branchId: string;
+    query: string;
+  }) => {
+    const qs = buildAgendaSearch(next);
+    window.history.replaceState(window.history.state, '', qs ? `${pathname}?${qs}` : pathname);
   };
+
+  const fetchDynamic = async (
+    next: {
+      selectedDate: string;
+      weekStart: string;
+      month: string;
+      view: AgendaViewMode;
+      status: string;
+      assignedUserId: string;
+      branchId: string;
+      query: string;
+    },
+    opts?: { prefetchOnly?: boolean }
+  ) => {
+    const range = resolveAgendaCalendarRange({
+      date: next.selectedDate,
+      week: next.weekStart,
+      month: next.month,
+      view: next.view,
+    });
+
+    const payload = {
+      from: range.from,
+      to: range.to,
+      weekStart: range.weekStart,
+      selectedDate: next.selectedDate,
+      branchId: next.branchId || undefined,
+      status: next.status || undefined,
+      assignedUserId: next.assignedUserId || undefined,
+      query: next.query || undefined,
+      includeWaitingRoom: canReadWaitingRoom,
+    };
+
+    const key = dynamicCacheKey(payload);
+    const cached = cacheRef.current.get(key);
+    if (cached) {
+      if (!opts?.prefetchOnly) setDynamic(cached);
+      return cached;
+    }
+
+    const requestId = ++requestIdRef.current;
+    if (!opts?.prefetchOnly) setCalendarPending(true);
+
+    try {
+      const data = await getAgendaDynamicData(payload);
+      cacheRef.current.set(key, data);
+      // Bound memory for rapid day scrubbing.
+      if (cacheRef.current.size > 24) {
+        const firstKey = cacheRef.current.keys().next().value;
+        if (firstKey) cacheRef.current.delete(firstKey);
+      }
+      if (!opts?.prefetchOnly && requestId === requestIdRef.current) {
+        setDynamic(data);
+      }
+      return data;
+    } finally {
+      if (!opts?.prefetchOnly && requestId === requestIdRef.current) {
+        setCalendarPending(false);
+      }
+    }
+  };
+
+  const applyState = (
+    patch: Partial<{
+      selectedDate: string;
+      weekStart: string;
+      month: string;
+      view: AgendaViewMode;
+      status: string;
+      assignedUserId: string;
+      branchId: string;
+      query: string;
+    }>
+  ) => {
+    const nextSelectedDate = patch.selectedDate ?? selectedDate;
+    const nextView = patch.view ?? view;
+    const nextWeekStart =
+      patch.weekStart ??
+      (patch.selectedDate ? getWeekStartDate(patch.selectedDate) : weekStart);
+    const nextMonth = patch.month ?? (patch.selectedDate ? patch.selectedDate.slice(0, 7) : month);
+
+    const next = {
+      selectedDate: nextSelectedDate,
+      weekStart: nextWeekStart,
+      month: nextMonth,
+      view: nextView,
+      status: patch.status ?? status,
+      assignedUserId: patch.assignedUserId ?? assignedUserId,
+      branchId: patch.branchId ?? branchId,
+      query: patch.query ?? query,
+    };
+
+    // Immediate UI response (<100ms perceived).
+    startTransition(() => {
+      setSelectedDate(next.selectedDate);
+      setWeekStart(next.weekStart);
+      setMonth(next.month);
+      setView(next.view);
+      setStatus(next.status);
+      setAssignedUserId(next.assignedUserId);
+      setBranchId(next.branchId);
+      setQuery(next.query);
+      if (patch.query !== undefined) setQueryDraft(next.query);
+    });
+
+    syncUrl(next);
+    void fetchDynamic(next);
+  };
+
+  // Prefetch adjacent day/week after settle (skip months).
+  useEffect(() => {
+    if (calendarPending) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      if (view === 'day') {
+        const prevDay = shiftAgendaDay(selectedDate, -1);
+        const nextDay = shiftAgendaDay(selectedDate, 1);
+        await Promise.all([
+          fetchDynamic(
+            {
+              selectedDate: prevDay,
+              weekStart: getWeekStartDate(prevDay),
+              month: prevDay.slice(0, 7),
+              view: 'day',
+              status,
+              assignedUserId,
+              branchId,
+              query,
+            },
+            { prefetchOnly: true }
+          ),
+          fetchDynamic(
+            {
+              selectedDate: nextDay,
+              weekStart: getWeekStartDate(nextDay),
+              month: nextDay.slice(0, 7),
+              view: 'day',
+              status,
+              assignedUserId,
+              branchId,
+              query,
+            },
+            { prefetchOnly: true }
+          ),
+        ]);
+        return;
+      }
+
+      if (view === 'week' && !cancelled) {
+        const prevWeek = shiftAgendaWeek(weekStart, -1);
+        const nextWeek = shiftAgendaWeek(weekStart, 1);
+        await Promise.all([
+          fetchDynamic(
+            {
+              selectedDate: prevWeek,
+              weekStart: prevWeek,
+              month: prevWeek.slice(0, 7),
+              view: 'week',
+              status,
+              assignedUserId,
+              branchId,
+              query,
+            },
+            { prefetchOnly: true }
+          ),
+          fetchDynamic(
+            {
+              selectedDate: nextWeek,
+              weekStart: nextWeek,
+              month: nextWeek.slice(0, 7),
+              view: 'week',
+              status,
+              assignedUserId,
+              branchId,
+              query,
+            },
+            { prefetchOnly: true }
+          ),
+        ]);
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally omit fetchDynamic identity; keyed off navigation state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, selectedDate, weekStart, status, assignedUserId, branchId, query, calendarPending]);
 
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    pushParams({ q: queryDraft.trim() || null });
+    applyState({ query: queryDraft.trim() });
   };
+
+  const isBusy = pending || calendarPending;
 
   return (
     <div className="space-y-4">
@@ -133,28 +394,28 @@ export function AppointmentsAgenda({
                 aria-label="Buscar citas"
               />
             </div>
-            <Button type="submit" variant="outline" disabled={pending}>
+            <Button type="submit" variant="outline" disabled={isBusy}>
               Buscar
             </Button>
           </form>
 
           <Select
-            value={initialStatus}
-            onChange={(e) => pushParams({ status: e.target.value || null })}
+            value={status}
+            onChange={(e) => applyState({ status: e.target.value })}
             className="w-full sm:w-44"
             aria-label="Filtrar por estado"
           >
             <option value="">Todos los estados</option>
-            {APPOINTMENT_STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {APPOINTMENT_STATUS_LABELS[status]}
+            {APPOINTMENT_STATUSES.map((item) => (
+              <option key={item} value={item}>
+                {APPOINTMENT_STATUS_LABELS[item]}
               </option>
             ))}
           </Select>
 
           <Select
-            value={initialAssignedUserId}
-            onChange={(e) => pushParams({ assigned: e.target.value || null })}
+            value={assignedUserId}
+            onChange={(e) => applyState({ assignedUserId: e.target.value })}
             className="w-full sm:w-48"
             aria-label="Filtrar por profesional"
           >
@@ -168,8 +429,8 @@ export function AppointmentsAgenda({
 
           {branches.length > 1 && (
             <Select
-              value={initialBranchId}
-              onChange={(e) => pushParams({ branch: e.target.value || null })}
+              value={branchId}
+              onChange={(e) => applyState({ branchId: e.target.value })}
               className="w-full sm:w-48"
               aria-label="Filtrar por sucursal"
             >
@@ -199,7 +460,7 @@ export function AppointmentsAgenda({
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-muted/60'
                 )}
-                onClick={() => pushParams({ view: option.value })}
+                onClick={() => applyState({ view: option.value })}
               >
                 {option.label}
               </button>
@@ -238,23 +499,40 @@ export function AppointmentsAgenda({
         selectedDate={selectedDate}
         countsByDay={countsByDay}
         view={view}
+        onNavigate={applyState}
       />
 
       {view === 'day' && (
         <h2 className="text-lg font-semibold">{formatDayLabel(selectedDate)}</h2>
       )}
 
-      <AppointmentsCalendarViews
-        view={view}
-        appointments={appointments}
-        selectedDate={selectedDate}
-        weekStart={weekStart}
-        month={month}
-        staff={staff}
-        canWrite={canWrite}
-        waitingRoomByAppointment={waitingRoomByAppointment}
-        onSelectAppointment={setSelected}
-      />
+      <div
+        className={cn(
+          'relative min-h-[12rem] transition-opacity',
+          calendarPending && 'opacity-60'
+        )}
+        aria-busy={calendarPending || undefined}
+      >
+        {calendarPending && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center">
+            <span className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground shadow-sm">
+              Actualizando calendario…
+            </span>
+          </div>
+        )}
+        <AppointmentsCalendarViews
+          view={view}
+          appointments={appointments}
+          selectedDate={selectedDate}
+          weekStart={weekStart}
+          month={month}
+          staff={staff}
+          canWrite={canWrite}
+          waitingRoomByAppointment={waitingRoomByAppointment}
+          onSelectAppointment={setSelected}
+          onNavigate={applyState}
+        />
+      </div>
 
       <AppointmentSidePanel
         appointment={selected}
@@ -265,7 +543,7 @@ export function AppointmentsAgenda({
         canCheckInWaitingRoom={canCheckInWaitingRoom}
         canBilling={canBilling}
         canVaccination={canVaccination}
-        waitingRoomStatus={selectedWaitingStatus}
+        waitingRoomStatus={selectedWaitingStatus as WaitingRoomStatus | null}
       />
     </div>
   );

@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useSearchParams } from 'next/navigation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -17,11 +16,14 @@ import {
   formatDayLabel,
   formatWeekdayLabel,
   getWeekDays,
+  getWeekStartDate,
   groupAppointmentsByAssignee,
+  shiftAgendaMonth,
   type AppointmentListRow,
   type AssignableStaffMember,
   type WaitingRoomStatus,
 } from '@sincvete/shared';
+import type { AgendaNavigatePatch } from '@/components/appointments/agenda-types';
 
 export type AgendaViewMode = 'day' | 'week' | 'month';
 
@@ -35,6 +37,7 @@ interface AppointmentsCalendarViewsProps {
   canWrite: boolean;
   waitingRoomByAppointment?: Record<string, WaitingRoomStatus>;
   onSelectAppointment: (appointment: AppointmentListRow) => void;
+  onNavigate: (patch: AgendaNavigatePatch) => void;
 }
 
 const DAY_HOURS = Array.from({ length: 13 }, (_, i) => i + 8); // 08–20
@@ -49,31 +52,10 @@ function hourKey(isoDate: string): number {
   return Number.isFinite(hour) ? hour : 0;
 }
 
-function agendaHref(
-  pathname: string,
-  searchParams: URLSearchParams,
-  patch: Record<string, string | null>
-): string {
-  const params = new URLSearchParams(searchParams.toString());
-  for (const [key, value] of Object.entries(patch)) {
-    if (value === null || value === '') params.delete(key);
-    else params.set(key, value);
-  }
-  const qs = params.toString();
-  return qs ? `${pathname}?${qs}` : pathname;
-}
-
-function shiftMonth(month: string, delta: number): string {
-  const [year, m] = month.split('-').map(Number);
-  const date = new Date(Date.UTC(year, m - 1 + delta, 1, 12));
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
 function getMonthDays(month: string): string[] {
   const [year, m] = month.split('-').map(Number);
   const first = new Date(Date.UTC(year, m - 1, 1, 12));
   const daysInMonth = new Date(Date.UTC(year, m, 0)).getUTCDate();
-  // Monday-based leading padding
   const weekday = first.getUTCDay();
   const leading = weekday === 0 ? 6 : weekday - 1;
   const cells: string[] = [];
@@ -82,9 +64,7 @@ function getMonthDays(month: string): string[] {
     cells.push(d.toISOString().slice(0, 10));
   }
   for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push(
-      `${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    );
+    cells.push(`${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`);
   }
   while (cells.length % 7 !== 0) {
     const last = cells[cells.length - 1];
@@ -164,9 +144,8 @@ export function AppointmentsCalendarViews({
   canWrite,
   waitingRoomByAppointment,
   onSelectAppointment,
+  onNavigate,
 }: AppointmentsCalendarViewsProps) {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
   const today = formatDateParam(new Date());
 
   if (view === 'day') {
@@ -197,7 +176,9 @@ export function AppointmentsCalendarViews({
         <div className="overflow-x-auto">
           <div
             className="grid min-w-[640px] gap-3"
-            style={{ gridTemplateColumns: `repeat(${assignedColumns.length + (unassigned.length ? 1 : 0)}, minmax(160px, 1fr))` }}
+            style={{
+              gridTemplateColumns: `repeat(${assignedColumns.length + (unassigned.length ? 1 : 0)}, minmax(160px, 1fr))`,
+            }}
           >
             {assignedColumns.map((member) => (
               <div key={member.userId} className="space-y-2">
@@ -298,19 +279,22 @@ export function AppointmentsCalendarViews({
                   isToday && !isSelected && 'border-primary/40'
                 )}
               >
-                <Link
-                  href={agendaHref(pathname, searchParams, {
-                    date: day,
-                    week: weekStart,
-                    view: 'day',
-                  })}
-                  className="mb-2 block rounded px-1 py-0.5 hover:bg-muted/40"
+                <button
+                  type="button"
+                  onClick={() =>
+                    onNavigate({
+                      selectedDate: day,
+                      weekStart,
+                      view: 'day',
+                    })
+                  }
+                  className="mb-2 block w-full rounded px-1 py-0.5 text-left hover:bg-muted/40"
                 >
                   <p className="text-[11px] uppercase text-muted-foreground">
                     {formatWeekdayLabel(day)}
                   </p>
                   <p className="text-sm font-semibold">{formatDayLabel(day)}</p>
-                </Link>
+                </button>
                 <div className="space-y-1.5">
                   {dayItems.length === 0 ? (
                     <p className="px-1 text-xs text-muted-foreground">—</p>
@@ -334,7 +318,6 @@ export function AppointmentsCalendarViews({
     );
   }
 
-  // month
   const monthDays = getMonthDays(month);
   const countsByDay = appointments.reduce<Record<string, number>>((acc, appointment) => {
     const day = dayKey(appointment.starts_at);
@@ -347,34 +330,42 @@ export function AppointmentsCalendarViews({
     year: 'numeric',
     timeZone: 'UTC',
   }).format(new Date(Date.UTC(year, monthNum - 1, 1, 12)));
-  const prevMonth = shiftMonth(month, -1);
-  const nextMonth = shiftMonth(month, 1);
+  const prevMonth = shiftAgendaMonth(month, -1);
+  const nextMonth = shiftAgendaMonth(month, 1);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
-        <Button variant="outline" size="sm" asChild>
-          <Link
-            href={agendaHref(pathname, searchParams, {
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          onClick={() =>
+            onNavigate({
               month: prevMonth,
-              date: `${prevMonth}-01`,
+              selectedDate: `${prevMonth}-01`,
+              weekStart: getWeekStartDate(`${prevMonth}-01`),
               view: 'month',
-            })}
-          >
-            Anterior
-          </Link>
+            })
+          }
+        >
+          Anterior
         </Button>
         <p className="text-sm font-semibold capitalize">{monthLabel}</p>
-        <Button variant="outline" size="sm" asChild>
-          <Link
-            href={agendaHref(pathname, searchParams, {
+        <Button
+          variant="outline"
+          size="sm"
+          type="button"
+          onClick={() =>
+            onNavigate({
               month: nextMonth,
-              date: `${nextMonth}-01`,
+              selectedDate: `${nextMonth}-01`,
+              weekStart: getWeekStartDate(`${nextMonth}-01`),
               view: 'month',
-            })}
-          >
-            Siguiente
-          </Link>
+            })
+          }
+        >
+          Siguiente
         </Button>
       </div>
       <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium uppercase text-muted-foreground sm:gap-2">
@@ -391,16 +382,19 @@ export function AppointmentsCalendarViews({
           const isSelected = day === selectedDate;
           const isToday = day === today;
           return (
-            <Link
+            <button
               key={day}
-              href={agendaHref(pathname, searchParams, {
-                date: day,
-                week: null,
-                month,
-                view: 'day',
-              })}
+              type="button"
+              onClick={() =>
+                onNavigate({
+                  selectedDate: day,
+                  weekStart: getWeekStartDate(day),
+                  month,
+                  view: 'day',
+                })
+              }
               className={cn(
-                'flex min-h-[4rem] flex-col rounded-lg border p-1.5 transition-colors hover:bg-muted/30 sm:min-h-[5rem] sm:p-2',
+                'flex min-h-[4rem] flex-col rounded-lg border p-1.5 text-left transition-colors hover:bg-muted/30 sm:min-h-[5rem] sm:p-2',
                 !inMonth && 'opacity-40',
                 isSelected && 'border-primary bg-primary/5',
                 isToday && !isSelected && 'border-primary/40'
@@ -418,7 +412,7 @@ export function AppointmentsCalendarViews({
                   </span>
                 </div>
               )}
-            </Link>
+            </button>
           );
         })}
       </div>
