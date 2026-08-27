@@ -84,12 +84,7 @@ function featureKeyFromJoin(features: NestedFeature): string | null {
  */
 export const loadOrganizationEntitlementInput = cache(async (organizationId: string) => {
   const supabase = await createServerClient();
-  const { error: expireError } = await supabase.rpc('expire_due_subscriptions', {
-    p_organization_id: organizationId,
-  });
-  if (expireError) {
-    console.warn('[entitlements] expire_due_subscriptions', expireError.message);
-  }
+  // Subscription expiry is scheduled (service_role job) — never write on page reads.
 
   const [featuresRes, subscriptionRes, overridesRes, addonFeaturesRes] = await Promise.all([
     supabase
@@ -426,40 +421,69 @@ export type ClinicCommercialShell = {
   banner: ClinicCommercialBanner | null;
 };
 
-export const getClinicCommercialShell = cache(
-  async (organizationId: string): Promise<ClinicCommercialShell> => {
+/**
+ * CRITICAL path for clinic nav gating: entitled hrefs from plan/features/overrides.
+ * Does not load checkout intents, usage meters, or marketing banner state.
+ */
+export const getClinicEntitledHrefs = cache(
+  async (organizationId: string): Promise<string[] | null> => {
     try {
       const input = await loadOrganizationEntitlementInput(organizationId);
-      if (input.schemaUnavailable) {
-        return { entitledHrefs: null, banner: null };
-      }
-      const entitlements = resolveOrganizationEntitlements(input);
-      const entitledHrefs = getEntitledClinicHrefs(entitlements);
+      if (input.schemaUnavailable) return null;
+      return getEntitledClinicHrefs(resolveOrganizationEntitlements(input));
+    } catch (error) {
+      console.error('[entitlements] entitled hrefs failed open', error);
+      return null;
+    }
+  }
+);
+
+/**
+ * NON-CRITICAL commercial banner (checkout, closed plans, add-ons ending, quota).
+ * Safe to defer relative to primary module content when streamed separately.
+ */
+export const getClinicCommercialBanner = cache(
+  async (organizationId: string): Promise<ClinicCommercialBanner | null> => {
+    try {
+      const input = await loadOrganizationEntitlementInput(organizationId);
+      if (input.schemaUnavailable) return null;
+
       const supabase = await createServerClient();
-      const intentsRes = await supabase.rpc('list_own_open_checkout_intents');
+      const [intentsRes, latestRes, addonsRes] = await Promise.all([
+        supabase.rpc('list_own_open_checkout_intents'),
+        !input.hasActiveSubscription
+          ? supabase
+              .from('organization_subscriptions')
+              .select('status, plans(name)')
+              .eq('organization_id', organizationId)
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        supabase.rpc('list_own_addons'),
+      ]);
+
       const openIntent = (intentsRes.data ?? []).find(
         (row) => row.kind === 'plan' || row.kind === 'addon'
       );
       const checkoutPending = openIntent
         ? { kind: openIntent.kind as 'plan' | 'addon', targetKey: openIntent.target_key }
         : null;
+
       let latestClosedStatus: 'expired' | 'cancelled' | null = null;
       let latestClosedPlanName: string | null = null;
-      if (!input.hasActiveSubscription) {
-        const latest = await supabase
-          .from('organization_subscriptions')
-          .select('status, plans(name)')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const latestJoin = latest.data?.plans as { name?: string } | { name?: string }[] | null;
+      const latestData = latestRes.data;
+      if (latestData?.status === 'expired' || latestData?.status === 'cancelled') {
+        const latestJoin = latestData.plans as { name?: string } | { name?: string }[] | null;
         const latestPlan = Array.isArray(latestJoin) ? latestJoin[0] : latestJoin;
-        if (latest.data?.status === 'expired' || latest.data?.status === 'cancelled') {
-          latestClosedStatus = latest.data.status;
-          latestClosedPlanName = latestPlan?.name ?? input.planName;
-        }
+        latestClosedStatus = latestData.status;
+        latestClosedPlanName = latestPlan?.name ?? input.planName;
       }
+
+      const addonsEnding = (addonsRes.data ?? [])
+        .filter((row) => row.status === 'active' && row.ends_at)
+        .map((row) => ({ name: row.addon_name, endsAt: row.ends_at as string }));
+
       const bannerInput = {
         hasOpenSubscription: input.hasActiveSubscription,
         status: input.subscriptionStatus,
@@ -470,19 +494,12 @@ export const getClinicCommercialShell = cache(
         latestClosedStatus,
         latestClosedPlanName,
         checkoutPending,
+        addonsEnding,
       };
-      const bannerWithoutAddons = resolveClinicCommercialBanner(bannerInput);
-      if (bannerWithoutAddons) {
-        return { entitledHrefs, banner: bannerWithoutAddons };
-      }
-      const addonsRes = await supabase.rpc('list_own_addons');
-      const addonsEnding = (addonsRes.data ?? [])
-        .filter((row) => row.status === 'active' && row.ends_at)
-        .map((row) => ({ name: row.addon_name, endsAt: row.ends_at as string }));
-      const bannerWithAddons = resolveClinicCommercialBanner({ ...bannerInput, addonsEnding });
-      if (bannerWithAddons) {
-        return { entitledHrefs, banner: bannerWithAddons };
-      }
+
+      const early = resolveClinicCommercialBanner(bannerInput);
+      if (early) return early;
+
       try {
         const [seats, meters] = await Promise.all([
           getSeatUsageMeters(organizationId).catch((error) => {
@@ -494,21 +511,27 @@ export const getClinicCommercialShell = cache(
             return [];
           }),
         ]);
-        return {
-          entitledHrefs,
-          banner: resolveClinicCommercialBanner({
-            ...bannerInput,
-            addonsEnding,
-            seats: [...seats, ...meters],
-          }),
-        };
+        return resolveClinicCommercialBanner({
+          ...bannerInput,
+          seats: [...seats, ...meters],
+        });
       } catch (error) {
         console.error('[entitlements] quota banner failed open', error);
-        return { entitledHrefs, banner: null };
+        return null;
       }
     } catch (error) {
-      console.error('[entitlements] clinic shell failed open', error);
-      return { entitledHrefs: null, banner: null };
+      console.error('[entitlements] commercial banner failed open', error);
+      return null;
     }
+  }
+);
+
+export const getClinicCommercialShell = cache(
+  async (organizationId: string): Promise<ClinicCommercialShell> => {
+    const [entitledHrefs, banner] = await Promise.all([
+      getClinicEntitledHrefs(organizationId),
+      getClinicCommercialBanner(organizationId),
+    ]);
+    return { entitledHrefs, banner };
   }
 );
