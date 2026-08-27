@@ -118,9 +118,21 @@ export function MockDashboard() {
 
 export function MockAgenda() {
   return (
-    <Chrome title="Agenda · semana">
+    <Chrome title="Agenda · día / semana / mes">
       <text x="244" y="108" fill="#134e4a" fontSize="18" fontFamily="Georgia, serif" fontWeight="700">
-        Agenda de la semana
+        Agenda del día
+      </text>
+      <rect x="244" y="88" width="52" height="22" rx="6" fill="#0d9488" />
+      <text x="254" y="103" fill="#fff" fontSize="10" fontFamily="Segoe UI, sans-serif" fontWeight="700">
+        Día
+      </text>
+      <rect x="302" y="88" width="64" height="22" rx="6" fill="#ccfbf1" />
+      <text x="310" y="103" fill="#0f766e" fontSize="10" fontFamily="Segoe UI, sans-serif" fontWeight="700">
+        Semana
+      </text>
+      <rect x="372" y="88" width="52" height="22" rx="6" fill="#ccfbf1" />
+      <text x="380" y="103" fill="#0f766e" fontSize="10" fontFamily="Segoe UI, sans-serif" fontWeight="700">
+        Mes
       </text>
       <rect x="700" y="88" width="108" height="28" rx="8" fill="#0d9488" />
       <text x="716" y="107" fill="#fff" fontSize="12" fontFamily="Segoe UI, sans-serif" fontWeight="700">
@@ -139,14 +151,14 @@ export function MockAgenda() {
         09:00 Luna
       </text>
       <text x="260" y="202" fill="#0f766e" fontSize="9" fontFamily="Segoe UI, sans-serif">
-        Control
+        Confirmada
       </text>
       <rect x="366" y="220" width="90" height="44" rx="8" fill="#5eead4" />
       <text x="374" y="238" fill="#134e4a" fontSize="10" fontFamily="Segoe UI, sans-serif">
         10:30 Misha
       </text>
       <text x="374" y="252" fill="#0f766e" fontSize="9" fontFamily="Segoe UI, sans-serif">
-        Vacuna
+        En sala
       </text>
       <rect x="594" y="186" width="90" height="52" rx="8" fill="#0d9488" />
       <text x="602" y="206" fill="#fff" fontSize="10" fontFamily="Segoe UI, sans-serif">

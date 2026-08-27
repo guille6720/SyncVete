@@ -111,13 +111,31 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           <Figure src={ILLUSTRATIONS.agenda} alt="Recepción con agenda semanal y un perro en sala de espera" />
           <div>
             <p>
-              La agenda muestra la semana. Con <strong>Nueva cita</strong> elegís paciente, fecha, profesional y motivo.
-              Desde la ficha del turno podés ver el detalle o editarlo.
+              La agenda es el calendario operativo de la clínica. Podés ver el día, la semana o el mes, filtrar por
+              profesional, sucursal o estado, y abrir un turno en el panel lateral sin salir de la vista.
             </p>
             <ul className="sv-steps">
-              <li>Si el paciente no existe, cargalo antes (o crealo desde el buscador de la cita).</li>
-              <li>Los estados del turno (pendiente, en consulta, completado, cancelado) se actualizan al atender.</li>
-              <li>Los recordatorios pueden avisar al tutor según cómo esté configurada la clínica.</li>
+              <li>
+                <strong>Nueva cita:</strong> paciente (o alta rápida de tutor + mascota), fecha, duración, tipo,
+                profesional, sucursal, modalidad (clínica / domicilio / video), medio de pago esperado y
+                recordatorios.
+              </li>
+              <li>
+                Estados de la cita: programada → confirmada → en curso → completada; también cancelada o ausente
+                (no-show).
+              </li>
+              <li>
+                <strong>Llegó / sala de espera:</strong> desde el panel del turno usá el check-in. La cola del día se
+                gestiona en <em>Sala de espera</em> (no es una segunda agenda).
+              </li>
+              <li>
+                <strong>Disponibilidad:</strong> en Agenda → Disponibilidad definís horarios y bloqueos del
+                profesional. El sistema evita doble reserva del mismo profesional.
+              </li>
+              <li>
+                <strong>Lista de espera:</strong> turnos futuros sin horario fijo (preferencias de día/hora). Cuando
+                se libera un espacio, SyncVete puede identificar candidatos compatibles.
+              </li>
             </ul>
           </div>
         </div>
