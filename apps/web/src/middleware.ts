@@ -51,9 +51,13 @@ export async function middleware(request: NextRequest) {
     }
   );
 
+  // Keep getUser() (not getClaims-only): refreshes cookies and preserves
+  // revocation semantics required for clinic session security.
+  const authStarted = performance.now();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const authMs = performance.now() - authStarted;
 
   const { pathname } = request.nextUrl;
 
@@ -90,6 +94,13 @@ export async function middleware(request: NextRequest) {
 
   // Landing pública: no redirigir usuarios logueados fuera de /
   // (pueden entrar a la app desde el header /login → /home)
+
+  if (process.env.VERCEL_ENV === 'preview' || process.env.SYNC_VETE_PERF_TIMING === '1') {
+    supabaseResponse.headers.set(
+      'Server-Timing',
+      `mw-auth;desc="middleware getUser";dur=${authMs.toFixed(1)}`
+    );
+  }
 
   return supabaseResponse;
 }

@@ -5344,6 +5344,14 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      get_session_bootstrap: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      expire_due_subscriptions_job: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
       require_platform_admin: {
         Args: Record<PropertyKey, never>;
         Returns: string;
