@@ -113,7 +113,7 @@ Returns only `appointment_id`, `waiting_room_status`. Falls back to mapping full
 | `npm run lint --workspace=@sincvete/web` | PASS |
 | `npm run test:unit --workspace=@sincvete/web` | PASS (12) |
 | `npm run test:unit --workspace=@sincvete/shared` | PASS (423) |
-| `npm run build --workspace=@sincvete/web` | (see CI/local build log) |
+| `npm run build --workspace=@sincvete/web` | PASS |
 
 ## Remaining bottlenecks
 
