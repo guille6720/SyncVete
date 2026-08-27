@@ -109,19 +109,7 @@ const QUICK_ACTIONS = [
   { label: 'IA clínica', href: '/ia-clinica', keywords: 'resumen soap indicaciones inteligencia' },
 ] as const;
 
-const PREFETCH_ON_OPEN = [
-  '/dashboard',
-  '/agenda',
-  '/pacientes',
-  '/historia-clinica',
-  '/consultas',
-  '/farmacia',
-  '/pacientes/nuevo',
-  '/agenda/nueva',
-  '/farmacia/nueva',
-  '/consultas/nueva',
-  '/historia-clinica/nuevo',
-] as const;
+const PREFETCH_ON_OPEN = ['/dashboard', '/agenda', '/pacientes'] as const;
 
 export function CommandPalette({
   entitledHrefs = null,

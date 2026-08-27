@@ -2,40 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  BedDouble,
-  BarChart3,
-  Calendar,
-  ClipboardList,
-  FlaskConical,
-  LayoutDashboard,
-  LogOut,
-  Menu,
-  Package,
-  PawPrint,
-  Receipt,
-  Scissors,
-  Settings,
-  Stethoscope,
-  Syringe,
-  Users,
-  X,
-  Bell,
-  Sparkles,
-  MessageCircle,
-  Pill,
-  Banknote,
-  Images,
-  Inbox,
-  ScrollText,
-  Shield,
-  Hourglass,
-  Briefcase,
-  Wallet,
-} from 'lucide-react';
+import { LogOut, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { signOut } from '@/actions/auth';
 import { BranchSelector } from '@/components/layout/branch-selector';
+import { ClinicSidebarNav } from '@/components/layout/clinic-sidebar-nav';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { APP_NAME, ROLE_LABELS, formatMeteredUsage, isClinicPathEntitled, type Role } from '@sincvete/shared';
@@ -47,45 +18,8 @@ import { CommandPalette, CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import type { ClinicCommercialBanner } from '@/lib/entitlements';
 
-const NAV_ITEMS = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'Agenda', href: '/agenda', icon: Calendar },
-  { label: 'Sala de espera', href: '/sala-espera', icon: Hourglass },
-  { label: 'Pacientes', href: '/pacientes', icon: PawPrint },
-  { label: 'Propietarios', href: '/propietarios', icon: Users },
-  { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList },
-  { label: 'Imágenes', href: '/imagenes', icon: Images },
-  { label: 'Consultas', href: '/consultas', icon: Stethoscope },
-  { label: 'Internación', href: '/internacion', icon: BedDouble },
-  { label: 'Vacunación', href: '/vacunacion', icon: Syringe },
-  { label: 'Cirugías', href: '/cirugias', icon: Scissors },
-  { label: 'Laboratorio', href: '/laboratorio', icon: FlaskConical },
-  { label: 'Inventario', href: '/inventario', icon: Package },
-  { label: 'Farmacia', href: '/farmacia', icon: Pill },
-  { label: 'Facturación', href: '/facturacion', icon: Receipt },
-  { label: 'Caja', href: '/caja', icon: Banknote },
-  { label: 'Profesionales', href: '/profesionales', icon: Briefcase },
-  { label: 'Liquidaciones', href: '/liquidaciones', icon: Wallet },
-  { label: 'Mis liquidaciones', href: '/liquidaciones/mis-liquidaciones', icon: Wallet },
-  { label: 'Reportes', href: '/reportes', icon: BarChart3 },
-  { label: 'Auditoría', href: '/auditoria', icon: ScrollText },
-  { label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle },
-  { label: 'Recordatorios', href: '/recordatorios', icon: Bell },
-  { label: 'Notificaciones', href: '/notificaciones', icon: Inbox },
-  { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles },
-  { label: 'Configuración', href: '/configuracion', icon: Settings },
-] as const;
-
-/** Critical clinical modules — prefetch on shell mount for snappier sidebar nav. */
-const PREFETCH_HREFS = [
-  '/dashboard',
-  '/agenda',
-  '/sala-espera',
-  '/pacientes',
-  '/historia-clinica',
-  '/consultas',
-  '/farmacia',
-] as const;
+/** Prefer hover/focus Next.js prefetch; avoid mounting a storm of heavy modules. */
+const IDLE_PREFETCH_HREFS = ['/dashboard', '/agenda'] as const;
 
 function quotaUsageText(banner: ClinicCommercialBanner): string {
   if (banner.quotaUsed == null || banner.quotaLimit == null) return '';
@@ -134,11 +68,19 @@ export function AppShell({
   }, [pathname]);
 
   useEffect(() => {
-    for (const href of PREFETCH_HREFS) {
-      if (isClinicPathEntitled(href, entitledHrefs)) {
-        router.prefetch(href);
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      if (cancelled) return;
+      for (const href of IDLE_PREFETCH_HREFS) {
+        if (isClinicPathEntitled(href, entitledHrefs)) {
+          router.prefetch(href);
+        }
       }
-    }
+    }, 500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [router, entitledHrefs]);
 
   const isWaitingRoomFullscreen =
@@ -241,67 +183,16 @@ export function AppShell({
           </div>
         )}
 
-        <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {NAV_ITEMS.filter((item) => {
-            if (item.href === '/liquidaciones/mis-liquidaciones' && !showMySettlementsNav) {
-              return false;
-            }
-            return isClinicPathEntitled(item.href, entitledHrefs);
-          }).map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
-            const isPending = pendingHref === item.href;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                prefetch
-                onClick={() => {
-                  if (!isActive) setPendingHref(item.href);
-                  setSidebarOpen(false);
-                }}
-                aria-current={isActive ? 'page' : undefined}
-                aria-busy={isPending || undefined}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                  isActive
-                    ? 'bg-[var(--clinic)] text-white shadow-sm shadow-[color-mix(in_oklab,var(--clinic)_25%,transparent)]'
-                    : 'text-[var(--shell-text)] hover:bg-[var(--clinic-soft)] hover:text-[var(--clinic)]',
-                  isPending && !isActive && 'bg-[var(--clinic-soft)] text-[var(--clinic)]'
-                )}
-              >
-                <span
-                  className={cn(
-                    'inline-flex h-7 w-7 items-center justify-center rounded-md',
-                    isActive
-                      ? 'bg-white/20 text-white'
-                      : 'bg-[var(--clinic-soft)] text-[var(--clinic)]'
-                  )}
-                >
-                  <item.icon className="h-4 w-4" />
-                </span>
-                {item.label}
-              </Link>
-            );
-          })}
-          {isPlatformAdmin ? (
-            <Link
-              href="/superadmin"
-              prefetch
-              onClick={() => setSidebarOpen(false)}
-              className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
-                pathname.startsWith('/superadmin')
-                  ? 'bg-[var(--clinic)] text-white shadow-sm'
-                  : 'text-[var(--shell-text)] hover:bg-[var(--clinic-soft)] hover:text-[var(--clinic)]'
-              )}
-            >
-              <span className="inline-flex h-7 w-7 items-center justify-center rounded-md bg-[var(--clinic-soft)] text-[var(--clinic)]">
-                <Shield className="h-4 w-4" />
-              </span>
-              Superadmin
-            </Link>
-          ) : null}
-        </nav>
+        <ClinicSidebarNav
+          entitledHrefs={entitledHrefs}
+          showMySettlementsNav={showMySettlementsNav}
+          isPlatformAdmin={isPlatformAdmin}
+          pendingHref={pendingHref}
+          onNavigate={(href, isActive) => {
+            if (!isActive) setPendingHref(href);
+            setSidebarOpen(false);
+          }}
+        />
 
         <div className="border-t p-3" style={{ borderColor: 'var(--shell-border)' }}>
           <div className="mb-2 px-3">
