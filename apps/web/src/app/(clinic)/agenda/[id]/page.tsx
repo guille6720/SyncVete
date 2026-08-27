@@ -1,6 +1,11 @@
 import { notFound, redirect } from 'next/navigation';
 import { formatDateParam, buildSettlementDetailBasePath } from '@sincvete/shared';
-import { getAppointment, canReadAppointments, canManageAppointments } from '@/actions/appointments';
+import {
+  getAppointment,
+  canReadAppointments,
+  canManageAppointments,
+  listAppointmentStatusEvents,
+} from '@/actions/appointments';
 import { canManageConsultations, getConsultationByAppointment } from '@/actions/consultations';
 import { canSendWhatsApp } from '@/actions/whatsapp';
 import { canManageWaitingRoom, canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
@@ -33,10 +38,12 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
 
   if (!appointment) notFound();
 
-  const settlementClaim =
+  const [settlementClaim, statusEvents] = await Promise.all([
     settlementAccess && appointment.status === 'completada'
-      ? await getSettlementClaimForSource('appointment', appointment.id)
-      : null;
+      ? getSettlementClaimForSource('appointment', appointment.id)
+      : Promise.resolve(null),
+    listAppointmentStatusEvents(id).catch(() => []),
+  ]);
   const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   let waitingRoomStatus = null;
@@ -58,6 +65,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       waitingRoomStatus={waitingRoomStatus}
       settlementClaim={settlementClaim}
       settlementDetailBasePath={settlementDetailBasePath}
+      statusEvents={statusEvents}
     />
   );
 }

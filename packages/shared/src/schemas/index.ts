@@ -1,5 +1,13 @@
 import { z } from 'zod';
 import { ROLES } from '../constants';
+import {
+  APPOINTMENT_STATUSES,
+  APPOINTMENT_TYPES,
+  CONSULTATION_MODES,
+  TIME_BLOCK_KINDS,
+  WAITLIST_STATUSES,
+} from '../constants/appointments';
+import { PAYMENT_METHODS } from '../constants/billing';
 import { NOTIFICATION_KINDS } from '../constants/notifications';
 
 export const emailSchema = z
@@ -274,6 +282,33 @@ const optionalDateTime = z
   .min(1, 'Fecha y hora requeridas')
   .refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha y hora inválidas');
 
+const optionalFormBoolean = z
+  .union([
+    z.boolean(),
+    z.literal('on'),
+    z.literal('true'),
+    z.literal('false'),
+    z.literal('1'),
+    z.literal('0'),
+    z.literal(''),
+    z.null(),
+  ])
+  .optional()
+  .transform((v) => {
+    if (v === undefined || v === null || v === '') return undefined;
+    if (v === true || v === 'on' || v === 'true' || v === '1') return true;
+    return false;
+  });
+
+const optionalTimeOfDay = z
+  .string()
+  .regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Hora inválida')
+  .optional()
+  .or(z.literal(''))
+  .transform((v) => (v === '' || v === undefined ? undefined : v.length === 5 ? `${v}:00` : v));
+
+const dateParamSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida');
+
 export const appointmentSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
   ownerId: z.string().uuid('Propietario inválido'),
@@ -283,9 +318,7 @@ export const appointmentSchema = z.object({
     .transform((v) => (v === '' ? undefined : v)),
   startsAt: optionalDateTime,
   durationMinutes: z.coerce.number().int().min(5).max(480).default(30),
-  appointmentType: z
-    .enum(['consulta', 'vacunacion', 'cirugia', 'control', 'emergencia', 'otro'])
-    .default('consulta'),
+  appointmentType: z.enum(APPOINTMENT_TYPES).default('consulta'),
   title: z
     .string()
     .max(200)
@@ -302,10 +335,75 @@ export const appointmentSchema = z.object({
     .union([z.string().uuid('Sucursal inválida'), z.literal('')])
     .optional()
     .transform((v) => (v === '' ? undefined : v)),
-  status: z
-    .enum(['programada', 'confirmada', 'en_curso', 'completada', 'cancelada', 'ausente'])
-    .optional(),
+  status: z.enum(APPOINTMENT_STATUSES).optional(),
   cancellationReason: z
+    .string()
+    .max(500)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? undefined : v)),
+  consultationMode: z
+    .union([z.enum(CONSULTATION_MODES), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' || v === undefined ? undefined : v)),
+  expectedPaymentMethod: z
+    .union([z.enum(PAYMENT_METHODS), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' || v === undefined ? undefined : v)),
+  room: z
+    .string()
+    .max(80)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? undefined : v)),
+  remind24h: optionalFormBoolean,
+  remind2h: optionalFormBoolean,
+  remindConfirmation: optionalFormBoolean,
+});
+
+export const appointmentListSchema = z.object({
+  weekStart: dateParamSchema.optional(),
+  from: dateParamSchema.optional(),
+  to: dateParamSchema.optional(),
+  query: z
+    .string()
+    .max(200)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? undefined : v)),
+  view: z.enum(['day', 'week', 'month', 'agenda']).optional(),
+  branchId: z.string().uuid().optional(),
+  status: z.enum(APPOINTMENT_STATUSES).optional(),
+  assignedUserId: z.string().uuid().optional(),
+});
+
+export const professionalScheduleSchema = z.object({
+  id: z.string().uuid().optional(),
+  branchId: z.string().uuid('Sucursal inválida'),
+  userId: z.string().uuid('Profesional inválido'),
+  weekday: z.coerce.number().int().min(1).max(7),
+  startTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Hora de inicio inválida'),
+  endTime: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/, 'Hora de fin inválida'),
+  slotDurationMinutes: z.coerce.number().int().min(5).max(480).default(30),
+  allowedAppointmentTypes: z.array(z.enum(APPOINTMENT_TYPES)).optional(),
+  isActive: z.coerce.boolean().default(true),
+});
+
+export const professionalScheduleListSchema = z.object({
+  branchId: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
+});
+
+export const professionalTimeBlockSchema = z.object({
+  branchId: z.string().uuid('Sucursal inválida'),
+  startsAt: optionalDateTime,
+  endsAt: optionalDateTime,
+  kind: z.enum(TIME_BLOCK_KINDS).default('blocked'),
+  userId: z
+    .union([z.string().uuid('Profesional inválido'), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  reason: z
     .string()
     .max(500)
     .optional()
@@ -313,17 +411,95 @@ export const appointmentSchema = z.object({
     .transform((v) => (v === '' ? undefined : v)),
 });
 
-export const appointmentListSchema = z.object({
-  weekStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+const optionalFilterDateTime = z
+  .string()
+  .refine((v) => !Number.isNaN(Date.parse(v)), 'Fecha y hora inválidas')
+  .optional();
+
+export const professionalTimeBlockListSchema = z.object({
   branchId: z.string().uuid().optional(),
-  status: z
-    .enum(['programada', 'confirmada', 'en_curso', 'completada', 'cancelada', 'ausente'])
-    .optional(),
-  assignedUserId: z.string().uuid().optional(),
+  userId: z.string().uuid().optional(),
+  from: optionalFilterDateTime,
+  to: optionalFilterDateTime,
+});
+
+export const waitlistEntrySchema = z.object({
+  branchId: z.string().uuid('Sucursal inválida'),
+  ownerId: z.string().uuid('Propietario inválido'),
+  patientId: z.string().uuid('Paciente inválido'),
+  appointmentType: z.enum(APPOINTMENT_TYPES).default('consulta'),
+  preferredUserId: z
+    .union([z.string().uuid('Profesional inválido'), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  preferredWeekdays: z
+    .union([
+      z.array(z.coerce.number().int().min(1).max(7)),
+      z.string(),
+      z.literal(''),
+    ])
+    .optional()
+    .transform((v) => {
+      if (v === undefined || v === '') return undefined;
+      if (Array.isArray(v)) return v;
+      return v
+        .split(',')
+        .map((part) => Number(part.trim()))
+        .filter((n) => Number.isInteger(n) && n >= 1 && n <= 7);
+    }),
+  preferredTimeStart: optionalTimeOfDay,
+  preferredTimeEnd: optionalTimeOfDay,
+  priority: z.coerce.number().int().min(0).max(100).default(0),
+  notes: z
+    .string()
+    .max(2000)
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? undefined : v)),
+});
+
+export const waitlistListSchema = z.object({
+  branchId: z.string().uuid().optional(),
+  status: z.enum(WAITLIST_STATUSES).optional(),
+});
+
+export const waitlistStatusUpdateSchema = z.object({
+  id: z.string().uuid('Entrada inválida'),
+  status: z.enum(WAITLIST_STATUSES),
+  matchedAppointmentId: z
+    .union([z.string().uuid('Cita inválida'), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+});
+
+export const waitlistMatchSchema = z.object({
+  startsAt: optionalDateTime,
+  endsAt: optionalDateTime,
+  branchId: z.string().uuid('Sucursal inválida'),
+  assignedUserId: z
+    .union([z.string().uuid('Profesional inválido'), z.literal('')])
+    .optional()
+    .transform((v) => (v === '' ? undefined : v)),
+  appointmentType: z.enum(APPOINTMENT_TYPES).optional(),
+});
+
+export const appointmentRescheduleSchema = z.object({
+  id: z.string().uuid('Cita inválida'),
+  startsAt: optionalDateTime,
+  durationMinutes: z.coerce.number().int().min(5).max(480).default(30),
 });
 
 export type AppointmentInput = z.infer<typeof appointmentSchema>;
 export type AppointmentListInput = z.infer<typeof appointmentListSchema>;
+export type ProfessionalScheduleInput = z.infer<typeof professionalScheduleSchema>;
+export type ProfessionalScheduleListInput = z.infer<typeof professionalScheduleListSchema>;
+export type ProfessionalTimeBlockInput = z.infer<typeof professionalTimeBlockSchema>;
+export type ProfessionalTimeBlockListInput = z.infer<typeof professionalTimeBlockListSchema>;
+export type WaitlistEntryInput = z.infer<typeof waitlistEntrySchema>;
+export type WaitlistListInput = z.infer<typeof waitlistListSchema>;
+export type WaitlistStatusUpdateInput = z.infer<typeof waitlistStatusUpdateSchema>;
+export type WaitlistMatchInput = z.infer<typeof waitlistMatchSchema>;
+export type AppointmentRescheduleInput = z.infer<typeof appointmentRescheduleSchema>;
 
 const optionalClinicalNumber = z
   .union([z.literal(''), z.coerce.number()])

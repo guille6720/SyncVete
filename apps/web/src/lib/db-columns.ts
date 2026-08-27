@@ -22,7 +22,7 @@ export const PRESCRIPTION_ITEM_COLUMNS =
   'id, organization_id, prescription_id, inventory_product_id, medication_name, dose, frequency, duration, route, quantity, instructions, sort_order, created_at, updated_at, deleted_at';
 
 export const APPOINTMENT_COLUMNS =
-  'id, organization_id, branch_id, patient_id, owner_id, assigned_user_id, starts_at, ends_at, status, appointment_type, title, notes, cancellation_reason, created_at, updated_at, deleted_at';
+  'id, organization_id, branch_id, patient_id, owner_id, assigned_user_id, starts_at, ends_at, status, appointment_type, title, notes, cancellation_reason, consultation_mode, expected_payment_method, room, remind_24h, remind_2h, remind_confirmation, created_at, updated_at, deleted_at';
 
 export const CONSULTATION_COLUMNS =
   'id, organization_id, branch_id, patient_id, owner_id, appointment_id, clinical_entry_id, veterinarian_id, status, started_at, completed_at, title, anamnesis, physical_exam, diagnosis, treatment, plan, weight_kg, temperature_c, notes, created_at, updated_at, deleted_at';

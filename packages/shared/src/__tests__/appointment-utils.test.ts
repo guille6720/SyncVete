@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildAppointmentDayMetrics,
   computeEndTime,
   formatDateParam,
   fromLocalDateTimeInput,
   getDurationMinutes,
   getWeekDays,
   getWeekStartDate,
+  groupAppointmentsByAssignee,
+  groupAppointmentsByDay,
+  isActiveAppointmentStatus,
   parseDateParam,
 } from '../utils/appointments';
+import { appointmentStatusLabelForOps } from '../constants/appointments';
 
 describe('appointment utils', () => {
   it('parses date param with fallback', () => {
@@ -37,5 +42,71 @@ describe('appointment utils', () => {
 
   it('formats date param', () => {
     expect(formatDateParam(new Date('2024-08-15T15:00:00.000Z'))).toMatch(/2024/);
+  });
+
+  it('detects active appointment statuses', () => {
+    expect(isActiveAppointmentStatus('programada')).toBe(true);
+    expect(isActiveAppointmentStatus('confirmada')).toBe(true);
+    expect(isActiveAppointmentStatus('en_curso')).toBe(true);
+    expect(isActiveAppointmentStatus('completada')).toBe(true);
+    expect(isActiveAppointmentStatus('cancelada')).toBe(false);
+    expect(isActiveAppointmentStatus('ausente')).toBe(false);
+  });
+
+  it('builds day metrics', () => {
+    const metrics = buildAppointmentDayMetrics([
+      { status: 'programada', starts_at: '2024-08-15T12:00:00.000Z' },
+      { status: 'confirmada', starts_at: '2024-08-15T13:00:00.000Z' },
+      { status: 'en_curso', starts_at: '2024-08-15T14:00:00.000Z' },
+      { status: 'completada', starts_at: '2024-08-15T15:00:00.000Z' },
+      { status: 'cancelada', starts_at: '2024-08-15T16:00:00.000Z' },
+      { status: 'ausente', starts_at: '2024-08-15T17:00:00.000Z' },
+    ]);
+    expect(metrics).toEqual({
+      total: 6,
+      active: 4,
+      programada: 1,
+      confirmada: 1,
+      enCurso: 1,
+      completada: 1,
+      cancelada: 1,
+      ausente: 1,
+    });
+  });
+
+  it('groups appointments by day and assignee', () => {
+    const entries = [
+      {
+        id: '1',
+        status: 'programada' as const,
+        starts_at: '2024-08-15T12:00:00.000Z',
+        assigned_user_id: 'u1',
+      },
+      {
+        id: '2',
+        status: 'confirmada' as const,
+        starts_at: '2024-08-16T12:00:00.000Z',
+        assigned_user_id: null,
+      },
+      {
+        id: '3',
+        status: 'en_curso' as const,
+        starts_at: '2024-08-15T15:00:00.000Z',
+        assigned_user_id: 'u1',
+      },
+    ];
+
+    const byDay = groupAppointmentsByDay(entries);
+    expect(Object.keys(byDay).length).toBeGreaterThanOrEqual(2);
+    expect(byDay[formatDateParam(new Date(entries[0].starts_at))]).toHaveLength(2);
+
+    const byAssignee = groupAppointmentsByAssignee(entries);
+    expect(byAssignee.u1).toHaveLength(2);
+    expect(byAssignee.unassigned).toHaveLength(1);
+  });
+
+  it('maps ops status labels', () => {
+    expect(appointmentStatusLabelForOps('programada')).toBe('Programada');
+    expect(appointmentStatusLabelForOps('ausente')).toBe('Ausente');
   });
 });

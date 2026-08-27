@@ -1,6 +1,9 @@
 import { APP_TIMEZONE } from '../constants';
+import type { AppointmentStatus } from '../constants/appointments';
+import type { AppointmentDashboardMetrics } from '../types/appointments';
 
 const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const INACTIVE_APPOINTMENT_STATUSES = new Set<AppointmentStatus>(['cancelada', 'ausente']);
 
 export function parseDateParam(dateStr?: string): string {
   if (dateStr && DATE_PARAM_REGEX.test(dateStr)) {
@@ -124,4 +127,83 @@ export function getDurationMinutes(startIso: string, endIso: string): number {
     return 30;
   }
   return Math.round((end - start) / 60_000);
+}
+
+export function isActiveAppointmentStatus(status: AppointmentStatus | string): boolean {
+  return !INACTIVE_APPOINTMENT_STATUSES.has(status as AppointmentStatus);
+}
+
+type AppointmentMetricEntry = {
+  status: AppointmentStatus | string;
+  starts_at: string;
+  assigned_user_id?: string | null;
+};
+
+export function buildAppointmentDayMetrics(
+  entries: AppointmentMetricEntry[]
+): AppointmentDashboardMetrics {
+  const metrics: AppointmentDashboardMetrics = {
+    total: entries.length,
+    active: 0,
+    programada: 0,
+    confirmada: 0,
+    enCurso: 0,
+    completada: 0,
+    cancelada: 0,
+    ausente: 0,
+  };
+
+  for (const entry of entries) {
+    if (isActiveAppointmentStatus(entry.status)) {
+      metrics.active += 1;
+    }
+    switch (entry.status) {
+      case 'programada':
+        metrics.programada += 1;
+        break;
+      case 'confirmada':
+        metrics.confirmada += 1;
+        break;
+      case 'en_curso':
+        metrics.enCurso += 1;
+        break;
+      case 'completada':
+        metrics.completada += 1;
+        break;
+      case 'cancelada':
+        metrics.cancelada += 1;
+        break;
+      case 'ausente':
+        metrics.ausente += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return metrics;
+}
+
+export function groupAppointmentsByDay<T extends { starts_at: string }>(
+  entries: T[]
+): Record<string, T[]> {
+  const grouped: Record<string, T[]> = {};
+  for (const entry of entries) {
+    const day = formatDateParam(new Date(entry.starts_at));
+    if (!grouped[day]) grouped[day] = [];
+    grouped[day].push(entry);
+  }
+  return grouped;
+}
+
+export function groupAppointmentsByAssignee<
+  T extends { assigned_user_id?: string | null },
+>(entries: T[]): Record<string, T[]> {
+  const grouped: Record<string, T[]> = {};
+  for (const entry of entries) {
+    const key = entry.assigned_user_id ?? 'unassigned';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(entry);
+  }
+  return grouped;
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, CalendarPlus, MessageCircle, Pencil, Stethoscope, Trash2 } from 'lucide-react';
@@ -11,11 +12,17 @@ import { WaitingRoomCheckInQrButton } from '@/components/waiting-room/waiting-ro
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ModalShell } from '@/components/ui/modal-shell';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
 import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_STATUS_VARIANT,
   APPOINTMENT_TYPE_LABELS,
+  CONSULTATION_MODE_LABELS,
+  PAYMENT_METHOD_LABELS,
   WAITING_ROOM_STATUS_LABELS,
   WAITING_ROOM_STATUS_VARIANT,
   formatAppointmentDateTime,
@@ -23,6 +30,9 @@ import {
   buildWhatsAppComposePath,
   type AppointmentListRow,
   type AppointmentStatus,
+  type AppointmentStatusEvent,
+  type ConsultationMode,
+  type PaymentMethod,
   type SettlementSourceClaimInfo,
   type WaitingRoomStatus,
 } from '@sincvete/shared';
@@ -38,6 +48,7 @@ interface AppointmentDetailProps {
   waitingRoomStatus?: WaitingRoomStatus | null;
   settlementClaim?: SettlementSourceClaimInfo | null;
   settlementDetailBasePath?: string;
+  statusEvents?: AppointmentStatusEvent[];
 }
 
 const STATUS_ACTIONS: Partial<
@@ -55,6 +66,12 @@ const STATUS_ACTIONS: Partial<
   en_curso: [{ label: 'Completar', next: 'completada' }],
 };
 
+type DialogState =
+  | { type: 'status'; status: AppointmentStatus }
+  | { type: 'delete' }
+  | { type: 'alert'; message: string }
+  | null;
+
 export function AppointmentDetail({
   appointment,
   canWrite,
@@ -65,9 +82,13 @@ export function AppointmentDetail({
   waitingRoomStatus = null,
   settlementClaim = null,
   settlementDetailBasePath = '/liquidaciones',
+  statusEvents = [],
 }: AppointmentDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
+  const [dialog, setDialog] = useState<DialogState>(null);
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
   const actions = STATUS_ACTIONS[appointment.status] ?? [];
   const canCheckIn =
     canCheckInWaitingRoom &&
@@ -77,18 +98,20 @@ export function AppointmentDetail({
 
   const handleStatusChange = (status: AppointmentStatus) => {
     if (status === 'cancelada') {
-      const reason = prompt('Motivo de cancelación (opcional)');
-      if (reason === null) return;
-      void runPending(async () => {
-        await updateAppointmentStatus(appointment.id, status, reason || undefined);
-        router.refresh();
-      });
+      setCancelReason('');
+      setCancelOpen(true);
       return;
     }
+    setDialog({ type: 'status', status });
+  };
 
-    if (!confirm(`¿Cambiar estado a "${APPOINTMENT_STATUS_LABELS[status]}"?`)) return;
+  const confirmStatus = (status: AppointmentStatus, reason?: string) => {
     void runPending(async () => {
-      await updateAppointmentStatus(appointment.id, status);
+      const result = await updateAppointmentStatus(appointment.id, status, reason);
+      if (!result.success) {
+        setDialog({ type: 'alert', message: result.error ?? 'No se pudo actualizar el estado' });
+        return;
+      }
       router.refresh();
     });
   };
@@ -97,7 +120,10 @@ export function AppointmentDetail({
     void runPending(async () => {
       const result = await startConsultationFromAppointment(appointment.id);
       if (result && !result.success) {
-        alert(result.error ?? 'No se pudo iniciar la consulta');
+        setDialog({
+          type: 'alert',
+          message: result.error ?? 'No se pudo iniciar la consulta',
+        });
       }
     });
   };
@@ -106,7 +132,7 @@ export function AppointmentDetail({
     void runPending(async () => {
       const result = await checkInAppointment(appointment.id);
       if (!result.success) {
-        alert(result.error ?? 'No se pudo hacer check-in');
+        setDialog({ type: 'alert', message: result.error ?? 'No se pudo hacer check-in' });
         return;
       }
       router.push('/sala-espera');
@@ -114,15 +140,91 @@ export function AppointmentDetail({
   };
 
   const handleDelete = () => {
-    if (!confirm('¿Eliminar esta cita?')) return;
     void runPending(async () => {
       const result = await deleteAppointment(appointment.id);
+      if (!result.success) {
+        setDialog({ type: 'alert', message: result.error ?? 'No se pudo eliminar la cita' });
+        return;
+      }
       if (result.success) router.push('/agenda');
     });
   };
 
+  const paymentLabel =
+    appointment.expected_payment_method &&
+    appointment.expected_payment_method in PAYMENT_METHOD_LABELS
+      ? PAYMENT_METHOD_LABELS[appointment.expected_payment_method as PaymentMethod]
+      : appointment.expected_payment_method;
+
   return (
     <div className="space-y-4">
+      <ConfirmDialog
+        open={dialog?.type === 'status'}
+        title="Cambiar estado"
+        description={
+          dialog?.type === 'status'
+            ? `¿Cambiar estado a "${APPOINTMENT_STATUS_LABELS[dialog.status]}"?`
+            : ''
+        }
+        confirmLabel="Cambiar"
+        onClose={() => setDialog(null)}
+        onConfirm={() => {
+          if (dialog?.type === 'status') confirmStatus(dialog.status);
+        }}
+      />
+      <ConfirmDialog
+        open={dialog?.type === 'delete'}
+        title="Eliminar cita"
+        description="¿Eliminar esta cita? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="destructive"
+        onClose={() => setDialog(null)}
+        onConfirm={handleDelete}
+      />
+      <ConfirmDialog
+        open={dialog?.type === 'alert'}
+        mode="alert"
+        title="No se pudo completar"
+        description={dialog?.type === 'alert' ? dialog.message : ''}
+        onClose={() => setDialog(null)}
+      />
+
+      <ModalShell
+        open={cancelOpen}
+        titleId="detail-cancel-title"
+        title="Cancelar cita"
+        description="Podés indicar un motivo opcional."
+        onClose={() => setCancelOpen(false)}
+      >
+        <div className="mt-4 space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="detail-cancel-reason">Motivo</Label>
+            <Input
+              id="detail-cancel-reason"
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              placeholder="Ej. el tutor reprogramó"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="ghost" onClick={() => setCancelOpen(false)}>
+              Volver
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              isPending={pending}
+              onClick={() => {
+                setCancelOpen(false);
+                confirmStatus('cancelada', cancelReason || undefined);
+              }}
+            >
+              Cancelar cita
+            </Button>
+          </div>
+        </div>
+      </ModalShell>
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/agenda">
@@ -209,7 +311,7 @@ export function AppointmentDetail({
               <Button
                 variant="destructive"
                 size="sm"
-                onClick={handleDelete}
+                onClick={() => setDialog({ type: 'delete' })}
                 isPending={pending}
               >
                 {pending ? (
@@ -242,7 +344,7 @@ export function AppointmentDetail({
             </Badge>
             {waitingRoomStatus && (
               <Badge variant={WAITING_ROOM_STATUS_VARIANT[waitingRoomStatus]}>
-                {WAITING_ROOM_STATUS_LABELS[waitingRoomStatus]}
+                SE · {WAITING_ROOM_STATUS_LABELS[waitingRoomStatus]}
               </Badge>
             )}
           </div>
@@ -281,6 +383,27 @@ export function AppointmentDetail({
             }
           />
           <DetailField label="Profesional" value={appointment.assigned_user_name} />
+          {appointment.consultation_mode && (
+            <DetailField
+              label="Modalidad"
+              value={
+                CONSULTATION_MODE_LABELS[appointment.consultation_mode as ConsultationMode] ??
+                appointment.consultation_mode
+              }
+            />
+          )}
+          {appointment.room && <DetailField label="Consultorio" value={appointment.room} />}
+          {paymentLabel && <DetailField label="Pago esperado" value={paymentLabel} />}
+          <DetailField
+            label="Recordatorios"
+            value={[
+              appointment.remind_24h ? '24 h' : null,
+              appointment.remind_2h ? '2 h' : null,
+              appointment.remind_confirmation ? 'Confirmación' : null,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'Ninguno'}
+          />
           {appointment.cancellation_reason && (
             <DetailField label="Motivo cancelación" value={appointment.cancellation_reason} />
           )}
@@ -288,6 +411,52 @@ export function AppointmentDetail({
             <div className="sm:col-span-2">
               <DetailField label="Notas" value={appointment.notes} />
             </div>
+          )}
+          <div className="sm:col-span-2">
+            <Link
+              href={`/pacientes/${appointment.patient_id}/historia`}
+              className="text-sm text-primary hover:underline"
+            >
+              Ver historia clínica
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Historial de estados</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {statusEvents.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Sin eventos registrados.</p>
+          ) : (
+            <ol className="space-y-3">
+              {statusEvents.map((event) => (
+                <li key={event.id} className="border-l-2 border-muted pl-3">
+                  <p className="text-sm font-medium">
+                    {event.from_status
+                      ? `${APPOINTMENT_STATUS_LABELS[event.from_status]} → ${APPOINTMENT_STATUS_LABELS[event.to_status]}`
+                      : APPOINTMENT_STATUS_LABELS[event.to_status]}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatAppointmentDateTime(event.created_at)}
+                    {event.note ? ` · ${event.note}` : ''}
+                  </p>
+                  {(event.new_starts_at || event.previous_starts_at) && (
+                    <p className="text-xs text-muted-foreground">
+                      Horario
+                      {event.previous_starts_at
+                        ? ` ${formatAppointmentDateTime(event.previous_starts_at)}`
+                        : ''}
+                      {event.new_starts_at
+                        ? ` → ${formatAppointmentDateTime(event.new_starts_at)}`
+                        : ''}
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ol>
           )}
         </CardContent>
       </Card>

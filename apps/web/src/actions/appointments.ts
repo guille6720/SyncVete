@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import {
   appointmentListSchema,
+  appointmentRescheduleSchema,
   appointmentSchema,
   computeEndTime,
   fromLocalDateTimeInput,
@@ -10,7 +11,10 @@ import {
   type Appointment,
   type AppointmentListRow,
   type AppointmentStatus,
+  type AppointmentStatusEvent,
   type AssignableStaffMember,
+  type ConsultationMode,
+  type PaymentMethod,
   type Role,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
@@ -46,6 +50,22 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   return { success: false, error: 'Ocurrió un error inesperado' };
 }
 
+function rpcErrorMessage(error: { message?: string } | null, fallback: string): string {
+  const message = error?.message?.trim();
+  if (!message) return fallback;
+  const cleaned = message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
+  if (
+    cleaned.includes('Horario no disponible') ||
+    cleaned.includes('Horario inválido') ||
+    cleaned.length > 0
+  ) {
+    if (cleaned.includes('Horario no disponible') || cleaned.includes('Horario inválido')) {
+      return cleaned;
+    }
+  }
+  return fallback;
+}
+
 function parseAppointmentForm(formData: FormData) {
   const startsAtRaw = formData.get('startsAt');
   const startsAt =
@@ -65,7 +85,53 @@ function parseAppointmentForm(formData: FormData) {
     branchId: formData.get('branchId'),
     status: formData.get('status') || undefined,
     cancellationReason: formData.get('cancellationReason'),
+    consultationMode: formData.get('consultationMode') || undefined,
+    expectedPaymentMethod: formData.get('expectedPaymentMethod') || undefined,
+    room: formData.get('room'),
+    // Checkboxes: absent from FormData when unchecked.
+    remind24h: formData.has('remind24h'),
+    remind2h: formData.has('remind2h'),
+    remindConfirmation: formData.has('remindConfirmation'),
   });
+}
+
+function appointmentWritePayload(data: {
+  consultationMode?: ConsultationMode;
+  expectedPaymentMethod?: PaymentMethod;
+  room?: string;
+  remind24h?: boolean;
+  remind2h?: boolean;
+  remindConfirmation?: boolean;
+}) {
+  return {
+    ...(data.consultationMode !== undefined
+      ? { consultation_mode: data.consultationMode }
+      : {}),
+    ...(data.expectedPaymentMethod !== undefined
+      ? { expected_payment_method: data.expectedPaymentMethod }
+      : {}),
+    ...(data.room !== undefined ? { room: data.room } : {}),
+    ...(data.remind24h !== undefined ? { remind_24h: data.remind24h } : {}),
+    ...(data.remind2h !== undefined ? { remind_2h: data.remind2h } : {}),
+    ...(data.remindConfirmation !== undefined
+      ? { remind_confirmation: data.remindConfirmation }
+      : {}),
+  };
+}
+
+async function enqueueReminderJobsSoft(appointmentId: string) {
+  try {
+    const supabase = await createServerClient();
+    const { error } = await supabase.rpc('enqueue_appointment_reminder_jobs', {
+      p_appointment_id: appointmentId,
+    });
+    if (error) {
+      console.error('enqueue_appointment_reminder_jobs', error);
+    }
+  } catch (error) {
+    // Soft-fail: reminder enqueue must not block appointment create.
+    console.error('enqueue_appointment_reminder_jobs', error);
+  }
 }
 
 export async function listAppointments(
@@ -78,6 +144,9 @@ export async function listAppointments(
 ): Promise<AppointmentListRow[]> {
   await requirePermission('appointments:read');
   const parsed = appointmentListSchema.parse(input);
+  if (!parsed.weekStart) {
+    throw new Error('weekStart es requerido');
+  }
   const session = await getSessionContext();
   const supabase = await createServerClient();
 
@@ -86,6 +155,35 @@ export async function listAppointments(
     p_branch_id: parsed.branchId ?? session?.branchId ?? null,
     p_status: parsed.status ?? null,
     p_assigned_user_id: parsed.assignedUserId ?? null,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as AppointmentListRow[];
+}
+
+export async function listAppointmentsCalendar(input: {
+  from: string;
+  to: string;
+  branchId?: string;
+  status?: string;
+  assignedUserId?: string;
+  query?: string;
+}): Promise<AppointmentListRow[]> {
+  await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
+  const parsed = appointmentListSchema.parse(input);
+  if (!parsed.from || !parsed.to) {
+    throw new Error('from y to son requeridos');
+  }
+  const session = await getSessionContext();
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase.rpc('list_appointments_calendar', {
+    p_from: parsed.from,
+    p_to: parsed.to,
+    p_branch_id: parsed.branchId ?? session?.branchId ?? null,
+    p_status: parsed.status ?? null,
+    p_assigned_user_id: parsed.assignedUserId ?? null,
+    p_query: parsed.query ?? null,
   });
 
   if (error) throw error;
@@ -163,13 +261,19 @@ export async function createAppointment(
         title: parsed.data.title ?? null,
         notes: parsed.data.notes ?? null,
         status: 'programada',
+        ...appointmentWritePayload(parsed.data),
       })
       .select('id')
       .single();
 
     if (error) {
-      return { success: false, error: 'No se pudo crear la cita' };
+      return {
+        success: false,
+        error: rpcErrorMessage(error, 'No se pudo crear la cita'),
+      };
     }
+
+    await enqueueReminderJobsSoft(data.id);
 
     revalidateAgenda(data.id);
     revalidateDashboard();
@@ -214,11 +318,15 @@ export async function updateAppointment(
         notes: parsed.data.notes ?? null,
         status: parsed.data.status,
         cancellation_reason: parsed.data.cancellationReason ?? null,
+        ...appointmentWritePayload(parsed.data),
       })
       .eq('id', appointmentId);
 
     if (error) {
-      return { success: false, error: 'No se pudo actualizar la cita' };
+      return {
+        success: false,
+        error: rpcErrorMessage(error, 'No se pudo actualizar la cita'),
+      };
     }
 
     revalidateAgenda(appointmentId);
@@ -226,6 +334,61 @@ export async function updateAppointment(
   } catch (error) {
     return actionError(error);
   }
+}
+
+export async function rescheduleAppointment(
+  id: string,
+  startsAt: string,
+  durationMinutes: number
+): Promise<ActionResult> {
+  try {
+    await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
+    const parsed = appointmentRescheduleSchema.safeParse({ id, startsAt, durationMinutes });
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const endsAt = computeEndTime(parsed.data.startsAt, parsed.data.durationMinutes);
+    const supabase = await createServerClient();
+    const { error } = await supabase
+      .from('appointments')
+      .update({
+        starts_at: parsed.data.startsAt,
+        ends_at: endsAt,
+      })
+      .eq('id', parsed.data.id)
+      .is('deleted_at', null);
+
+    if (error) {
+      return {
+        success: false,
+        error: rpcErrorMessage(error, 'No se pudo reprogramar la cita'),
+      };
+    }
+
+    revalidateAgenda(parsed.data.id);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listAppointmentStatusEvents(
+  appointmentId: string
+): Promise<AppointmentStatusEvent[]> {
+  await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase.rpc('list_appointment_status_events', {
+    p_appointment_id: appointmentId,
+  });
+
+  if (error) throw error;
+  return (data ?? []) as AppointmentStatusEvent[];
 }
 
 export async function updateAppointmentStatus(

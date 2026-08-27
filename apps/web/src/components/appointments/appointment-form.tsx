@@ -16,7 +16,11 @@ import {
   APPOINTMENT_STATUS_LABELS,
   APPOINTMENT_TYPES,
   APPOINTMENT_TYPE_LABELS,
+  CONSULTATION_MODES,
+  CONSULTATION_MODE_LABELS,
   DEFAULT_APPOINTMENT_DURATION_MINUTES,
+  PAYMENT_METHODS,
+  PAYMENT_METHOD_LABELS,
   getDurationMinutes,
   toLocalDateTimeInput,
   type AppointmentListRow,
@@ -60,6 +64,8 @@ export function AppointmentForm({
       ? toLocalDateTimeInput(appointment.starts_at)
       : defaultStartsAt ?? toLocalDateTimeInput(new Date().toISOString());
 
+  const branchDefault = appointment?.branch_id ?? defaultBranchId ?? '';
+
   return (
     <Card>
       <CardHeader>
@@ -72,6 +78,7 @@ export function AppointmentForm({
             defaultPatientName={appointment?.patient_name ?? defaultPatientName}
             defaultOwnerId={appointment?.owner_id ?? defaultOwnerId}
             defaultOwnerName={appointment?.owner_full_name ?? defaultOwnerName}
+            defaultBranchId={branchDefault}
             error={state?.fieldErrors?.patientId?.[0] ?? state?.fieldErrors?.ownerId?.[0]}
           />
 
@@ -137,24 +144,67 @@ export function AppointmentForm({
             </div>
           </div>
 
-          {branches.length > 0 && (
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="branchId">Sucursal *</Label>
+              <Label htmlFor="consultationMode">Modalidad</Label>
               <Select
-                id="branchId"
-                name="branchId"
-                required
-                defaultValue={appointment?.branch_id ?? defaultBranchId ?? ''}
+                id="consultationMode"
+                name="consultationMode"
+                defaultValue={appointment?.consultation_mode ?? 'clinic'}
               >
-                <option value="">—</option>
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {branch.name}
+                {CONSULTATION_MODES.map((mode) => (
+                  <option key={mode} value={mode}>
+                    {CONSULTATION_MODE_LABELS[mode]}
                   </option>
                 ))}
               </Select>
             </div>
-          )}
+            <div className="space-y-2">
+              <Label htmlFor="expectedPaymentMethod">Medio de pago esperado</Label>
+              <Select
+                id="expectedPaymentMethod"
+                name="expectedPaymentMethod"
+                defaultValue={appointment?.expected_payment_method ?? ''}
+              >
+                <option value="">Sin especificar</option>
+                {PAYMENT_METHODS.map((method) => (
+                  <option key={method} value={method}>
+                    {PAYMENT_METHOD_LABELS[method]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="room">Consultorio / sala</Label>
+              <Input
+                id="room"
+                name="room"
+                defaultValue={appointment?.room ?? ''}
+                placeholder="Consultorio 1"
+              />
+            </div>
+            {branches.length > 0 && (
+              <div className="space-y-2">
+                <Label htmlFor="branchId">Sucursal *</Label>
+                <Select
+                  id="branchId"
+                  name="branchId"
+                  required
+                  defaultValue={branchDefault}
+                >
+                  <option value="">—</option>
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="title">Motivo</Label>
@@ -170,6 +220,39 @@ export function AppointmentForm({
             <Label htmlFor="notes">Notas</Label>
             <Textarea id="notes" name="notes" defaultValue={appointment?.notes ?? ''} rows={3} />
           </div>
+
+          <fieldset className="space-y-2">
+            <legend className="text-sm font-medium">Recordatorios</legend>
+            <div className="flex flex-wrap gap-4 text-sm">
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="remind24h"
+                  value="true"
+                  defaultChecked={appointment?.remind_24h ?? true}
+                />
+                Recordatorio 24 h
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="remind2h"
+                  value="true"
+                  defaultChecked={appointment?.remind_2h ?? true}
+                />
+                Recordatorio 2 h
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  name="remindConfirmation"
+                  value="true"
+                  defaultChecked={appointment?.remind_confirmation ?? true}
+                />
+                Pedir confirmación
+              </label>
+            </div>
+          </fieldset>
 
           {appointment && (
             <div className="space-y-2">
@@ -197,7 +280,9 @@ export function AppointmentForm({
 
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
           {state?.success && appointment && (
-            <p className="text-sm text-emerald-600">Cita actualizada correctamente</p>
+            <p className="text-sm text-emerald-700 dark:text-emerald-400">
+              Cita actualizada correctamente
+            </p>
           )}
 
           <div className="flex gap-2">

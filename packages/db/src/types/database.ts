@@ -57,6 +57,28 @@ export type AppointmentType =
   | 'emergencia'
   | 'otro';
 
+export type ConsultationMode = 'clinic' | 'home_visit' | 'video';
+
+export type TimeBlockKind = 'break' | 'vacation' | 'blocked';
+
+export type WaitlistStatus = 'open' | 'offered' | 'booked' | 'cancelled' | 'expired';
+
+export type AppointmentReminderJobKind =
+  | 'confirmation'
+  | 'remind_24h'
+  | 'remind_2h'
+  | 'cancellation'
+  | 'reschedule'
+  | 'professional_notify';
+
+export type AppointmentReminderJobStatus =
+  | 'pending'
+  | 'due'
+  | 'sent'
+  | 'skipped'
+  | 'failed'
+  | 'cancelled';
+
 export type WaitingRoomStatus =
   | 'waiting'
   | 'called'
@@ -2218,6 +2240,12 @@ export interface Database {
           title: string | null;
           notes: string | null;
           cancellation_reason: string | null;
+          consultation_mode: ConsultationMode | null;
+          expected_payment_method: string | null;
+          room: string | null;
+          remind_24h: boolean;
+          remind_2h: boolean;
+          remind_confirmation: boolean;
           source_system: string | null;
           source_record_id: string | null;
           import_batch_id: string | null;
@@ -2241,6 +2269,12 @@ export interface Database {
           title?: string | null;
           notes?: string | null;
           cancellation_reason?: string | null;
+          consultation_mode?: ConsultationMode | null;
+          expected_payment_method?: string | null;
+          room?: string | null;
+          remind_24h?: boolean;
+          remind_2h?: boolean;
+          remind_confirmation?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
@@ -2264,6 +2298,12 @@ export interface Database {
           title?: string | null;
           notes?: string | null;
           cancellation_reason?: string | null;
+          consultation_mode?: ConsultationMode | null;
+          expected_payment_method?: string | null;
+          room?: string | null;
+          remind_24h?: boolean;
+          remind_2h?: boolean;
+          remind_confirmation?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
@@ -2300,6 +2340,341 @@ export interface Database {
             columns: ['owner_id'];
             isOneToOne: false;
             referencedRelation: 'owners';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      professional_schedules: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          user_id: string;
+          weekday: number;
+          start_time: string;
+          end_time: string;
+          slot_duration_minutes: number;
+          allowed_appointment_types: AppointmentType[] | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          user_id: string;
+          weekday: number;
+          start_time: string;
+          end_time: string;
+          slot_duration_minutes?: number;
+          allowed_appointment_types?: AppointmentType[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          user_id?: string;
+          weekday?: number;
+          start_time?: string;
+          end_time?: string;
+          slot_duration_minutes?: number;
+          allowed_appointment_types?: AppointmentType[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'professional_schedules_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'professional_schedules_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      professional_time_blocks: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          user_id: string | null;
+          kind: TimeBlockKind;
+          starts_at: string;
+          ends_at: string;
+          reason: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          user_id?: string | null;
+          kind?: TimeBlockKind;
+          starts_at: string;
+          ends_at: string;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          user_id?: string | null;
+          kind?: TimeBlockKind;
+          starts_at?: string;
+          ends_at?: string;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'professional_time_blocks_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'professional_time_blocks_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      appointment_waitlist: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          owner_id: string;
+          patient_id: string;
+          preferred_user_id: string | null;
+          appointment_type: AppointmentType;
+          preferred_weekdays: number[] | null;
+          preferred_time_start: string | null;
+          preferred_time_end: string | null;
+          priority: number;
+          notes: string | null;
+          status: WaitlistStatus;
+          matched_appointment_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          owner_id: string;
+          patient_id: string;
+          preferred_user_id?: string | null;
+          appointment_type?: AppointmentType;
+          preferred_weekdays?: number[] | null;
+          preferred_time_start?: string | null;
+          preferred_time_end?: string | null;
+          priority?: number;
+          notes?: string | null;
+          status?: WaitlistStatus;
+          matched_appointment_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          owner_id?: string;
+          patient_id?: string;
+          preferred_user_id?: string | null;
+          appointment_type?: AppointmentType;
+          preferred_weekdays?: number[] | null;
+          preferred_time_start?: string | null;
+          preferred_time_end?: string | null;
+          priority?: number;
+          notes?: string | null;
+          status?: WaitlistStatus;
+          matched_appointment_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_waitlist_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_waitlist_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_waitlist_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'owners';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_waitlist_patient_id_fkey';
+            columns: ['patient_id'];
+            isOneToOne: false;
+            referencedRelation: 'patients';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      appointment_status_events: {
+        Row: {
+          id: string;
+          organization_id: string;
+          appointment_id: string;
+          from_status: AppointmentStatus | null;
+          to_status: AppointmentStatus;
+          previous_starts_at: string | null;
+          previous_ends_at: string | null;
+          new_starts_at: string | null;
+          new_ends_at: string | null;
+          changed_by: string | null;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          appointment_id: string;
+          from_status?: AppointmentStatus | null;
+          to_status: AppointmentStatus;
+          previous_starts_at?: string | null;
+          previous_ends_at?: string | null;
+          new_starts_at?: string | null;
+          new_ends_at?: string | null;
+          changed_by?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          appointment_id?: string;
+          from_status?: AppointmentStatus | null;
+          to_status?: AppointmentStatus;
+          previous_starts_at?: string | null;
+          previous_ends_at?: string | null;
+          new_starts_at?: string | null;
+          new_ends_at?: string | null;
+          changed_by?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_status_events_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_status_events_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      appointment_reminder_jobs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          appointment_id: string;
+          kind: AppointmentReminderJobKind;
+          status: AppointmentReminderJobStatus;
+          scheduled_for: string;
+          sent_at: string | null;
+          error: string | null;
+          payload: Json;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          appointment_id: string;
+          kind: AppointmentReminderJobKind;
+          status?: AppointmentReminderJobStatus;
+          scheduled_for: string;
+          sent_at?: string | null;
+          error?: string | null;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          appointment_id?: string;
+          kind?: AppointmentReminderJobKind;
+          status?: AppointmentReminderJobStatus;
+          scheduled_for?: string;
+          sent_at?: string | null;
+          error?: string | null;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_reminder_jobs_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_reminder_jobs_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
             referencedColumns: ['id'];
           },
         ];
@@ -6783,7 +7158,165 @@ export interface Database {
           assigned_user_name: string | null;
           created_at: string;
           updated_at: string;
+          consultation_mode: ConsultationMode | null;
+          room: string | null;
+          expected_payment_method: string | null;
+          remind_24h: boolean;
+          remind_2h: boolean;
+          remind_confirmation: boolean;
         }[];
+      };
+      list_appointments_calendar: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_branch_id?: string | null;
+          p_status?: string | null;
+          p_assigned_user_id?: string | null;
+          p_query?: string | null;
+        };
+        Returns: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          patient_id: string;
+          owner_id: string;
+          assigned_user_id: string | null;
+          starts_at: string;
+          ends_at: string;
+          status: AppointmentStatus;
+          appointment_type: AppointmentType;
+          title: string | null;
+          notes: string | null;
+          cancellation_reason: string | null;
+          patient_name: string;
+          patient_species: PatientSpecies;
+          owner_full_name: string;
+          assigned_user_name: string | null;
+          created_at: string;
+          updated_at: string;
+          consultation_mode: ConsultationMode | null;
+          room: string | null;
+          expected_payment_method: string | null;
+          remind_24h: boolean;
+          remind_2h: boolean;
+          remind_confirmation: boolean;
+        }[];
+      };
+      appointment_has_overlap: {
+        Args: {
+          p_organization_id: string;
+          p_assigned_user_id: string;
+          p_starts_at: string;
+          p_ends_at: string;
+          p_exclude_id?: string | null;
+        };
+        Returns: boolean;
+      };
+      upsert_professional_schedule: {
+        Args: {
+          p_branch_id: string;
+          p_user_id: string;
+          p_weekday: number;
+          p_start_time: string;
+          p_end_time: string;
+          p_slot_duration_minutes?: number;
+          p_allowed_appointment_types?: AppointmentType[] | null;
+          p_is_active?: boolean;
+          p_id?: string | null;
+        };
+        Returns: Json;
+      };
+      list_professional_schedules: {
+        Args: {
+          p_branch_id?: string | null;
+          p_user_id?: string | null;
+        };
+        Returns: Database['public']['Tables']['professional_schedules']['Row'][];
+      };
+      soft_delete_professional_schedule: {
+        Args: {
+          p_id: string;
+        };
+        Returns: boolean;
+      };
+      create_professional_time_block: {
+        Args: {
+          p_branch_id: string;
+          p_starts_at: string;
+          p_ends_at: string;
+          p_kind?: TimeBlockKind;
+          p_user_id?: string | null;
+          p_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      list_professional_time_blocks: {
+        Args: {
+          p_branch_id?: string | null;
+          p_user_id?: string | null;
+          p_from?: string | null;
+          p_to?: string | null;
+        };
+        Returns: Database['public']['Tables']['professional_time_blocks']['Row'][];
+      };
+      soft_delete_professional_time_block: {
+        Args: {
+          p_id: string;
+        };
+        Returns: boolean;
+      };
+      create_waitlist_entry: {
+        Args: {
+          p_branch_id: string;
+          p_owner_id: string;
+          p_patient_id: string;
+          p_appointment_type?: AppointmentType;
+          p_preferred_user_id?: string | null;
+          p_preferred_weekdays?: number[] | null;
+          p_preferred_time_start?: string | null;
+          p_preferred_time_end?: string | null;
+          p_priority?: number;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      list_waitlist: {
+        Args: {
+          p_branch_id?: string | null;
+          p_status?: WaitlistStatus | null;
+        };
+        Returns: Database['public']['Tables']['appointment_waitlist']['Row'][];
+      };
+      update_waitlist_status: {
+        Args: {
+          p_id: string;
+          p_status: WaitlistStatus;
+          p_matched_appointment_id?: string | null;
+        };
+        Returns: Json;
+      };
+      match_waitlist_for_slot: {
+        Args: {
+          p_starts_at: string;
+          p_ends_at: string;
+          p_branch_id: string;
+          p_assigned_user_id?: string | null;
+          p_appointment_type?: AppointmentType | null;
+        };
+        Returns: Database['public']['Tables']['appointment_waitlist']['Row'][];
+      };
+      enqueue_appointment_reminder_jobs: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: number;
+      };
+      list_appointment_status_events: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: Database['public']['Tables']['appointment_status_events']['Row'][];
       };
       check_in_appointment: {
         Args: {
@@ -7728,6 +8261,11 @@ export interface Database {
       patient_sex: PatientSex;
       appointment_status: AppointmentStatus;
       appointment_type: AppointmentType;
+      consultation_mode: ConsultationMode;
+      time_block_kind: TimeBlockKind;
+      waitlist_status: WaitlistStatus;
+      reminder_job_kind: AppointmentReminderJobKind;
+      reminder_job_status: AppointmentReminderJobStatus;
       waiting_room_status: WaitingRoomStatus;
       clinical_entry_type: ClinicalEntryType;
       consultation_status: ConsultationStatus;
