@@ -65,6 +65,9 @@ function rpcErrorMessage(error: { message?: string; code?: string; details?: str
   ) {
     return 'La base de datos no tiene el esquema de agenda actualizado. Pedile al equipo que aplique la migración en este entorno.';
   }
+  if (/appointments_expected_payment_method_check/i.test(cleaned)) {
+    return 'El medio de pago elegido no es válido. Probá de nuevo o elegí otra opción.';
+  }
   if (cleaned.length > 0 && cleaned.length < 220) {
     return cleaned;
   }
