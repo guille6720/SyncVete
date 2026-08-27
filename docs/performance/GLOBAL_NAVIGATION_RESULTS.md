@@ -93,17 +93,29 @@
 - Docs: `docs/performance/EXPIRE_SUBSCRIPTIONS_CRON.md`
 - **No new indexes.** No RLS policy weakening. `expire_due_subscriptions` EXECUTE revoked from `authenticated`.
 
-## Tests
+## Tests / Phase 14 quality gates (2026-08-27)
 
-| Suite | Result |
+| Gate | Command | Result | Notes |
+|---|---|---|---|
+| TypeScript web | `npm run typecheck -w @sincvete/web` | **PASS** | exit 0 |
+| TypeScript shared | `npm run typecheck -w @sincvete/shared` | **PASS** | exit 0 |
+| TypeScript db | `npm run typecheck -w @sincvete/db` | **PASS** | exit 0 |
+| Lint web | `npm run lint -w @sincvete/web` | **PASS** | exit 0 |
+| Unit web | `npm run test:unit -w @sincvete/web` | **PASS** | 3 files / **19** tests |
+| Unit shared | `npm run test:unit -w @sincvete/shared` | **PASS** | 33 files / **423** tests |
+| Integration db | `npm run test:integration -w @sincvete/db` | **PASS** | 4 passed / **57 skipped** (DB env not required for smoke skip path) |
+| E2E smoke | `npm run test:e2e -w @sincvete/web` | **PASS** | 5/5 Playwright smoke |
+| Production build | `npm run build -w @sincvete/web` | **PASS** | Next.js build ~36s, exit 0 (local `.env.local`) |
+
+### Regressions vs pre-existing
+
+| Finding | Classification |
 |---|---|
-| `agenda-performance.test.ts` | PASS (10) |
-| `clinic-sidebar-nav-catalog.test.ts` | PASS (4) |
-| `dashboard-utils.test.ts` | PASS (5) |
-| `agenda-range.test.ts` | PASS (6) |
-| `tsc --noEmit` (apps/web) | PASS |
-| Full integration / e2e against Staging DB | **NOT RUN** (no credentials here) |
-| Production build | **NOT RUN** in this pass |
+| None — all executed gates exit 0 | — |
+| 57 integration tests skipped without live DB URL | **PRE-EXISTING / env-gated** (not a regression) |
+| Full Staging Preview wall-clock QA | **OUT OF SCOPE for Phase 14 automation** (Phase 13 human) |
+
+No regressions introduced by this work were detected by Phase 14 gates.
 
 ## Security validation
 
