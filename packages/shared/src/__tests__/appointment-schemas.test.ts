@@ -55,6 +55,21 @@ describe('appointmentSchema', () => {
     }
   });
 
+  it('accepts nullish optional fields from FormData-like payloads', () => {
+    const result = appointmentSchema.safeParse({
+      patientId: validPatientId,
+      ownerId: validOwnerId,
+      startsAt: '2024-08-15T12:00:00.000Z',
+      title: null,
+      notes: null,
+      cancellationReason: null,
+      room: null,
+      consultationMode: null,
+      expectedPaymentMethod: null,
+    });
+    expect(result.success).toBe(true);
+  });
+
   it('accepts consultation mode, payment and remind flags', () => {
     const result = appointmentSchema.safeParse({
       patientId: validPatientId,

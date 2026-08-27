@@ -66,28 +66,34 @@ function rpcErrorMessage(error: { message?: string } | null, fallback: string): 
   return fallback;
 }
 
+function formString(formData: FormData, key: string): string | undefined {
+  const value = formData.get(key);
+  if (typeof value !== 'string') return undefined;
+  return value;
+}
+
 function parseAppointmentForm(formData: FormData) {
-  const startsAtRaw = formData.get('startsAt');
+  const startsAtRaw = formString(formData, 'startsAt');
   const startsAt =
-    typeof startsAtRaw === 'string' && startsAtRaw.includes('T') && !startsAtRaw.endsWith('Z')
+    startsAtRaw && startsAtRaw.includes('T') && !startsAtRaw.endsWith('Z')
       ? fromLocalDateTimeInput(startsAtRaw)
       : startsAtRaw;
 
   return appointmentSchema.safeParse({
-    patientId: formData.get('patientId'),
-    ownerId: formData.get('ownerId'),
-    assignedUserId: formData.get('assignedUserId'),
+    patientId: formString(formData, 'patientId'),
+    ownerId: formString(formData, 'ownerId'),
+    assignedUserId: formString(formData, 'assignedUserId'),
     startsAt,
-    durationMinutes: formData.get('durationMinutes') || 30,
-    appointmentType: formData.get('appointmentType') || 'consulta',
-    title: formData.get('title'),
-    notes: formData.get('notes'),
-    branchId: formData.get('branchId'),
-    status: formData.get('status') || undefined,
-    cancellationReason: formData.get('cancellationReason'),
-    consultationMode: formData.get('consultationMode') || undefined,
-    expectedPaymentMethod: formData.get('expectedPaymentMethod') || undefined,
-    room: formData.get('room'),
+    durationMinutes: formString(formData, 'durationMinutes') || 30,
+    appointmentType: formString(formData, 'appointmentType') || 'consulta',
+    title: formString(formData, 'title') ?? '',
+    notes: formString(formData, 'notes') ?? '',
+    branchId: formString(formData, 'branchId'),
+    status: formString(formData, 'status') || undefined,
+    cancellationReason: formString(formData, 'cancellationReason') ?? '',
+    consultationMode: formString(formData, 'consultationMode') || undefined,
+    expectedPaymentMethod: formString(formData, 'expectedPaymentMethod') || undefined,
+    room: formString(formData, 'room') ?? '',
     // Checkboxes: absent from FormData when unchecked.
     remind24h: formData.has('remind24h'),
     remind2h: formData.has('remind2h'),
@@ -231,10 +237,12 @@ export async function createAppointment(
     const parsed = parseAppointmentForm(formData);
 
     if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors as Record<string, string[]>;
+      const firstError = Object.values(fieldErrors).flat()[0];
       return {
         success: false,
-        error: 'Datos inválidos',
-        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+        error: firstError ?? 'Datos inválidos',
+        fieldErrors,
       };
     }
 
@@ -293,10 +301,12 @@ export async function updateAppointment(
     const parsed = parseAppointmentForm(formData);
 
     if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors as Record<string, string[]>;
+      const firstError = Object.values(fieldErrors).flat()[0];
       return {
         success: false,
-        error: 'Datos inválidos',
-        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+        error: firstError ?? 'Datos inválidos',
+        fieldErrors,
       };
     }
 
@@ -345,10 +355,12 @@ export async function rescheduleAppointment(
     await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
     const parsed = appointmentRescheduleSchema.safeParse({ id, startsAt, durationMinutes });
     if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors as Record<string, string[]>;
+      const firstError = Object.values(fieldErrors).flat()[0];
       return {
         success: false,
-        error: 'Datos inválidos',
-        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+        error: firstError ?? 'Datos inválidos',
+        fieldErrors,
       };
     }
 

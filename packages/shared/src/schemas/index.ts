@@ -322,40 +322,40 @@ export const appointmentSchema = z.object({
   title: z
     .string()
     .max(200)
-    .optional()
+    .nullish()
     .or(z.literal(''))
-    .transform((v) => (v === '' ? undefined : v)),
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   notes: z
     .string()
     .max(2000)
-    .optional()
+    .nullish()
     .or(z.literal(''))
-    .transform((v) => (v === '' ? undefined : v)),
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   branchId: z
     .union([z.string().uuid('Sucursal inválida'), z.literal('')])
-    .optional()
-    .transform((v) => (v === '' ? undefined : v)),
+    .nullish()
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   status: z.enum(APPOINTMENT_STATUSES).optional(),
   cancellationReason: z
     .string()
     .max(500)
-    .optional()
+    .nullish()
     .or(z.literal(''))
-    .transform((v) => (v === '' ? undefined : v)),
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   consultationMode: z
     .union([z.enum(CONSULTATION_MODES), z.literal('')])
-    .optional()
-    .transform((v) => (v === '' || v === undefined ? undefined : v)),
+    .nullish()
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   expectedPaymentMethod: z
     .union([z.enum(PAYMENT_METHODS), z.literal('')])
-    .optional()
-    .transform((v) => (v === '' || v === undefined ? undefined : v)),
+    .nullish()
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   room: z
     .string()
     .max(80)
-    .optional()
+    .nullish()
     .or(z.literal(''))
-    .transform((v) => (v === '' ? undefined : v)),
+    .transform((v) => (v === '' || v == null ? undefined : v)),
   remind24h: optionalFormBoolean,
   remind2h: optionalFormBoolean,
   remindConfirmation: optionalFormBoolean,
