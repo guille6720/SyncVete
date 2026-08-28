@@ -22,6 +22,7 @@ import type {
 import {
   APPOINTMENT_STATUSES,
   APPOINTMENT_STATUS_LABELS,
+  filterAssignableStaffByBranch,
   formatDateParam,
   formatDayLabel,
   getWeekStartDate,
@@ -160,6 +161,11 @@ export function AppointmentsAgenda({
   const dayAppointments = useMemo(
     () => appointments.filter((appointment) => getDayKey(appointment.starts_at) === selectedDate),
     [appointments, selectedDate]
+  );
+
+  const visibleStaff = useMemo(
+    () => filterAssignableStaffByBranch(staff, branchId || null),
+    [staff, branchId]
   );
 
   const selectedWaitingStatus = selected
@@ -434,7 +440,7 @@ export function AppointmentsAgenda({
             aria-label="Filtrar por profesional"
           >
             <option value="">Todos los profesionales</option>
-            {staff.map((member) => (
+            {visibleStaff.map((member) => (
               <option key={member.userId} value={member.userId}>
                 {member.fullName}
               </option>

@@ -47,6 +47,7 @@ describe('agenda shell capability flags', () => {
     };
 
     expect(shell.canWrite).toBe(true);
+    expect(shell.staff).toEqual([]);
     expect(shell.canCheckInWaitingRoom).toBe(false);
     expect(shell.canBilling).toBe(false);
   });

@@ -46,6 +46,8 @@ export interface AssignableStaffMember {
   userId: string;
   fullName: string;
   role: string;
+  /** Branches where this user can be assigned (from branch_members / professional_branches). */
+  branchIds: string[];
 }
 
 export interface WaitlistEntry {

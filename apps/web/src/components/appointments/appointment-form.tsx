@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { createAppointment, updateAppointment } from '@/actions/appointments';
 import { PatientPicker } from '@/components/appointments/patient-picker';
@@ -21,6 +21,7 @@ import {
   DEFAULT_APPOINTMENT_DURATION_MINUTES,
   PAYMENT_METHODS,
   PAYMENT_METHOD_LABELS,
+  filterAssignableStaffByBranch,
   getDurationMinutes,
   toLocalDateTimeInput,
   type AppointmentListRow,
@@ -65,6 +66,11 @@ export function AppointmentForm({
       : defaultStartsAt ?? toLocalDateTimeInput(new Date().toISOString());
 
   const branchDefault = appointment?.branch_id ?? defaultBranchId ?? '';
+  const [selectedBranchId, setSelectedBranchId] = useState(branchDefault);
+  const visibleStaff = useMemo(
+    () => filterAssignableStaffByBranch(staff, selectedBranchId || null),
+    [staff, selectedBranchId]
+  );
 
   return (
     <Card>
@@ -135,12 +141,18 @@ export function AppointmentForm({
                 defaultValue={appointment?.assigned_user_id ?? ''}
               >
                 <option value="">Sin asignar</option>
-                {staff.map((member) => (
+                {visibleStaff.map((member) => (
                   <option key={member.userId} value={member.userId}>
                     {member.fullName}
                   </option>
                 ))}
               </Select>
+              {visibleStaff.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
+                  No hay profesionales con usuario de la app en esta sucursal. Invitá al equipo en
+                  Configuración o vinculá un usuario en Profesionales.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -194,6 +206,7 @@ export function AppointmentForm({
                   name="branchId"
                   required
                   defaultValue={branchDefault}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
                 >
                   <option value="">—</option>
                   {branches.map((branch) => (

@@ -2,6 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import {
+  APPOINTMENT_ASSIGNABLE_ROLES,
   appointmentListSchema,
   appointmentRescheduleSchema,
   appointmentSchema,
@@ -523,33 +524,115 @@ const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => 
   if (!session) return [];
 
   const supabase = await createServerClient();
-  let query = supabase
+  type StaffRow = {
+    userId: string;
+    fullName: string;
+    role: Role;
+    branchIds: Set<string>;
+  };
+  const byUser = new Map<string, StaffRow>();
+
+  const { data: members, error: membersError } = await supabase
     .from('branch_members')
-    .select('user_id, role')
+    .select('user_id, role, branch_id')
     .eq('organization_id', session.organizationId)
     .eq('is_active', true)
-    .is('deleted_at', null);
+    .is('deleted_at', null)
+    .in('role', [...APPOINTMENT_ASSIGNABLE_ROLES]);
 
-  if (session.branchId) {
-    query = query.eq('branch_id', session.branchId);
+  if (membersError) {
+    console.warn('[appointments] assignable staff branch_members', membersError.message);
+  } else {
+    for (const member of members ?? []) {
+      const role = member.role as Role;
+      const existing = byUser.get(member.user_id);
+      if (existing) {
+        existing.branchIds.add(member.branch_id);
+      } else {
+        byUser.set(member.user_id, {
+          userId: member.user_id,
+          fullName: '',
+          role,
+          branchIds: new Set([member.branch_id]),
+        });
+      }
+    }
   }
 
-  const { data: members, error } = await query;
-  if (error || !members?.length) return [];
+  const { data: linkedProfessionals, error: prosError } = await supabase
+    .from('professionals')
+    .select('id, user_id, first_name, last_name')
+    .eq('organization_id', session.organizationId)
+    .eq('is_active', true)
+    .is('deleted_at', null)
+    .not('user_id', 'is', null);
 
-  const userIds = [...new Set(members.map((m) => m.user_id))];
-  const { data: profiles } = await supabase
+  if (prosError) {
+    console.warn('[appointments] assignable staff professionals', prosError.message);
+  } else if (linkedProfessionals?.length) {
+    const proIds = linkedProfessionals.map((row) => row.id);
+    const { data: proBranches, error: proBranchesError } = await supabase
+      .from('professional_branches')
+      .select('professional_id, branch_id')
+      .in('professional_id', proIds)
+      .eq('is_active', true)
+      .is('deleted_at', null);
+
+    if (proBranchesError) {
+      console.warn('[appointments] assignable staff professional_branches', proBranchesError.message);
+    }
+
+    const branchesByPro = new Map<string, string[]>();
+    for (const row of proBranches ?? []) {
+      const list = branchesByPro.get(row.professional_id) ?? [];
+      list.push(row.branch_id);
+      branchesByPro.set(row.professional_id, list);
+    }
+
+    for (const pro of linkedProfessionals) {
+      if (!pro.user_id) continue;
+      const branchIds = branchesByPro.get(pro.id) ?? [];
+      const proName = `${pro.first_name ?? ''} ${pro.last_name ?? ''}`.trim();
+      const existing = byUser.get(pro.user_id);
+      if (existing) {
+        for (const branchId of branchIds) existing.branchIds.add(branchId);
+        if (!existing.fullName && proName) existing.fullName = proName;
+      } else {
+        byUser.set(pro.user_id, {
+          userId: pro.user_id,
+          fullName: proName,
+          role: 'veterinarian',
+          branchIds: new Set(branchIds),
+        });
+      }
+    }
+  }
+
+  if (byUser.size === 0) return [];
+
+  const userIds = [...byUser.keys()];
+  const { data: profiles, error: profilesError } = await supabase
     .from('profiles')
     .select('id, full_name')
     .in('id', userIds);
 
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p.full_name]));
+  if (profilesError) {
+    console.warn('[appointments] assignable staff profiles', profilesError.message);
+  } else {
+    for (const profile of profiles ?? []) {
+      const row = byUser.get(profile.id);
+      if (row && profile.full_name) row.fullName = profile.full_name;
+    }
+  }
 
-  return members.map((member) => ({
-    userId: member.user_id,
-    fullName: profileMap.get(member.user_id) ?? 'Sin nombre',
-    role: member.role as Role,
-  }));
+  return [...byUser.values()]
+    .map((row) => ({
+      userId: row.userId,
+      fullName: row.fullName || 'Sin nombre',
+      role: row.role,
+      branchIds: [...row.branchIds],
+    }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
 });
 
 export async function getAssignableStaff(): Promise<AssignableStaffMember[]> {

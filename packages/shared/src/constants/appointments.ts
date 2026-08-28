@@ -24,6 +24,16 @@ export const CONSULTATION_MODES = ['clinic', 'home_visit', 'video'] as const;
 
 export type ConsultationMode = (typeof CONSULTATION_MODES)[number];
 
+/** Roles that may appear as assignees on appointments (branch_members.user_id). */
+export const APPOINTMENT_ASSIGNABLE_ROLES = [
+  'owner',
+  'admin',
+  'veterinarian',
+  'nurse',
+] as const;
+
+export type AppointmentAssignableRole = (typeof APPOINTMENT_ASSIGNABLE_ROLES)[number];
+
 export const CONSULTATION_MODE_LABELS: Record<ConsultationMode, string> = {
   clinic: 'En clínica',
   home_visit: 'Domicilio',

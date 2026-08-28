@@ -9,6 +9,7 @@ import {
   getWeekStartDate,
   groupAppointmentsByAssignee,
   groupAppointmentsByDay,
+  filterAssignableStaffByBranch,
   isActiveAppointmentStatus,
   parseDateParam,
 } from '../utils/appointments';
@@ -108,5 +109,15 @@ describe('appointment utils', () => {
   it('maps ops status labels', () => {
     expect(appointmentStatusLabelForOps('programada')).toBe('Programada');
     expect(appointmentStatusLabelForOps('ausente')).toBe('Ausente');
+  });
+
+  it('filters assignable staff by branch', () => {
+    const staff = [
+      { userId: 'u1', fullName: 'Ana', role: 'veterinarian', branchIds: ['b1'] },
+      { userId: 'u2', fullName: 'Bruno', role: 'veterinarian', branchIds: ['b2'] },
+      { userId: 'u3', fullName: 'Carla', role: 'veterinarian', branchIds: [] },
+    ];
+    expect(filterAssignableStaffByBranch(staff, 'b1').map((m) => m.userId)).toEqual(['u1', 'u3']);
+    expect(filterAssignableStaffByBranch(staff, null)).toHaveLength(3);
   });
 });

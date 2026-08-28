@@ -1,6 +1,6 @@
 import { APP_TIMEZONE } from '../constants';
 import type { AppointmentStatus } from '../constants/appointments';
-import type { AppointmentDashboardMetrics } from '../types/appointments';
+import type { AppointmentDashboardMetrics, AssignableStaffMember } from '../types/appointments';
 
 const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const INACTIVE_APPOINTMENT_STATUSES = new Set<AppointmentStatus>(['cancelada', 'ausente']);
@@ -301,4 +301,15 @@ export function resolveAgendaCalendarRange(input: {
     month,
     view,
   };
+}
+
+/** Filter assignable staff to a branch; members without branchIds apply to all branches. */
+export function filterAssignableStaffByBranch(
+  staff: AssignableStaffMember[],
+  branchId?: string | null
+): AssignableStaffMember[] {
+  if (!branchId) return staff;
+  return staff.filter(
+    (member) => member.branchIds.length === 0 || member.branchIds.includes(branchId)
+  );
 }
