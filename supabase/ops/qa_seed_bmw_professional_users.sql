@@ -54,6 +54,18 @@ BEGIN
     FROM auth.users
     WHERE lower(email) = lower(v_email);
 
+    -- Never reuse org owner accounts (e.g. Guille) if email lookup fails but user_id was wrong.
+    IF v_user_id IS NOT NULL AND EXISTS (
+      SELECT 1
+      FROM public.branch_members bm
+      WHERE bm.user_id = v_user_id
+        AND bm.organization_id = v_org_id
+        AND bm.role = 'owner'
+        AND bm.deleted_at IS NULL
+    ) THEN
+      v_user_id := NULL;
+    END IF;
+
     IF v_user_id IS NULL THEN
       v_user_id := gen_random_uuid();
 
