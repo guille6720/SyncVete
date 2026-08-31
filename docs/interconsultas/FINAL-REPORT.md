@@ -9,7 +9,7 @@ Not full PASS because: migration not yet applied to Staging Supabase in this ses
 ## Git
 - Base branch: `staging/perf-phase-2-session`
 - Feature branch: `feature/interconsultas-staging`
-- Final commit SHA: *(see latest commit on feature branch after commit)*
+- Final commit SHA: `63d6333419f05bff799116d56837b9af7e311b1e`
 
 ## Database
 - Migrations added: `supabase/migrations/20260831120000_interconsultations_module.sql`
