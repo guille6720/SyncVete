@@ -191,6 +191,7 @@ export type SettlementItemSourceType =
   | 'lab_order'
   | 'prescription'
   | 'vaccination'
+  | 'interconsultation'
   | 'manual_adjustment'
   | 'fixed_compensation';
 

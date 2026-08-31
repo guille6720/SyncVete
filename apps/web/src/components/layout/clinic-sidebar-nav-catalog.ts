@@ -13,6 +13,7 @@ import {
   Inbox,
   LayoutDashboard,
   MessageCircle,
+  MessagesSquare,
   Package,
   PawPrint,
   Pill,
@@ -69,6 +70,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Caja', href: '/caja', icon: Banknote, groupId: 'management' },
 
   { label: 'Profesionales', href: '/profesionales', icon: Briefcase, groupId: 'professionals' },
+  { label: 'Interconsultas', href: '/interconsultas', icon: MessagesSquare, groupId: 'professionals' },
   { label: 'Liquidaciones', href: '/liquidaciones', icon: Wallet, groupId: 'professionals' },
   {
     label: 'Mis liquidaciones',

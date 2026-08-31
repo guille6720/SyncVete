@@ -11,6 +11,7 @@ const PUBLIC_ROUTES = [
   '/auth/callback',
   '/portal/activar',
   '/check-in',
+  '/interconsulta/responder',
   '/recuperar-contrasena',
   '/actualizar-contrasena',
   '/manifest.webmanifest',

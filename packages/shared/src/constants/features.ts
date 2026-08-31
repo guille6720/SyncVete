@@ -42,6 +42,7 @@ export const FEATURES = {
   DATA_IMPORT_EXPORT: 'data.import_export',
 
   PROFESSIONALS_SETTLEMENTS: 'professionals.settlements',
+  PROFESSIONALS_INTERCONSULTATIONS: 'professionals.interconsultations',
 
   AI: 'ai.enabled',
   AI_PATIENT_SUMMARY: 'ai.patient_summary',
@@ -111,6 +112,7 @@ export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/auditoria': FEATURES.AUDIT,
   '/ia-clinica': FEATURES.AI,
   '/profesionales': FEATURES.PROFESSIONALS_SETTLEMENTS,
+  '/interconsultas': FEATURES.PROFESSIONALS_INTERCONSULTATIONS,
   '/liquidaciones': FEATURES.PROFESSIONALS_SETTLEMENTS,
   '/liquidaciones/mis-liquidaciones': FEATURES.PROFESSIONALS_SETTLEMENTS,
 };

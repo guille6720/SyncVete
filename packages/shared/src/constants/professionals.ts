@@ -131,6 +131,7 @@ export const SETTLEMENT_ITEM_SOURCE_TYPES = [
   'lab_order',
   'prescription',
   'vaccination',
+  'interconsultation',
   'manual_adjustment',
   'fixed_compensation',
 ] as const;
@@ -146,6 +147,7 @@ export const SETTLEMENT_ITEM_SOURCE_TYPE_LABELS: Record<SettlementItemSourceType
   lab_order: 'Laboratorio',
   prescription: 'Receta',
   vaccination: 'Vacunación',
+  interconsultation: 'Interconsulta',
   manual_adjustment: 'Ajuste manual',
   fixed_compensation: 'Compensación fija',
 };

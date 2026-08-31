@@ -1420,3 +1420,4 @@ export type WaitingRoomRemoveInput = z.infer<typeof waitingRoomRemoveSchema>;
 export type WaitingRoomNotesInput = z.infer<typeof waitingRoomNotesSchema>;
 
 export * from './professionals';
+export * from './interconsultations';

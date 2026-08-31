@@ -50,6 +50,10 @@ export const PERMISSIONS = [
   'professional_settlements:read',
   'professional_settlements:approve',
   'professional_settlements:pay',
+  'interconsultations:read',
+  'interconsultations:write',
+  'interconsultations:approve',
+  'interconsultations:billing',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -84,6 +88,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'professional_settlements:read',
     'professional_settlements:approve',
     'professional_settlements:pay',
+    'interconsultations:read',
+    'interconsultations:write',
+    'interconsultations:approve',
+    'interconsultations:billing',
   ],
   veterinarian: [
     'patients:read',
@@ -98,6 +106,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'data:export',
     'waiting_room:read',
     'waiting_room:write',
+    'interconsultations:read',
+    'interconsultations:write',
   ],
   nurse: [
     'patients:read',
@@ -110,6 +120,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'whatsapp:send',
     'waiting_room:read',
     'waiting_room:write',
+    'interconsultations:read',
   ],
   receptionist: [
     'patients:read',
@@ -120,6 +131,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'whatsapp:send',
     'waiting_room:read',
     'waiting_room:write',
+    'interconsultations:read',
   ],
   cashier: [
     'patients:read',
@@ -131,6 +143,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'waiting_room:write',
     'professional_settlements:read',
     'professional_settlements:pay',
+    'interconsultations:read',
+    'interconsultations:billing',
   ],
   lab_tech: [
     'patients:read',
@@ -146,6 +160,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'clinical:read',
     'reports:read',
     'waiting_room:read',
+    'interconsultations:read',
   ],
 };
 

@@ -50,4 +50,10 @@ describe('clinic-sidebar-nav', () => {
       findActiveSidebarGroupId('/liquidaciones/mis-liquidaciones', CLINIC_SIDEBAR_NAV_ITEMS)
     ).toBe('professionals');
   });
+
+  it('includes Interconsultas under professionals group', () => {
+    const item = CLINIC_SIDEBAR_NAV_ITEMS.find((entry) => entry.href === '/interconsultas');
+    expect(item?.groupId).toBe('professionals');
+    expect(item?.label).toBe('Interconsultas');
+  });
 });

@@ -40,6 +40,10 @@ export const PERMISSION_LABELS: Record<string, string> = {
   'professional_settlements:read': 'Ver liquidaciones',
   'professional_settlements:approve': 'Aprobar liquidaciones',
   'professional_settlements:pay': 'Registrar pagos a profesionales',
+  'interconsultations:read': 'Ver interconsultas',
+  'interconsultations:write': 'Gestionar interconsultas',
+  'interconsultations:approve': 'Aprobar presupuestos de interconsulta',
+  'interconsultations:billing': 'Facturar interconsultas',
 };
 
 export const BRANCH_COOKIE_NAME = 'sincvete_branch_id';
