@@ -14,7 +14,7 @@ import {
 import { createServerClient } from '@/lib/supabase/server';
 import { PermissionError, requirePermission, requirePermissionAndFeature, canPermissionAndFeature } from '@/lib/permissions';
 import { getSessionContext } from '@/lib/session';
-import { revalidatePatient, revalidatePatientsList } from '@/lib/cache-revalidate';
+import { revalidateOwnerPatients, revalidatePatient, revalidatePatientsList } from '@/lib/cache-revalidate';
 import { PATIENT_COLUMNS } from '@/lib/db-columns';
 import {
   FEATURES,
@@ -243,6 +243,7 @@ export async function createPatient(
     }
 
     revalidatePatientsList();
+    revalidateOwnerPatients(parsed.data.ownerId);
     return { success: true, data: { id: data.id } };
   } catch (error) {
     return actionError<{ id: string }>(error);
@@ -313,6 +314,7 @@ export async function updatePatient(
 
     revalidatePatientsList();
     revalidatePatient(patientId);
+    revalidateOwnerPatients(parsed.data.ownerId);
     return { success: true, data: { id: patientId } };
   } catch (error) {
     return actionError<{ id: string }>(error);

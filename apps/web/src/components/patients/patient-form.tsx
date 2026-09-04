@@ -44,8 +44,13 @@ export function PatientForm({
 
   useEffect(() => {
     if (!state?.success || !state.data?.id) return;
+    if (returnTo) {
+      router.push(returnTo);
+      router.refresh();
+      return;
+    }
     if (!patient) {
-      router.push(returnTo || `/pacientes/${state.data.id}`);
+      router.push(`/pacientes/${state.data.id}`);
     }
   }, [state, patient, router, returnTo]);
 
@@ -244,7 +249,14 @@ export function PatientForm({
               {pending ? 'Guardando...' : patient ? 'Guardar cambios' : 'Crear paciente'}
             </Button>
             <Button variant="outline" asChild>
-              <Link href={patient ? `/pacientes/${patient.id}` : '/pacientes'}>Cancelar</Link>
+              <Link
+                href={
+                  returnTo ||
+                  (patient ? `/pacientes/${patient.id}` : '/pacientes')
+                }
+              >
+                Cancelar
+              </Link>
             </Button>
           </div>
         </form>

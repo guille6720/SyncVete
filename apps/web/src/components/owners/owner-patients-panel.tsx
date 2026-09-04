@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { PawPrint, Plus } from 'lucide-react';
+import { Eye, PawPrint, Pencil, Plus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,7 @@ export function OwnerPatientsPanel({
 }: OwnerPatientsPanelProps) {
   if (!patientsEnabled) return null;
 
-  const newPatientHref = `/pacientes/nuevo?ownerId=${encodeURIComponent(ownerId)}&returnTo=${encodeURIComponent(`/propietarios/${ownerId}`)}`;
+  const newPatientHref = `/propietarios/${ownerId}/pacientes/nuevo`;
 
   return (
     <Card>
@@ -38,7 +38,7 @@ export function OwnerPatientsPanel({
           <Button size="sm" asChild>
             <Link href={newPatientHref}>
               <Plus className="mr-2 h-4 w-4" />
-              Nuevo paciente
+              Agregar paciente
             </Link>
           </Button>
         )}
@@ -51,18 +51,21 @@ export function OwnerPatientsPanel({
               <Button className="mt-3" variant="outline" size="sm" asChild>
                 <Link href={newPatientHref}>
                   <Plus className="mr-2 h-4 w-4" />
-                  Asociar paciente
+                  Agregar paciente
                 </Link>
               </Button>
             )}
           </div>
         ) : (
           <ul className="divide-y rounded-md border">
-            {patients.map((patient) => (
-              <li key={patient.id}>
-                <Link
-                  href={`/pacientes/${patient.id}`}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 transition hover:bg-muted/50"
+            {patients.map((patient) => {
+              const editHref = `/propietarios/${ownerId}/pacientes/${patient.id}/editar`;
+              const viewHref = `/pacientes/${patient.id}`;
+
+              return (
+                <li
+                  key={patient.id}
+                  className="flex flex-col gap-3 px-3 py-3 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium">
@@ -72,19 +75,35 @@ export function OwnerPatientsPanel({
                       {patient.species}
                       {patient.breed ? ` · ${patient.breed}` : ''}
                     </p>
+                    <div className="mt-1.5">
+                      {patient.is_deceased ? (
+                        <Badge variant="destructive">Fallecido</Badge>
+                      ) : (
+                        <Badge variant={patient.is_active ? 'success' : 'default'}>
+                          {patient.is_active ? 'Activo' : 'Inactivo'}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex shrink-0 gap-1.5">
-                    {patient.is_deceased ? (
-                      <Badge variant="destructive">Fallecido</Badge>
-                    ) : (
-                      <Badge variant={patient.is_active ? 'success' : 'default'}>
-                        {patient.is_active ? 'Activo' : 'Inactivo'}
-                      </Badge>
+                  <div className="flex shrink-0 flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={viewHref}>
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        Ver
+                      </Link>
+                    </Button>
+                    {canWrite && (
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={editHref}>
+                          <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                          Editar
+                        </Link>
+                      </Button>
                     )}
                   </div>
-                </Link>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
       </CardContent>

@@ -49,7 +49,7 @@ export function OwnerDetail({
   const entitled = (href: string) => isClinicPathEntitled(href, entitledHrefs);
   const queueHref = `/sala-espera?q=${encodeURIComponent(owner.full_name)}`;
   const patientsEnabled = entitled('/pacientes');
-  const newPatientHref = `/pacientes/nuevo?ownerId=${encodeURIComponent(owner.id)}&returnTo=${encodeURIComponent(`/propietarios/${owner.id}`)}`;
+  const newPatientHref = `/propietarios/${owner.id}/pacientes/nuevo`;
 
   const handleDelete = async () => {
     if (!confirm('¿Eliminar este propietario? Esta acción no se puede deshacer.')) return;
@@ -89,7 +89,7 @@ export function OwnerDetail({
             <Button variant="outline" size="sm" asChild>
               <Link href={newPatientHref}>
                 <PawPrint className="mr-2 h-4 w-4" />
-                Nuevo paciente
+                Agregar paciente
               </Link>
             </Button>
           )}
