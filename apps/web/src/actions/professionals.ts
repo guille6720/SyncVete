@@ -10,14 +10,15 @@ import {
   type ProfessionalListRow,
   type ProfessionalSettlementSummary,
 } from '@sincvete/shared';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import {
   PermissionError,
   canPermissionAndFeature,
   requirePermissionAndFeature,
 } from '@/lib/permissions';
-import { FEATURES, planRestrictionResult, canUseFeature } from '@/lib/entitlements';
+import { FEATURES, planRestrictionResult, canUseFeature, assertWithinLimit, getSeatUsageMeters } from '@/lib/entitlements';
 import { getSessionContext } from '@/actions/auth';
+import { randomBytes } from 'crypto';
 import type { Database } from '@sincvete/db';
 
 type ProfessionalUpdate = Database['public']['Tables']['professionals']['Update'];
@@ -26,6 +27,8 @@ function revalidateProfessionalsModule() {
   revalidatePath('/profesionales');
   revalidatePath('/liquidaciones');
   revalidatePath('/configuracion');
+  revalidatePath('/agenda');
+  revalidatePath('/agenda/nueva');
 }
 
 function isNextRedirect(error: unknown): boolean {
@@ -53,6 +56,134 @@ function rpcErrorMessage(error: { message?: string } | null): string {
   const message = error?.message?.trim();
   if (!message) return 'No se pudo completar la operación';
   return message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
+}
+
+async function assertAgendaSeatAvailable(organizationId: string, userId?: string | null) {
+  const supabase = await createServerClient();
+  if (userId) {
+    const { data: vetRow } = await supabase
+      .from('branch_members')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('role', 'veterinarian')
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .limit(1)
+      .maybeSingle();
+    if (vetRow) return;
+  }
+
+  const seats = await getSeatUsageMeters(organizationId);
+  const meter = seats.find((item) => item.featureKey === FEATURES.PROFESSIONALS_MAX);
+  await assertWithinLimit({
+    organizationId,
+    featureKey: FEATURES.PROFESSIONALS_MAX,
+    currentCount: meter?.used ?? 0,
+  });
+}
+
+/**
+ * Ensures the professional has an auth identity + branch_members so they appear
+ * in Agenda → Nuevo turno (getAssignableStaff).
+ */
+async function ensureProfessionalAgendaAccess(params: {
+  organizationId: string;
+  branchIds: string[];
+  fullName: string;
+  userId?: string | null;
+  agendaEmail?: string | null;
+}): Promise<{ userId: string } | { error: string }> {
+  const branchIds = [...new Set(params.branchIds.filter(Boolean))];
+  if (branchIds.length === 0) {
+    return { error: 'Seleccioná al menos una sucursal para habilitar agenda' };
+  }
+
+  const service = await createServiceClient();
+  const supabase = await createServerClient();
+  let userId = params.userId ?? null;
+  const email = params.agendaEmail?.trim().toLowerCase() || null;
+
+  if (!userId && email) {
+    const { data: listed } = await service.auth.admin.listUsers({ page: 1, perPage: 1000 });
+    const existing = listed.users.find((u) => u.email?.toLowerCase() === email);
+    if (existing) {
+      userId = existing.id;
+    } else {
+      const { count: profileCount } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true)
+        .is('deleted_at', null);
+      await assertWithinLimit({
+        organizationId: params.organizationId,
+        featureKey: FEATURES.USERS_MAX,
+        currentCount: profileCount ?? 0,
+      });
+
+      const tempPassword = `Sv${randomBytes(9).toString('base64url')}!`;
+      const created = await service.auth.admin.createUser({
+        email,
+        password: tempPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: params.fullName,
+          organization_id: params.organizationId,
+          role: 'veterinarian',
+        },
+      });
+      if (created.error || !created.data.user) {
+        return { error: created.error?.message || 'No se pudo crear el usuario de agenda' };
+      }
+      userId = created.data.user.id;
+    }
+  }
+
+  if (!userId) {
+    return { error: 'Indicá un email o vinculá un usuario para agenda' };
+  }
+
+  await assertAgendaSeatAvailable(params.organizationId, userId);
+
+  const { error: profileError } = await service.from('profiles').upsert(
+    {
+      id: userId,
+      organization_id: params.organizationId,
+      full_name: params.fullName,
+      is_active: true,
+      deleted_at: null,
+    },
+    { onConflict: 'id' }
+  );
+  if (profileError) {
+    return { error: rpcErrorMessage(profileError) };
+  }
+
+  for (const branchId of branchIds) {
+    const { error: memberError } = await service.from('branch_members').upsert(
+      {
+        organization_id: params.organizationId,
+        branch_id: branchId,
+        user_id: userId,
+        role: 'veterinarian',
+        is_active: true,
+        deleted_at: null,
+      },
+      { onConflict: 'branch_id,user_id' }
+    );
+    if (memberError) {
+      // Fallback if unique constraint name differs: soft update path via RPC.
+      const { error: rpcError } = await supabase.rpc('add_team_member', {
+        p_user_id: userId,
+        p_branch_id: branchId,
+        p_role: 'veterinarian',
+      });
+      if (rpcError) {
+        return { error: rpcErrorMessage(memberError) || rpcError.message };
+      }
+    }
+  }
+
+  return { userId };
 }
 
 function mapProfessional(row: Record<string, unknown>): Professional {
@@ -383,6 +514,8 @@ export async function createProfessional(
     const session = await getSessionContext();
     if (!session) return { success: false, error: 'Sesión inválida' };
 
+    const enableAgenda =
+      formData.get('enableAgenda') === 'true' || formData.get('enableAgenda') === 'on';
     const parsed = professionalCreateSchema.safeParse({
       userId: formData.get('userId') || null,
       profileId: formData.get('profileId') || null,
@@ -400,6 +533,8 @@ export async function createProfessional(
       invoiceRequired: formData.get('invoiceRequired') === 'true' || formData.get('invoiceRequired') === 'on',
       notes: formData.get('notes') || null,
       branchIds: formData.getAll('branchIds').map(String).filter(Boolean),
+      enableAgenda,
+      agendaEmail: formData.get('agendaEmail') || null,
     });
 
     if (!parsed.success) {
@@ -410,13 +545,36 @@ export async function createProfessional(
       };
     }
 
+    let branchIds = parsed.data.branchIds;
+    if (branchIds.length === 0 && session.branchId) {
+      branchIds = [session.branchId];
+    }
+
+    let userId = parsed.data.userId ?? null;
+    let profileId = parsed.data.profileId ?? null;
+
+    if (enableAgenda) {
+      const agenda = await ensureProfessionalAgendaAccess({
+        organizationId: session.organizationId,
+        branchIds,
+        fullName: `${parsed.data.firstName} ${parsed.data.lastName}`.trim(),
+        userId,
+        agendaEmail: parsed.data.agendaEmail,
+      });
+      if ('error' in agenda) {
+        return { success: false, error: agenda.error };
+      }
+      userId = agenda.userId;
+      profileId = agenda.userId;
+    }
+
     const supabase = await createServerClient();
     const { data, error } = await supabase
       .from('professionals')
       .insert({
         organization_id: session.organizationId,
-        user_id: parsed.data.userId ?? null,
-        profile_id: parsed.data.profileId ?? null,
+        user_id: userId,
+        profile_id: profileId,
         first_name: parsed.data.firstName,
         last_name: parsed.data.lastName,
         document_number: parsed.data.documentNumber ?? null,
@@ -438,8 +596,8 @@ export async function createProfessional(
       return { success: false, error: rpcErrorMessage(error) };
     }
 
-    if (parsed.data.branchIds.length > 0) {
-      const branchRows = parsed.data.branchIds.map((branchId) => ({
+    if (branchIds.length > 0) {
+      const branchRows = branchIds.map((branchId: string) => ({
         organization_id: session.organizationId,
         professional_id: data.id,
         branch_id: branchId,
@@ -491,6 +649,11 @@ export async function updateProfessional(
       branchIds: formData.has('branchIds')
         ? formData.getAll('branchIds').map(String).filter(Boolean)
         : undefined,
+      enableAgenda:
+        formData.get('enableAgenda') === 'true' || formData.get('enableAgenda') === 'on'
+          ? true
+          : undefined,
+      agendaEmail: formData.get('agendaEmail') || undefined,
     });
 
     if (!parsed.success) {
@@ -501,7 +664,10 @@ export async function updateProfessional(
       };
     }
 
-    const { id, branchIds, ...fields } = parsed.data;
+    const session = await getSessionContext();
+    if (!session) return { success: false, error: 'Sesión inválida' };
+
+    const { id, branchIds, enableAgenda, agendaEmail, ...fields } = parsed.data;
     const patch: ProfessionalUpdate = {};
     if (fields.userId !== undefined) patch.user_id = fields.userId;
     if (fields.profileId !== undefined) patch.profile_id = fields.profileId;
@@ -522,6 +688,46 @@ export async function updateProfessional(
     if (fields.notes !== undefined) patch.notes = fields.notes;
 
     const supabase = await createServerClient();
+    const { data: existing, error: existingError } = await supabase
+      .from('professionals')
+      .select('*')
+      .eq('id', id)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (existingError || !existing) {
+      return { success: false, error: 'Profesional no encontrado' };
+    }
+
+    let resolvedBranchIds: string[] =
+      branchIds ??
+      (
+        await supabase
+          .from('professional_branches')
+          .select('branch_id')
+          .eq('professional_id', id)
+          .eq('is_active', true)
+          .is('deleted_at', null)
+      ).data?.map((row) => String(row.branch_id)) ??
+      [];
+    if (resolvedBranchIds.length === 0 && session.branchId) {
+      resolvedBranchIds = [session.branchId];
+    }
+
+    if (enableAgenda === true || (!existing.user_id && (fields.userId || agendaEmail))) {
+      const agenda = await ensureProfessionalAgendaAccess({
+        organizationId: session.organizationId,
+        branchIds: resolvedBranchIds,
+        fullName: `${fields.firstName ?? existing.first_name} ${fields.lastName ?? existing.last_name}`.trim(),
+        userId: (fields.userId as string | undefined) ?? existing.user_id,
+        agendaEmail: agendaEmail as string | undefined,
+      });
+      if ('error' in agenda) {
+        return { success: false, error: agenda.error };
+      }
+      patch.user_id = agenda.userId;
+      patch.profile_id = agenda.userId;
+    }
+
     const { data, error } = await supabase
       .from('professionals')
       .update(patch)
@@ -540,9 +746,8 @@ export async function updateProfessional(
         .update({ is_active: false })
         .eq('professional_id', id);
       if (branchIds.length > 0) {
-        const session = await getSessionContext();
-        const branchRows = branchIds.map((branchId) => ({
-          organization_id: session!.organizationId,
+        const branchRows = branchIds.map((branchId: string) => ({
+          organization_id: session.organizationId,
           professional_id: id,
           branch_id: branchId,
           is_active: true,

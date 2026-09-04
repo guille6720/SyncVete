@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { createProfessional, updateProfessional } from '@/actions/professionals';
@@ -44,6 +44,10 @@ export function ProfessionalForm({
   const router = useRouter();
   const action = mode === 'create' ? createProfessional : updateProfessional;
   const [state, formAction, pending] = useActionState(action, null);
+  const [enableAgenda, setEnableAgenda] = useState(
+    mode === 'create' ? true : !professional?.user_id
+  );
+  const [linkedUserId, setLinkedUserId] = useState(professional?.user_id ?? '');
 
   useEffect(() => {
     if (!state?.success) return;
@@ -61,12 +65,15 @@ export function ProfessionalForm({
     document.getElementById('nuevo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [mode]);
 
+  const needsAgendaEmail = enableAgenda && !linkedUserId;
+  const alreadyOnAgenda = Boolean(professional?.user_id);
+
   return (
     <Card id={mode === 'create' ? 'nuevo' : undefined}>
       <CardHeader>
         <CardTitle>{mode === 'create' ? 'Nuevo profesional' : 'Editar profesional'}</CardTitle>
         <CardDescription>
-          Registro operativo de compensación. No reemplaza usuarios del equipo ni nómina legal.
+          Registro del profesional. Si habilitás agenda, queda disponible para Nuevo turno.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -111,7 +118,12 @@ export function ProfessionalForm({
             </div>
             <div className="space-y-2">
               <Label htmlFor="userId">Usuario vinculado (opcional)</Label>
-              <Select id="userId" name="userId" defaultValue={professional?.user_id ?? ''}>
+              <Select
+                id="userId"
+                name="userId"
+                value={linkedUserId}
+                onChange={(e) => setLinkedUserId(e.target.value)}
+              >
                 <option value="">Sin vincular</option>
                 {staff.map((member) => (
                   <option key={member.userId} value={member.userId}>
@@ -120,6 +132,43 @@ export function ProfessionalForm({
                 ))}
               </Select>
             </div>
+          </div>
+
+          <div className="space-y-3 rounded-md border p-3">
+            <label className="flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="enableAgenda"
+                value="true"
+                className="mt-0.5"
+                checked={enableAgenda}
+                onChange={(e) => setEnableAgenda(e.target.checked)}
+              />
+              <span>
+                <span className="font-medium">Disponible en agenda / Nuevo turno</span>
+                <span className="mt-0.5 block text-muted-foreground">
+                  {alreadyOnAgenda && !enableAgenda
+                    ? 'Este profesional ya está vinculado a un usuario de agenda.'
+                    : 'Lo agrega automáticamente a las opciones al crear un turno.'}
+                </span>
+              </span>
+            </label>
+            {needsAgendaEmail && (
+              <div className="space-y-2">
+                <Label htmlFor="agendaEmail">Email para agenda *</Label>
+                <Input
+                  id="agendaEmail"
+                  name="agendaEmail"
+                  type="email"
+                  required={needsAgendaEmail}
+                  placeholder="profesional@clinica.com"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se crea o reutiliza el usuario del equipo con rol veterinario en las sucursales
+                  seleccionadas.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -156,7 +205,7 @@ export function ProfessionalForm({
 
           {branches.length > 0 && (
             <div className="space-y-2">
-              <Label>Sucursales</Label>
+              <Label>Sucursales {enableAgenda ? '*' : ''}</Label>
               <div className="grid gap-2 sm:grid-cols-2">
                 {branches.map((branch) => (
                   <label key={branch.id} className="flex items-center gap-2 text-sm">
@@ -164,12 +213,20 @@ export function ProfessionalForm({
                       type="checkbox"
                       name="branchIds"
                       value={branch.id}
-                      defaultChecked={branchIds.includes(branch.id)}
+                      defaultChecked={
+                        branchIds.includes(branch.id) ||
+                        (mode === 'create' && branches.length === 1)
+                      }
                     />
                     {branch.name}
                   </label>
                 ))}
               </div>
+              {enableAgenda && (
+                <p className="text-xs text-muted-foreground">
+                  Necesarias para que figure en Nuevo turno de esa sucursal.
+                </p>
+              )}
             </div>
           )}
 
@@ -200,6 +257,9 @@ export function ProfessionalForm({
           </div>
 
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
+          {state?.fieldErrors?.agendaEmail?.[0] && (
+            <p className="text-sm text-destructive">{state.fieldErrors.agendaEmail[0]}</p>
+          )}
           {state?.success && mode === 'edit' && (
             <p className="text-sm text-emerald-600">Profesional actualizado</p>
           )}

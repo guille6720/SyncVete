@@ -11,7 +11,27 @@ import { PAYMENT_METHODS } from '../constants/billing';
 const moneySchema = z.coerce.number().finite().min(0).max(999999999999.99);
 const percentageSchema = z.coerce.number().finite().min(0).max(100);
 
-export const professionalCreateSchema = z.object({
+function refineProfessionalAgendaAccess<T extends z.ZodTypeAny>(schema: T) {
+  return schema.superRefine((value, ctx) => {
+    const data = value as {
+      enableAgenda?: boolean;
+      userId?: string | null;
+      agendaEmail?: string | null;
+    };
+    if (data.enableAgenda !== true) return;
+    if (data.userId) return;
+    const email = typeof data.agendaEmail === 'string' ? data.agendaEmail.trim() : '';
+    if (!email) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Indicá un email para agenda o vinculá un usuario',
+        path: ['agendaEmail'],
+      });
+    }
+  });
+}
+
+const professionalFieldsSchema = z.object({
   userId: z.string().uuid().optional().nullable(),
   profileId: z.string().uuid().optional().nullable(),
   firstName: z.string().trim().min(1).max(100),
@@ -28,11 +48,21 @@ export const professionalCreateSchema = z.object({
   invoiceRequired: z.boolean().optional().default(false),
   notes: z.string().trim().max(2000).optional().nullable(),
   branchIds: z.array(z.string().uuid()).optional().default([]),
+  /** When true, ensure auth user + branch_members so they appear in Agenda. */
+  enableAgenda: z.boolean().optional(),
+  agendaEmail: z
+    .union([z.literal(''), z.string().trim().email('Email inválido').max(200)])
+    .optional()
+    .nullable(),
 });
 
-export const professionalUpdateSchema = professionalCreateSchema.partial().extend({
-  id: z.string().uuid(),
-});
+export const professionalCreateSchema = refineProfessionalAgendaAccess(professionalFieldsSchema);
+
+export const professionalUpdateSchema = refineProfessionalAgendaAccess(
+  professionalFieldsSchema.partial().extend({
+    id: z.string().uuid(),
+  })
+);
 
 export const compensationSchemeCreateSchema = z.object({
   professionalId: z.string().uuid(),
