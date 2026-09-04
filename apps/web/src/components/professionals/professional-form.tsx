@@ -1,9 +1,13 @@
 'use client';
 
-import { useActionState, useState } from 'react';
+import { useActionState, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
 import { createProfessional, updateProfessional } from '@/actions/professionals';
+import {
+  DEFAULT_WEEKDAY_HOURS,
+  ProfessionalHoursEditor,
+  type ProfessionalHoursDraft,
+} from '@/components/professionals/professional-hours-editor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,6 +36,7 @@ interface ProfessionalFormProps {
   branches: BranchOption[];
   staff?: StaffOption[];
   branchIds?: string[];
+  initialHours?: ProfessionalHoursDraft[];
 }
 
 export function ProfessionalForm({
@@ -40,14 +45,22 @@ export function ProfessionalForm({
   branches,
   staff = [],
   branchIds = [],
+  initialHours,
 }: ProfessionalFormProps) {
   const router = useRouter();
   const action = mode === 'create' ? createProfessional : updateProfessional;
   const [state, formAction, pending] = useActionState(action, null);
   const [enableAgenda, setEnableAgenda] = useState(
-    mode === 'create' ? true : !professional?.user_id
+    mode === 'create' || !professional?.user_id
   );
   const [linkedUserId, setLinkedUserId] = useState(professional?.user_id ?? '');
+  const [hours, setHours] = useState<ProfessionalHoursDraft[]>(
+    initialHours && initialHours.length > 0
+      ? initialHours
+      : mode === 'create'
+        ? DEFAULT_WEEKDAY_HOURS
+        : []
+  );
 
   useEffect(() => {
     if (!state?.success) return;
@@ -58,22 +71,16 @@ export function ProfessionalForm({
     router.refresh();
   }, [state, mode, router]);
 
-  useEffect(() => {
-    if (mode !== 'create') return;
-    if (typeof window === 'undefined') return;
-    if (window.location.hash !== '#nuevo') return;
-    document.getElementById('nuevo')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [mode]);
-
   const needsAgendaEmail = enableAgenda && !linkedUserId;
   const alreadyOnAgenda = Boolean(professional?.user_id);
+  const showHours = enableAgenda || alreadyOnAgenda;
 
   return (
-    <Card id={mode === 'create' ? 'nuevo' : undefined}>
+    <Card>
       <CardHeader>
         <CardTitle>{mode === 'create' ? 'Nuevo profesional' : 'Editar profesional'}</CardTitle>
         <CardDescription>
-          Registro del profesional. Si habilitás agenda, queda disponible para Nuevo turno.
+          Completá los datos, habilitá agenda y definí días y horarios de atención.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -222,11 +229,18 @@ export function ProfessionalForm({
                   </label>
                 ))}
               </div>
-              {enableAgenda && (
+            </div>
+          )}
+
+          {showHours && (
+            <div className="space-y-2 rounded-md border p-3">
+              <div>
+                <p className="text-sm font-medium">Días y horarios de atención</p>
                 <p className="text-xs text-muted-foreground">
-                  Necesarias para que figure en Nuevo turno de esa sucursal.
+                  Se guardan en la agenda del profesional para tomar turnos.
                 </p>
-              )}
+              </div>
+              <ProfessionalHoursEditor value={hours} onChange={setHours} disabled={pending} />
             </div>
           )}
 

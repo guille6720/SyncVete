@@ -186,6 +186,84 @@ async function ensureProfessionalAgendaAccess(params: {
   return { userId };
 }
 
+function normalizeTime(value: string): string {
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+function parseSchedulesJson(raw: FormDataEntryValue | null): Array<{
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  slotDurationMinutes: number;
+}> {
+  if (typeof raw !== 'string' || !raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((row) => {
+        if (!row || typeof row !== 'object') return null;
+        const item = row as Record<string, unknown>;
+        const weekday = Number(item.weekday);
+        const startTime = String(item.startTime ?? '');
+        const endTime = String(item.endTime ?? '');
+        const slotDurationMinutes = Number(item.slotDurationMinutes ?? 30);
+        if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) return null;
+        if (!/^\d{2}:\d{2}/.test(startTime) || !/^\d{2}:\d{2}/.test(endTime)) return null;
+        return {
+          weekday,
+          startTime,
+          endTime,
+          slotDurationMinutes:
+            Number.isFinite(slotDurationMinutes) && slotDurationMinutes >= 5
+              ? slotDurationMinutes
+              : 30,
+        };
+      })
+      .filter((row): row is NonNullable<typeof row> => Boolean(row));
+  } catch {
+    return [];
+  }
+}
+
+async function saveProfessionalSchedules(params: {
+  userId: string;
+  branchIds: string[];
+  schedules: Array<{
+    weekday: number;
+    startTime: string;
+    endTime: string;
+    slotDurationMinutes: number;
+  }>;
+}): Promise<string | null> {
+  if (params.schedules.length === 0 || params.branchIds.length === 0) return null;
+  const supabase = await createServerClient();
+  for (const branchId of params.branchIds) {
+    for (const schedule of params.schedules) {
+      const { error } = await supabase.rpc('upsert_professional_schedule', {
+        p_branch_id: branchId,
+        p_user_id: params.userId,
+        p_weekday: schedule.weekday,
+        p_start_time: normalizeTime(schedule.startTime),
+        p_end_time: normalizeTime(schedule.endTime),
+        p_slot_duration_minutes: schedule.slotDurationMinutes,
+        p_allowed_appointment_types: null,
+        p_is_active: true,
+        p_id: null,
+      });
+      if (error) {
+        if (/schema cache|does not exist|Could not find the (table|function)/i.test(error.message)) {
+          return null;
+        }
+        return rpcErrorMessage(error);
+      }
+    }
+  }
+  revalidatePath('/agenda');
+  revalidatePath('/agenda/disponibilidad');
+  return null;
+}
+
 function mapProfessional(row: Record<string, unknown>): Professional {
   return {
     id: String(row.id),
@@ -609,6 +687,21 @@ export async function createProfessional(
       }
     }
 
+    if (userId) {
+      const schedules = parseSchedulesJson(formData.get('schedulesJson'));
+      const scheduleError = await saveProfessionalSchedules({
+        userId,
+        branchIds,
+        schedules,
+      });
+      if (scheduleError) {
+        return {
+          success: false,
+          error: `Profesional creado, pero no se pudieron guardar los horarios: ${scheduleError}`,
+        };
+      }
+    }
+
     revalidateProfessionalsModule();
     return { success: true, data: mapProfessional(data as Record<string, unknown>) };
   } catch (error) {
@@ -757,6 +850,24 @@ export async function updateProfessional(
           .upsert(branchRows, { onConflict: 'professional_id,branch_id' });
         if (branchError) {
           return { success: false, error: rpcErrorMessage(branchError) };
+        }
+      }
+    }
+
+    const linkedUserId = (patch.user_id as string | undefined) ?? data.user_id ?? null;
+    if (linkedUserId) {
+      const schedules = parseSchedulesJson(formData.get('schedulesJson'));
+      if (schedules.length > 0) {
+        const scheduleError = await saveProfessionalSchedules({
+          userId: String(linkedUserId),
+          branchIds: resolvedBranchIds,
+          schedules,
+        });
+        if (scheduleError) {
+          return {
+            success: false,
+            error: `Profesional actualizado, pero no se pudieron guardar los horarios: ${scheduleError}`,
+          };
         }
       }
     }

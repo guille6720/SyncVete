@@ -7,6 +7,7 @@ import {
   listCompensationSchemes,
   listSettlements,
 } from '@/actions/professional-settlements';
+import { listProfessionalSchedules } from '@/actions/appointment-availability';
 import {
   canReadProfessionals,
   canWriteProfessionals,
@@ -34,7 +35,7 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
   const professional = await getProfessional(id);
   if (!professional) notFound();
 
-  const [branches, professionalBranches, staff, canWrite, canReadComp, canWriteComp, canReadSettlements, organization, settlementSummary] =
+  const [branches, professionalBranches, staff, canWrite, canReadComp, canWriteComp, canReadSettlements, organization, settlementSummary, schedules] =
     await Promise.all([
       getUserBranches(),
       listProfessionalBranches(id),
@@ -47,10 +48,19 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
       canReadProfessionalSettlements().then((allowed) =>
         allowed ? getProfessionalSettlementSummary(id) : null
       ),
+      professional.user_id
+        ? listProfessionalSchedules({ userId: professional.user_id }).catch(() => [])
+        : Promise.resolve([]),
     ]);
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
   const branchIds = professionalBranches.map((row) => row.branch_id);
+  const initialHours = schedules.map((row) => ({
+    weekday: row.weekday,
+    startTime: String(row.start_time).slice(0, 5),
+    endTime: String(row.end_time).slice(0, 5),
+    slotDurationMinutes: row.slot_duration_minutes ?? 30,
+  }));
 
   let schemes: Awaited<ReturnType<typeof listCompensationSchemes>> = [];
   const rulesByScheme: Record<string, Awaited<ReturnType<typeof listCompensationRules>>> = {};
@@ -97,6 +107,7 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
           branches={branches}
           branchIds={branchIds}
           staff={staff.map((member) => ({ userId: member.userId, fullName: member.fullName }))}
+          initialHours={initialHours}
         />
       )}
 
