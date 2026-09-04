@@ -45,8 +45,8 @@ const NAV_ITEMS = [
     icon: Hourglass,
     keywords: 'cola checkin llamado recepcion espera',
   },
-  { label: 'Pacientes', href: '/pacientes', icon: PawPrint, keywords: 'mascotas animales' },
   { label: 'Propietarios', href: '/propietarios', icon: Users, keywords: 'clientes tutores' },
+  { label: 'Pacientes', href: '/pacientes', icon: PawPrint, keywords: 'mascotas animales' },
   { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList, keywords: 'historia clinica evolucion' },
   { label: 'Imágenes', href: '/imagenes', icon: Images, keywords: 'fotos radiografia ecografia estudios galeria' },
   { label: 'Consultas', href: '/consultas', icon: Stethoscope, keywords: 'atencion clinica' },
@@ -87,8 +87,8 @@ const NAV_ITEMS = [
 ] as const;
 
 const QUICK_ACTIONS = [
-  { label: 'Nuevo paciente', href: '/pacientes/nuevo', keywords: 'crear mascota animal' },
   { label: 'Nuevo propietario', href: '/propietarios/nuevo', keywords: 'crear tutor cliente' },
+  { label: 'Nuevo paciente', href: '/pacientes/nuevo', keywords: 'crear mascota animal' },
   { label: 'Nueva cita', href: '/agenda/nueva', keywords: 'agendar turno cita' },
   { label: 'Nueva entrada clínica', href: '/historia-clinica/nuevo', keywords: 'historia clinica evolucion' },
   { label: 'Nueva consulta', href: '/consultas/nueva', keywords: 'atencion consulta' },

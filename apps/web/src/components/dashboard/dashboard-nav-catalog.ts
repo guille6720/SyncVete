@@ -207,21 +207,21 @@ export const DASHBOARD_NAV_ACTIONS: DashboardNavAction[] = [
     groupId: 'clinical',
   },
   {
-    id: 'new-patient',
-    label: 'Nuevo paciente',
-    href: '/pacientes/nuevo',
-    icon: PawPrint,
-    requiresWrite: true,
-    tone: 'bg-teal-100 text-teal-800 ring-teal-200 hover:bg-teal-200/80 dark:bg-teal-950 dark:text-teal-200 dark:ring-teal-800',
-    groupId: 'patients',
-  },
-  {
     id: 'new-owner',
     label: 'Nuevo propietario',
     href: '/propietarios/nuevo',
     icon: UserPlus,
     requiresWrite: true,
     tone: 'bg-sky-100 text-sky-800 ring-sky-200 hover:bg-sky-200/80 dark:bg-sky-950 dark:text-sky-200 dark:ring-sky-800',
+    groupId: 'patients',
+  },
+  {
+    id: 'new-patient',
+    label: 'Nuevo paciente',
+    href: '/pacientes/nuevo',
+    icon: PawPrint,
+    requiresWrite: true,
+    tone: 'bg-teal-100 text-teal-800 ring-teal-200 hover:bg-teal-200/80 dark:bg-teal-950 dark:text-teal-200 dark:ring-teal-800',
     groupId: 'patients',
   },
   {
@@ -376,6 +376,7 @@ export const DASHBOARD_NAV_ACTIONS: DashboardNavAction[] = [
  */
 export const DEFAULT_QUICK_ACTION_IDS: DashboardNavActionId[] = [
   'new-consultation',
+  'new-owner',
   'new-patient',
   'new-prescription',
   'waiting-room',
