@@ -244,7 +244,12 @@ export async function listCompensationSchemes(professionalId: string): Promise<C
     .eq('professional_id', professionalId)
     .is('deleted_at', null)
     .order('valid_from', { ascending: false });
-  if (error) throw error;
+  if (error) {
+    if (/schema cache|does not exist|Could not find the (table|function)/i.test(error.message)) {
+      return [];
+    }
+    throw error;
+  }
   return (data ?? []).map((row) => mapScheme(row as Record<string, unknown>));
 }
 
@@ -260,7 +265,12 @@ export async function listCompensationRules(schemeId: string): Promise<Compensat
     .eq('compensation_scheme_id', schemeId)
     .is('deleted_at', null)
     .order('created_at', { ascending: true });
-  if (error) throw error;
+  if (error) {
+    if (/schema cache|does not exist|Could not find the (table|function)/i.test(error.message)) {
+      return [];
+    }
+    throw error;
+  }
   return (data ?? []).map((row) => mapRule(row as Record<string, unknown>));
 }
 
@@ -1128,7 +1138,13 @@ export async function listSettlements(input: {
     p_page: parsed.data.page,
     p_page_size: parsed.data.pageSize,
   });
-  if (error) throw error;
+  if (error) {
+    // Staging / partial migrations: do not crash professional detail.
+    if (/schema cache|does not exist|Could not find the (table|function)/i.test(error.message)) {
+      return buildPaginatedResult([], 0, parsed.data.page, parsed.data.pageSize);
+    }
+    throw error;
+  }
 
   const payload = (data ?? { items: [], total: 0 }) as {
     items?: Record<string, unknown>[];

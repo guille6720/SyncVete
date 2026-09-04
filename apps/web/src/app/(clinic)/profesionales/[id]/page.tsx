@@ -75,7 +75,8 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
           {professional.last_name}, {professional.first_name}
         </h1>
         <p className="text-muted-foreground">
-          {PROFESSIONAL_RELATIONSHIP_LABELS[professional.relationship_type]}
+          {PROFESSIONAL_RELATIONSHIP_LABELS[professional.relationship_type] ??
+            professional.relationship_type}
           {professional.specialty ? ` · ${professional.specialty}` : ''}
         </p>
       </div>

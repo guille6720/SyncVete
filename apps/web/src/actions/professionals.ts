@@ -233,9 +233,48 @@ export async function getProfessionalSettlementSummary(
       .limit(1)
       .maybeSingle(),
   ]);
-  if (settlementsError) throw settlementsError;
-  if (schemesError) throw schemesError;
-  if (paymentError) throw paymentError;
+  if (settlementsError) {
+    if (/schema cache|does not exist|Could not find the (table|function)/i.test(settlementsError.message)) {
+      return {
+        openBalance: 0,
+        pendingSettlementCount: 0,
+        approvedUnpaidCount: 0,
+        activeSchemeName: null,
+        lastPaymentAmount: null,
+        lastPaymentDate: null,
+        lastPaymentSettlementId: null,
+      };
+    }
+    throw settlementsError;
+  }
+  if (schemesError) {
+    if (/schema cache|does not exist|Could not find the (table|function)/i.test(schemesError.message)) {
+      return {
+        openBalance: 0,
+        pendingSettlementCount: 0,
+        approvedUnpaidCount: 0,
+        activeSchemeName: null,
+        lastPaymentAmount: null,
+        lastPaymentDate: null,
+        lastPaymentSettlementId: null,
+      };
+    }
+    throw schemesError;
+  }
+  if (paymentError) {
+    if (/schema cache|does not exist|Could not find the (table|function)/i.test(paymentError.message)) {
+      return {
+        openBalance: 0,
+        pendingSettlementCount: 0,
+        approvedUnpaidCount: 0,
+        activeSchemeName: null,
+        lastPaymentAmount: null,
+        lastPaymentDate: null,
+        lastPaymentSettlementId: null,
+      };
+    }
+    throw paymentError;
+  }
 
   let openBalance = 0;
   let pendingSettlementCount = 0;
