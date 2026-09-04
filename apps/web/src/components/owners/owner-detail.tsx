@@ -2,37 +2,54 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Hourglass, MessageCircle, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Hourglass, MessageCircle, PawPrint, Pencil, Trash2 } from 'lucide-react';
 import { deleteOwner } from '@/actions/owners';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DOCUMENT_TYPE_LABELS, buildWhatsAppComposePath, isClinicPathEntitled, type Owner, type OwnerPortalStatus, type OwnerWaitingRoomHistoryRow } from '@sincvete/shared';
+import {
+  DOCUMENT_TYPE_LABELS,
+  buildWhatsAppComposePath,
+  isClinicPathEntitled,
+  type Owner,
+  type OwnerPortalStatus,
+  type OwnerWaitingRoomHistoryRow,
+  type PatientListRow,
+} from '@sincvete/shared';
 import { OwnerPortalCard } from '@/components/owners/owner-portal-card';
+import { OwnerPatientsPanel } from '@/components/owners/owner-patients-panel';
 import { OwnerWaitingRoomHistory } from '@/components/owners/owner-waiting-room-history';
 
 interface OwnerDetailProps {
   owner: Owner;
   canWrite: boolean;
+  canManagePatients?: boolean;
   canSendWhatsApp?: boolean;
   portalEnabled?: boolean;
   portalStatus: OwnerPortalStatus | null;
   entitledHrefs?: string[] | null;
   waitingRoomHistory?: OwnerWaitingRoomHistoryRow[];
+  patients?: PatientListRow[];
+  patientsTotal?: number;
 }
 
 export function OwnerDetail({
   owner,
   canWrite,
+  canManagePatients = false,
   canSendWhatsApp = false,
   portalEnabled = true,
   portalStatus,
   entitledHrefs = null,
   waitingRoomHistory = [],
+  patients = [],
+  patientsTotal = 0,
 }: OwnerDetailProps) {
   const router = useRouter();
   const entitled = (href: string) => isClinicPathEntitled(href, entitledHrefs);
   const queueHref = `/sala-espera?q=${encodeURIComponent(owner.full_name)}`;
+  const patientsEnabled = entitled('/pacientes');
+  const newPatientHref = `/pacientes/nuevo?ownerId=${encodeURIComponent(owner.id)}&returnTo=${encodeURIComponent(`/propietarios/${owner.id}`)}`;
 
   const handleDelete = async () => {
     if (!confirm('¿Eliminar este propietario? Esta acción no se puede deshacer.')) return;
@@ -65,6 +82,14 @@ export function OwnerDetail({
               <Link href={queueHref}>
                 <Hourglass className="mr-2 h-4 w-4" />
                 Sala de espera
+              </Link>
+            </Button>
+          )}
+          {canManagePatients && patientsEnabled && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={newPatientHref}>
+                <PawPrint className="mr-2 h-4 w-4" />
+                Nuevo paciente
               </Link>
             </Button>
           )}
@@ -117,6 +142,14 @@ export function OwnerDetail({
           )}
         </CardContent>
       </Card>
+
+      <OwnerPatientsPanel
+        ownerId={owner.id}
+        patients={patients}
+        total={patientsTotal}
+        canWrite={canManagePatients}
+        patientsEnabled={patientsEnabled}
+      />
 
       {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
         <OwnerWaitingRoomHistory history={waitingRoomHistory} ownerName={owner.full_name} />

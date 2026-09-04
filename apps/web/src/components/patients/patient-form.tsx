@@ -26,6 +26,7 @@ interface PatientFormProps {
   branches: Array<{ id: string; name: string }>;
   defaultBranchId?: string | null;
   defaultOwnerId?: string;
+  returnTo?: string | null;
 }
 
 export function PatientForm({
@@ -34,6 +35,7 @@ export function PatientForm({
   branches,
   defaultBranchId,
   defaultOwnerId,
+  returnTo = null,
 }: PatientFormProps) {
   const router = useRouter();
   const action = patient ? updatePatient.bind(null, patient.id) : createPatient;
@@ -43,9 +45,9 @@ export function PatientForm({
   useEffect(() => {
     if (!state?.success || !state.data?.id) return;
     if (!patient) {
-      router.push(`/pacientes/${state.data.id}`);
+      router.push(returnTo || `/pacientes/${state.data.id}`);
     }
-  }, [state, patient, router]);
+  }, [state, patient, router, returnTo]);
 
   useEffect(() => {
     return () => {
