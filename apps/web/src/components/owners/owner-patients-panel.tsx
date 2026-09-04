@@ -32,7 +32,7 @@ export function OwnerPatientsPanel({
         <div className="flex items-center gap-2">
           <PawPrint className="h-4 w-4 text-muted-foreground" />
           <CardTitle className="text-base">Pacientes</CardTitle>
-          <Badge variant="secondary">{total}</Badge>
+          <Badge variant="default">{total}</Badge>
         </div>
         {canWrite && (
           <Button size="sm" asChild>
@@ -77,7 +77,7 @@ export function OwnerPatientsPanel({
                     {patient.is_deceased ? (
                       <Badge variant="destructive">Fallecido</Badge>
                     ) : (
-                      <Badge variant={patient.is_active ? 'success' : 'secondary'}>
+                      <Badge variant={patient.is_active ? 'success' : 'default'}>
                         {patient.is_active ? 'Activo' : 'Inactivo'}
                       </Badge>
                     )}
