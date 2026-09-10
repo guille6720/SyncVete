@@ -20,19 +20,53 @@ interface PageProps {
 }
 
 export default async function ConfiguracionPage({ searchParams }: PageProps) {
-  const session = await getSessionContext();
+  const [session, params] = await Promise.all([getSessionContext(), searchParams]);
   if (!session) redirect('/login');
 
-  const params = await searchParams;
+  const canOrg = hasPermission(session.permissions, 'org:manage');
+  const canBranch = hasPermission(session.permissions, 'branch:manage');
+  const canUsers = hasPermission(session.permissions, 'users:manage');
+
   const availableTabs: SettingsTab[] = ['roles', 'legal'];
   if (session.isPlatformAdmin) availableTabs.push('guia-superadmin');
-  if (hasPermission(session.permissions, 'org:manage')) availableTabs.unshift('clinica', 'plan');
-  if (hasPermission(session.permissions, 'branch:manage')) availableTabs.push('sucursales');
-  if (hasPermission(session.permissions, 'users:manage')) availableTabs.push('equipo');
-  const [canImportData, canExportData] = await Promise.all([
+  if (canOrg) availableTabs.unshift('clinica', 'plan');
+  if (canBranch) availableTabs.push('sucursales');
+  if (canUsers) availableTabs.push('equipo');
+
+  const needBranches = canBranch || canUsers;
+  const branchPageSize = canUsers ? 100 : 50;
+
+  const [
+    canImportData,
+    canExportData,
+    showProfessionalsLink,
+    clinicResult,
+    planBillingInitial,
+    seats,
+    branchesResult,
+    teamParts,
+  ] = await Promise.all([
     canPermissionAndFeature('data:import', FEATURES.DATA_IMPORT_EXPORT),
     canPermissionAndFeature('data:export', FEATURES.DATA_IMPORT_EXPORT),
+    canPermissionAndFeature('professionals:read', FEATURES.PROFESSIONALS_SETTLEMENTS),
+    canOrg ? getOrganizationSettingsForm() : Promise.resolve(null),
+    canOrg
+      ? getPlanBillingState().catch(() => undefined)
+      : Promise.resolve(undefined),
+    canUsers || canBranch
+      ? getSeatUsageMeters(session.organizationId).catch(() => [] as SeatUsageMeter[])
+      : Promise.resolve([] as SeatUsageMeter[]),
+    needBranches
+      ? listBranches({ page: 1, pageSize: branchPageSize })
+      : Promise.resolve(undefined),
+    canUsers
+      ? Promise.all([
+          listTeamMembers({ page: 1, pageSize: 50 }),
+          listPendingInvitations(),
+        ])
+      : Promise.resolve(null),
   ]);
+
   if (canImportData || canExportData) availableTabs.push('import-export');
 
   const requested = params.tab;
@@ -44,63 +78,37 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
         : availableTabs[0];
 
   let clinicData;
-  let planBilling;
-  let seats: SeatUsageMeter[] = [];
-  if (hasPermission(session.permissions, 'org:manage')) {
-    const result = await getOrganizationSettingsForm();
-    if (result.success && result.data) {
-      clinicData = {
-        organizationName: result.data.organization.name,
-        settings: result.data.settings,
-      };
-    }
-    try {
-      planBilling = await getPlanBillingState();
-      if (params.checkout === 'cancel') {
-        await cancelClinicCheckoutIntents();
-        planBilling = await getPlanBillingState();
-      }
-    } catch {
-      planBilling = undefined;
-    }
+  if (clinicResult?.success && clinicResult.data) {
+    clinicData = {
+      organizationName: clinicResult.data.organization.name,
+      settings: clinicResult.data.settings,
+    };
   }
 
-  if (
-    hasPermission(session.permissions, 'users:manage') ||
-    hasPermission(session.permissions, 'branch:manage')
-  ) {
+  let planBilling = planBillingInitial;
+  if (canOrg && params.checkout === 'cancel') {
     try {
-      seats = await getSeatUsageMeters(session.organizationId);
+      await cancelClinicCheckoutIntents();
+      planBilling = await getPlanBillingState();
     } catch {
-      seats = [];
+      // keep initial plan billing
     }
   }
 
   let branchesData;
-  if (hasPermission(session.permissions, 'branch:manage')) {
-    branchesData = await listBranches({ page: 1, pageSize: 50 });
+  if (canBranch && branchesResult) {
+    branchesData = branchesResult;
   }
 
   let teamData;
-  let showProfessionalsLink = false;
-  if (hasPermission(session.permissions, 'users:manage')) {
-    const [members, invitations, branches] = await Promise.all([
-      listTeamMembers({ page: 1, pageSize: 50 }),
-      listPendingInvitations(),
-      listBranches({ page: 1, pageSize: 100 }),
-    ]);
-
+  if (canUsers && teamParts && branchesResult) {
+    const [members, invitations] = teamParts;
     teamData = {
       members,
       invitations,
-      branches: branches.data as Branch[],
+      branches: branchesResult.data as Branch[],
     };
   }
-
-  showProfessionalsLink = await canPermissionAndFeature(
-    'professionals:read',
-    FEATURES.PROFESSIONALS_SETTLEMENTS
-  );
 
   return (
     <SettingsPageClient

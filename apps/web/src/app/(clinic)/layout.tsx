@@ -1,11 +1,12 @@
 import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import { getSessionContext } from '@/lib/session';
-import { countUnreadNotifications } from '@/actions/notifications';
 import { getUserBranches } from '@/actions/settings';
 import { AppShell } from '@/components/layout/app-shell';
 import { EntitlementRouteGate } from '@/components/entitlements/entitlement-route-gate';
 import { ClinicBillingBannerSlot } from '@/components/entitlements/clinic-billing-banner-slot';
+import { ClinicUnreadNotificationsBell } from '@/components/notifications/clinic-unread-notifications-bell';
+import { NotificationBell } from '@/components/notifications/notification-bell';
 import { getClinicEntitledHrefs } from '@/lib/entitlements';
 import { hasLinkedProfessionalProfile } from '@/actions/professionals';
 
@@ -21,11 +22,10 @@ export default async function ClinicLayout({ children }: { children: React.React
     redirect(session.kind === 'portal' ? '/portal' : '/login');
   }
 
-  // Critical path only: session shell + entitled hrefs for nav gating.
-  // Commercial banner (checkout/meters) streams separately and must not block modules.
-  const [branches, unreadNotifications, entitledHrefs, showMySettlementsNav] = await Promise.all([
+  // Critical path: shell chrome needed before paint.
+  // Unread badge + commercial banner stream separately (must not block module nav).
+  const [branches, entitledHrefs, showMySettlementsNav] = await Promise.all([
     getUserBranches(),
-    countUnreadNotifications(),
     getClinicEntitledHrefs(session.organizationId),
     hasLinkedProfessionalProfile(),
   ]);
@@ -42,10 +42,14 @@ export default async function ClinicLayout({ children }: { children: React.React
       branchName={branchName}
       branches={branches}
       activeBranchId={session.branchId}
-      unreadNotifications={unreadNotifications}
       isPlatformAdmin={session.isPlatformAdmin}
       entitledHrefs={entitledHrefs}
       showMySettlementsNav={showMySettlementsNav}
+      notificationBellSlot={
+        <Suspense fallback={<NotificationBell unreadCount={0} />}>
+          <ClinicUnreadNotificationsBell />
+        </Suspense>
+      }
       billingBannerSlot={
         <Suspense fallback={null}>
           <ClinicBillingBannerSlot organizationId={session.organizationId} />

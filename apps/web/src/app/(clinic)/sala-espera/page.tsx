@@ -69,7 +69,11 @@ function salaEsperaHref(opts: {
 }
 
 export default async function SalaEsperaPage({ searchParams }: SalaEsperaPageProps) {
-  const [canRead, params] = await Promise.all([canReadWaitingRoom(), searchParams]);
+  const [canRead, params, session] = await Promise.all([
+    canReadWaitingRoom(),
+    searchParams,
+    getSessionContext(),
+  ]);
   if (!canRead) redirect('/dashboard');
 
   const today = formatDateParam(new Date());
@@ -80,33 +84,36 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
   const prevDate = addDaysIso(selectedDate, -1);
   const nextDate = addDaysIso(selectedDate, 1);
   const weekStart = getWeekStartDate(selectedDate);
+  const listBranchId = resolveWaitingRoomListBranchId(
+    boardFilters.branchId,
+    session?.branchId
+  );
 
-  const [canWrite, canWhatsApp, canStartConsultation, organization, session, branches] =
-    await Promise.all([
-      canManageWaitingRoom(),
-      canSendWhatsApp(),
-      canManageConsultations(),
-      getOrganization(),
-      getSessionContext(),
-      getUserBranches(),
-    ]);
+  const [
+    canWrite,
+    canWhatsApp,
+    canStartConsultation,
+    organization,
+    branches,
+    entries,
+    weekAppointments,
+  ] = await Promise.all([
+    canManageWaitingRoom(),
+    canSendWhatsApp(),
+    canManageConsultations(),
+    getOrganization(),
+    getUserBranches(),
+    listWaitingRoom({ date: selectedDate, branchId: listBranchId }),
+    isToday
+      ? listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[])
+      : Promise.resolve([] as AppointmentListRow[]),
+  ]);
 
   const orgSettings = parseOrganizationSettings(organization?.settings);
   const roomPresets = orgSettings.waitingRoomRooms ?? [];
   const whatsAppAutoEnabled = orgSettings.waitingRoomWhatsAppAutoEnabled === true;
   const boardSoundEnabled = orgSettings.waitingRoomBoardSoundEnabled === true;
   const currentUserId = session?.userId ?? null;
-  const listBranchId = resolveWaitingRoomListBranchId(
-    boardFilters.branchId,
-    session?.branchId
-  );
-
-  const [entries, weekAppointments] = await Promise.all([
-    listWaitingRoom({ date: selectedDate, branchId: listBranchId }),
-    isToday
-      ? listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[])
-      : Promise.resolve([] as AppointmentListRow[]),
-  ]);
 
   const visibleEntries =
     mineOnly && currentUserId

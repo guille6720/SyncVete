@@ -13,10 +13,9 @@ import { ProfessionalsList } from '@/components/professionals/professionals-list
 import { formatMeteredUsage, isQuotaNearLimit, parseOrganizationSettings } from '@sincvete/shared';
 
 export default async function ProfesionalesPage() {
-  const canRead = await canReadProfessionals();
+  const [canRead, session] = await Promise.all([canReadProfessionals(), getSessionContext()]);
   if (!canRead) redirect('/dashboard');
 
-  const session = await getSessionContext();
   const [professionals, canWrite, branches, staff, seats, organization] = await Promise.all([
     listProfessionalsWithSummary(),
     canWriteProfessionals(),

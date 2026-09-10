@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cache } from 'react';
 import {
   professionalCreateSchema,
   professionalUpdateSchema,
@@ -289,6 +290,10 @@ export async function getProfessional(id: string): Promise<Professional | null> 
 }
 
 export async function getProfessionalForCurrentUser(): Promise<Professional | null> {
+  return loadProfessionalForCurrentUser();
+}
+
+const loadProfessionalForCurrentUser = cache(async (): Promise<Professional | null> => {
   const session = await getSessionContext();
   if (!session?.userId) return null;
 
@@ -314,10 +319,10 @@ export async function getProfessionalForCurrentUser(): Promise<Professional | nu
     throw error;
   }
   return data ? mapProfessional(data as Record<string, unknown>) : null;
-}
+});
 
 export async function hasLinkedProfessionalProfile(): Promise<boolean> {
-  const professional = await getProfessionalForCurrentUser();
+  const professional = await loadProfessionalForCurrentUser();
   return professional != null;
 }
 

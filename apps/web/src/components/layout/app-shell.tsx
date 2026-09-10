@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -14,8 +15,13 @@ import { BrandLogo } from '@/components/brand/syncvete-logo';
 import { ThemeControls } from '@/components/theme/theme-controls';
 import { AppUpdateBanner } from '@/components/layout/app-update-banner';
 import { InstallAppButton } from '@/components/pwa/install-app-button';
-import { CommandPalette, CommandPaletteTrigger } from './command-palette';
+import { CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+
+const CommandPalette = dynamic(
+  () => import('./command-palette').then((mod) => ({ default: mod.CommandPalette })),
+  { ssr: false }
+);
 
 /** Prefer hover/focus Next.js prefetch; avoid mounting a storm of heavy modules. */
 const IDLE_PREFETCH_HREFS = ['/dashboard', '/agenda'] as const;
@@ -32,6 +38,8 @@ interface AppShellProps {
   entitledHrefs?: string[] | null;
   /** Streamed commercial banner (non-critical). Prefer over blocking layout awaits. */
   billingBannerSlot?: React.ReactNode;
+  /** Streamed notification bell; falls back to unreadNotifications when omitted. */
+  notificationBellSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
 }
 
@@ -46,6 +54,7 @@ export function AppShell({
   isPlatformAdmin = false,
   entitledHrefs = null,
   billingBannerSlot = null,
+  notificationBellSlot = null,
   showMySettlementsNav = false,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -226,7 +235,7 @@ export function AppShell({
                 <BranchSelector branches={branches} activeBranchId={activeBranchId ?? null} />
               </div>
             )}
-            <NotificationBell unreadCount={unreadNotifications} />
+            {notificationBellSlot ?? <NotificationBell unreadCount={unreadNotifications} />}
           </div>
         </header>
 
