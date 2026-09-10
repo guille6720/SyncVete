@@ -308,7 +308,7 @@ export const DASHBOARD_NAV_ACTIONS: DashboardNavAction[] = [
   {
     id: 'new-professional',
     label: 'Nuevo profesional',
-    href: '/profesionales#nuevo',
+    href: '/profesionales/nuevo',
     icon: UserPlus,
     requiresWrite: false,
     tone: ACTION_TONE,

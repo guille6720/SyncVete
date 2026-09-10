@@ -54,6 +54,6 @@ describe('dashboard-nav-catalog', () => {
 
     expect(professionals?.href).toBe('/profesionales');
     expect(settlements?.href).toBe('/liquidaciones');
-    expect(create?.href).toBe('/profesionales#nuevo');
+    expect(create?.href).toBe('/profesionales/nuevo');
   });
 });
