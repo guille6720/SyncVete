@@ -66,6 +66,17 @@ function rpcErrorMessage(error: { message?: string } | null): string {
   return message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
 }
 
+function mapAuthAdminError(error: { message?: string } | null | undefined): string {
+  const message = error?.message?.trim() || 'No se pudo completar la operación de Auth';
+  if (/invalid api key/i.test(message)) {
+    return 'Clave de servicio de Supabase inválida. En Vercel, SUPABASE_SERVICE_ROLE_KEY debe ser la service_role del mismo proyecto que NEXT_PUBLIC_SUPABASE_URL (sin comillas). Después hacé Redeploy.';
+  }
+  if (/jwt|not authorized|forbidden/i.test(message)) {
+    return 'La service role no autoriza crear usuarios. Verificá SUPABASE_SERVICE_ROLE_KEY en Vercel y redeploy.';
+  }
+  return message;
+}
+
 function mapProfessional(row: Record<string, unknown>): Professional {
   return {
     id: String(row.id),
@@ -777,12 +788,23 @@ export async function createProfessionalOnboarding(
       }
 
       const supabaseForLimit = await createServerClient();
-      const service = await createServiceClient();
+      let service;
+      try {
+        service = await createServiceClient();
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : mapAuthAdminError(null),
+        };
+      }
 
-      const { data: existingUsers } = await service.auth.admin.listUsers({
+      const { data: existingUsers, error: listError } = await service.auth.admin.listUsers({
         page: 1,
         perPage: 1000,
       });
+      if (listError) {
+        return { success: false, error: mapAuthAdminError(listError) };
+      }
       const existingUser = existingUsers.users.find(
         (u) => u.email?.toLowerCase() === accessEmail
       );
@@ -834,7 +856,7 @@ export async function createProfessionalOnboarding(
           },
         });
         if (metaError) {
-          return { success: false, error: metaError.message };
+          return { success: false, error: mapAuthAdminError(metaError) };
         }
       } else {
         temporaryPassword =
@@ -888,7 +910,7 @@ export async function createProfessionalOnboarding(
         if (createError || !created.user) {
           return {
             success: false,
-            error: createError?.message || 'No se pudo crear el usuario',
+            error: mapAuthAdminError(createError) || 'No se pudo crear el usuario',
           };
         }
         createdUserId = created.user.id;
