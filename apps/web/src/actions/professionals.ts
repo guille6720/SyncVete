@@ -66,6 +66,13 @@ function rpcErrorMessage(error: { message?: string } | null): string {
   return message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
 }
 
+function isMissingProfessionalsProfileColumnError(error: { message?: string } | null): boolean {
+  const message = error?.message ?? '';
+  return /Could not find the '(phone|email|address|date_of_birth|avatar_url|created_by)' column of 'professionals'/i.test(
+    message
+  );
+}
+
 function mapAuthAdminError(error: { message?: string } | null | undefined): string {
   const message = error?.message?.trim() || 'No se pudo completar la operación de Auth';
   if (/invalid api key/i.test(message)) {
@@ -75,6 +82,69 @@ function mapAuthAdminError(error: { message?: string } | null | undefined): stri
     return 'La service role no autoriza crear usuarios. Verificá SUPABASE_SERVICE_ROLE_KEY en Vercel y redeploy.';
   }
   return message;
+}
+
+type ProfessionalBaseInsert = {
+  organization_id: string;
+  user_id: string | null;
+  profile_id: string | null;
+  first_name: string;
+  last_name: string;
+  document_number: string | null;
+  tax_id: string | null;
+  professional_license: string | null;
+  professional_license_jurisdiction: string | null;
+  specialty: string | null;
+  relationship_type: Professional['relationship_type'];
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+  invoice_required: boolean;
+  notes: string | null;
+  created_by: string;
+};
+
+type ProfessionalProfilePatch = {
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  date_of_birth: string | null;
+  avatar_url: string | null;
+};
+
+/** Insert compatible with DBs that still lack 20260915000000 profile columns. */
+async function insertProfessionalWithOptionalProfile(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  base: ProfessionalBaseInsert,
+  profile: ProfessionalProfilePatch
+) {
+  const withProfile = { ...base, ...profile };
+  const firstAttempt = await supabase.from('professionals').insert(withProfile).select('*').single();
+
+  if (!firstAttempt.error) {
+    return firstAttempt;
+  }
+
+  if (!isMissingProfessionalsProfileColumnError(firstAttempt.error)) {
+    return firstAttempt;
+  }
+
+  // Fallback: core columns only (migration not applied yet).
+  const { created_by: _createdBy, ...legacyBase } = base;
+  const legacyAttempt = await supabase.from('professionals').insert(legacyBase).select('*').single();
+  if (legacyAttempt.error || !legacyAttempt.data) {
+    return {
+      data: null,
+      error: {
+        message:
+          'Falta la migración de campos de profesionales (phone/email/address). Ejecutá en Supabase SQL: supabase/migrations/20260915000000_professionals_profile_fields.sql',
+      },
+    };
+  }
+
+  // Best-effort profile patch once columns exist partially; ignore schema misses.
+  await supabase.from('professionals').update(profile).eq('id', legacyAttempt.data.id);
+  return legacyAttempt;
 }
 
 function mapProfessional(row: Record<string, unknown>): Professional {
@@ -420,9 +490,9 @@ export async function createProfessional(
     };
 
     const supabase = await createServerClient();
-    const { data, error } = await supabase
-      .from('professionals')
-      .insert({
+    const { data, error } = await insertProfessionalWithOptionalProfile(
+      supabase,
+      {
         organization_id: session.organizationId,
         user_id: parsed.data.userId ?? null,
         profile_id: parsed.data.profileId ?? null,
@@ -431,13 +501,10 @@ export async function createProfessional(
         document_number: emptyToNull(parsed.data.documentNumber),
         tax_id: emptyToNull(parsed.data.taxId),
         professional_license: emptyToNull(parsed.data.professionalLicense),
-        professional_license_jurisdiction: emptyToNull(parsed.data.professionalLicenseJurisdiction),
+        professional_license_jurisdiction: emptyToNull(
+          parsed.data.professionalLicenseJurisdiction
+        ),
         specialty: emptyToNull(parsed.data.specialty),
-        phone: emptyToNull(parsed.data.phone),
-        email: emptyToNull(parsed.data.email),
-        address: emptyToNull(parsed.data.address),
-        date_of_birth: emptyToNull(parsed.data.dateOfBirth),
-        avatar_url: emptyToNull(parsed.data.avatarUrl),
         relationship_type: parsed.data.relationshipType,
         start_date: emptyToNull(parsed.data.startDate),
         end_date: emptyToNull(parsed.data.endDate),
@@ -445,9 +512,15 @@ export async function createProfessional(
         invoice_required: parsed.data.invoiceRequired ?? false,
         notes: emptyToNull(parsed.data.notes),
         created_by: session.userId,
-      })
-      .select('*')
-      .single();
+      },
+      {
+        phone: emptyToNull(parsed.data.phone),
+        email: emptyToNull(parsed.data.email),
+        address: emptyToNull(parsed.data.address),
+        date_of_birth: emptyToNull(parsed.data.dateOfBirth),
+        avatar_url: emptyToNull(parsed.data.avatarUrl),
+      }
+    );
 
     if (error) {
       return { success: false, error: rpcErrorMessage(error) };
@@ -943,9 +1016,9 @@ export async function createProfessionalOnboarding(
     }
 
     const supabase = await createServerClient();
-    const { data, error } = await supabase
-      .from('professionals')
-      .insert({
+    const { data, error } = await insertProfessionalWithOptionalProfile(
+      supabase,
+      {
         organization_id: session.organizationId,
         user_id: createdUserId,
         profile_id: createdUserId,
@@ -956,11 +1029,6 @@ export async function createProfessionalOnboarding(
         professional_license: emptyToNull(input.professionalLicense),
         professional_license_jurisdiction: emptyToNull(input.professionalLicenseJurisdiction),
         specialty: emptyToNull(input.specialty),
-        phone: emptyToNull(input.phone),
-        email: emptyToNull(input.email || input.accessEmail),
-        address: emptyToNull(input.address),
-        date_of_birth: emptyToNull(input.dateOfBirth),
-        avatar_url: emptyToNull(input.avatarUrl),
         relationship_type: input.relationshipType,
         start_date: emptyToNull(input.startDate),
         end_date: emptyToNull(input.endDate),
@@ -968,9 +1036,15 @@ export async function createProfessionalOnboarding(
         invoice_required: input.invoiceRequired ?? false,
         notes: emptyToNull(input.notes),
         created_by: session.userId,
-      })
-      .select('*')
-      .single();
+      },
+      {
+        phone: emptyToNull(input.phone),
+        email: emptyToNull(input.email || input.accessEmail),
+        address: emptyToNull(input.address),
+        date_of_birth: emptyToNull(input.dateOfBirth),
+        avatar_url: emptyToNull(input.avatarUrl),
+      }
+    );
 
     if (error) {
       return { success: false, error: rpcErrorMessage(error) };
