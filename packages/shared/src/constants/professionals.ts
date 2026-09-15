@@ -178,3 +178,43 @@ export function isSettlementStatus(value: string): value is SettlementStatus {
 export function isSettlementLocked(status: SettlementStatus): boolean {
   return (SETTLEMENT_LOCKED_STATUSES as readonly string[]).includes(status);
 }
+
+/** Permission templates used when creating a professional account (role + specialty). */
+export const PROFESSIONAL_ACCESS_TEMPLATES = [
+  'veterinarian',
+  'veterinarian_admin',
+  'specialist',
+  'surgeon',
+  'external',
+] as const;
+
+export type ProfessionalAccessTemplate = (typeof PROFESSIONAL_ACCESS_TEMPLATES)[number];
+
+export const PROFESSIONAL_ACCESS_TEMPLATE_LABELS: Record<ProfessionalAccessTemplate, string> = {
+  veterinarian: 'Veterinario',
+  veterinarian_admin: 'Veterinario administrador',
+  specialist: 'Especialista',
+  surgeon: 'Cirujano',
+  external: 'Profesional externo',
+};
+
+export const PROFESSIONAL_ACCESS_TEMPLATE_HINTS: Record<ProfessionalAccessTemplate, string> = {
+  veterinarian: 'Pacientes, agenda, clínica y sala de espera.',
+  veterinarian_admin: 'Como veterinario + lectura de liquidaciones y reportes ampliados.',
+  specialist: 'Clínica y agenda; ideal para cardiología, dermatología, etc.',
+  surgeon: 'Enfoque en cirugías y clínica; agenda propia.',
+  external: 'Acceso limitado de lectura clínica y agenda propia.',
+};
+
+/** Suggested specialty label when picking a template (editable in the form). */
+export const PROFESSIONAL_ACCESS_TEMPLATE_DEFAULT_SPECIALTY: Record<
+  ProfessionalAccessTemplate,
+  string
+> = {
+  veterinarian: 'Medicina general',
+  veterinarian_admin: 'Medicina general',
+  specialist: 'Especialidad',
+  surgeon: 'Cirugía',
+  external: 'Externo',
+};
+

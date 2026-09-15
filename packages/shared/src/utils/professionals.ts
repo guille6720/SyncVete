@@ -1,6 +1,10 @@
 import type { ProfessionalSettlement, ProfessionalSettlementItem } from '../types/professionals';
-import type { SettlementItemSourceType } from '../constants/professionals';
+import type {
+  ProfessionalAccessTemplate,
+  SettlementItemSourceType,
+} from '../constants/professionals';
 import { PROFESSIONALS_MONETARY_SCALE } from '../constants/professionals';
+import { ROLE_PERMISSIONS, type Permission, type Role } from '../constants';
 
 /** Documented rounding: half-up to 2 decimals at each line; totals sum rounded lines. */
 export function roundProfessionalMoney(value: number): number {
@@ -12,6 +16,43 @@ export function parseNumericField(value: unknown): number {
   if (value == null) return 0;
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Maps access template → platform role + optional permission overrides. */
+export function resolveProfessionalAccessTemplate(template: ProfessionalAccessTemplate): {
+  role: Role;
+  permissions: Permission[] | null;
+} {
+  switch (template) {
+    case 'veterinarian_admin':
+      return {
+        role: 'veterinarian',
+        permissions: Array.from(
+          new Set([
+            ...ROLE_PERMISSIONS.veterinarian,
+            'reports:read' as Permission,
+            'professional_settlements:read' as Permission,
+            'billing:read' as Permission,
+          ])
+        ),
+      };
+    case 'external':
+      return {
+        role: 'readonly',
+        permissions: [
+          'patients:read',
+          'appointments:read',
+          'appointments:write',
+          'clinical:read',
+          'waiting_room:read',
+        ],
+      };
+    case 'specialist':
+    case 'surgeon':
+    case 'veterinarian':
+    default:
+      return { role: 'veterinarian', permissions: null };
+  }
 }
 
 export function mapSettlementRow(row: Record<string, unknown>): ProfessionalSettlement {

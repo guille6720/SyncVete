@@ -4,21 +4,30 @@ import { revalidatePath } from 'next/cache';
 import { cache } from 'react';
 import {
   professionalCreateSchema,
+  professionalOnboardingSchema,
   professionalUpdateSchema,
+  resolveProfessionalAccessTemplate,
   type ActionResult,
   type Professional,
   type ProfessionalBranch,
   type ProfessionalListRow,
   type ProfessionalSettlementSummary,
 } from '@sincvete/shared';
-import { createServerClient } from '@/lib/supabase/server';
+import type { Json } from '@sincvete/db';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import {
   PermissionError,
   canPermissionAndFeature,
   requirePermission,
   requirePermissionAndFeature,
 } from '@/lib/permissions';
-import { FEATURES, planRestrictionResult, canUseFeature } from '@/lib/entitlements';
+import {
+  FEATURES,
+  assertWithinLimit,
+  getSeatUsageMeters,
+  planRestrictionResult,
+  canUseFeature,
+} from '@/lib/entitlements';
 import { getSessionContext } from '@/actions/auth';
 import type { Database } from '@sincvete/db';
 
@@ -676,6 +685,324 @@ export async function setProfessionalMembershipActive(
     revalidateProfessionalsModule();
     revalidatePath('/configuracion');
     return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+type ProfessionalOnboardingResult = Professional & { temporaryPassword?: string };
+
+function generateTemporaryPassword(length = 12): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+}
+
+function normalizeScheduleTime(value: string): string {
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+export async function createProfessionalOnboarding(
+  _prev: ActionResult<ProfessionalOnboardingResult> | null,
+  formData: FormData
+): Promise<ActionResult<ProfessionalOnboardingResult>> {
+  try {
+    await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    const session = await getSessionContext();
+    if (!session) return { success: false, error: 'Sesión inválida' };
+
+    const createPlatformAccessRaw = formData.get('createPlatformAccess');
+    const createPlatformAccess =
+      createPlatformAccessRaw === 'true' || createPlatformAccessRaw === 'on';
+
+    const parsed = professionalOnboardingSchema.safeParse({
+      firstName: formData.get('firstName'),
+      lastName: formData.get('lastName'),
+      documentNumber: formData.get('documentNumber') || null,
+      professionalLicense: formData.get('professionalLicense') || null,
+      specialty: formData.get('specialty') || null,
+      phone: formData.get('phone') || null,
+      email: formData.get('email') || null,
+      relationshipType: formData.get('relationshipType'),
+      isActive: formData.get('isActive') === 'true' || formData.get('isActive') === 'on',
+      notes: formData.get('notes') || null,
+      branchId: formData.get('branchId'),
+      branchIds: formData.getAll('branchIds').map(String).filter(Boolean),
+      accessTemplate: formData.get('accessTemplate') || 'veterinarian',
+      createPlatformAccess,
+      accessEmail: formData.get('accessEmail') || null,
+      passwordMode: formData.get('passwordMode') || 'auto',
+      password: formData.get('password') || null,
+      forcePasswordChange:
+        formData.get('forcePasswordChange') === 'true' ||
+        formData.get('forcePasswordChange') === 'on',
+      scheduleWeekdays: formData.getAll('scheduleWeekdays').map(String).filter(Boolean),
+      scheduleStartTime: formData.get('scheduleStartTime') || '09:00',
+      scheduleEndTime: formData.get('scheduleEndTime') || '18:00',
+      scheduleSlotMinutes: formData.get('scheduleSlotMinutes') || 30,
+    });
+
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0]?.message;
+      return {
+        success: false,
+        error: firstIssue || 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const input = parsed.data;
+    const emptyToNull = (value: string | null | undefined) => {
+      if (value == null || value === '') return null;
+      return value;
+    };
+
+    const branchIds = Array.from(
+      new Set([input.branchId, ...(input.branchIds ?? [])].filter(Boolean))
+    );
+
+    let temporaryPassword: string | undefined;
+    let createdUserId: string | null = null;
+    const accessTemplate = resolveProfessionalAccessTemplate(input.accessTemplate);
+
+    if (input.createPlatformAccess) {
+      await requirePermission('users:manage');
+
+      const accessEmail = String(input.accessEmail || input.email || '')
+        .trim()
+        .toLowerCase();
+      if (!accessEmail) {
+        return { success: false, error: 'Indicá un email para el acceso' };
+      }
+
+      const supabaseForLimit = await createServerClient();
+      const service = await createServiceClient();
+
+      const { data: existingUsers } = await service.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+      const existingUser = existingUsers.users.find(
+        (u) => u.email?.toLowerCase() === accessEmail
+      );
+
+      if (existingUser) {
+        const { data: existingProfile } = await supabaseForLimit
+          .from('profiles')
+          .select('id, organization_id')
+          .eq('id', existingUser.id)
+          .is('deleted_at', null)
+          .maybeSingle();
+
+        if (
+          existingProfile?.organization_id &&
+          existingProfile.organization_id !== session.organizationId
+        ) {
+          return {
+            success: false,
+            error: 'Ese email ya pertenece a otra organización',
+          };
+        }
+
+        if (!existingProfile) {
+          const [{ count: profileCount }, { count: inviteCount }] = await Promise.all([
+            supabaseForLimit
+              .from('profiles')
+              .select('id', { count: 'exact', head: true })
+              .eq('is_active', true)
+              .is('deleted_at', null),
+            supabaseForLimit
+              .from('organization_invitations')
+              .select('id', { count: 'exact', head: true })
+              .eq('status', 'pending')
+              .is('deleted_at', null),
+          ]);
+          await assertWithinLimit({
+            organizationId: session.organizationId,
+            featureKey: FEATURES.USERS_MAX,
+            currentCount: (profileCount ?? 0) + (inviteCount ?? 0),
+          });
+        }
+
+        createdUserId = existingUser.id;
+        temporaryPassword = undefined;
+        const { error: metaError } = await service.auth.admin.updateUserById(existingUser.id, {
+          user_metadata: {
+            ...(existingUser.user_metadata ?? {}),
+            full_name: `${input.firstName} ${input.lastName}`.trim(),
+          },
+        });
+        if (metaError) {
+          return { success: false, error: metaError.message };
+        }
+      } else {
+        temporaryPassword =
+          input.passwordMode === 'manual' && input.password
+            ? input.password
+            : generateTemporaryPassword();
+
+        const [{ count: profileCount }, { count: inviteCount }] = await Promise.all([
+          supabaseForLimit
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('is_active', true)
+            .is('deleted_at', null),
+          supabaseForLimit
+            .from('organization_invitations')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'pending')
+            .is('deleted_at', null),
+        ]);
+        await assertWithinLimit({
+          organizationId: session.organizationId,
+          featureKey: FEATURES.USERS_MAX,
+          currentCount: (profileCount ?? 0) + (inviteCount ?? 0),
+        });
+
+        if (accessTemplate.role === 'veterinarian') {
+          const seats = await getSeatUsageMeters(session.organizationId);
+          const meter = seats.find((item) => item.featureKey === FEATURES.PROFESSIONALS_MAX);
+          if (meter) {
+            await assertWithinLimit({
+              organizationId: session.organizationId,
+              featureKey: FEATURES.PROFESSIONALS_MAX,
+              currentCount: meter.used,
+            });
+          }
+        }
+
+        const { data: created, error: createError } = await service.auth.admin.createUser({
+          email: accessEmail,
+          password: temporaryPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: `${input.firstName} ${input.lastName}`.trim(),
+            force_password_change: input.forcePasswordChange,
+            organization_id: session.organizationId,
+            branch_id: input.branchId,
+            role: accessTemplate.role,
+          },
+        });
+
+        if (createError || !created.user) {
+          return {
+            success: false,
+            error: createError?.message || 'No se pudo crear el usuario',
+          };
+        }
+        createdUserId = created.user.id;
+      }
+
+      const supabase = await createServerClient();
+      const { error: rpcError } = await supabase.rpc('add_team_member', {
+        p_user_id: createdUserId,
+        p_branch_id: input.branchId,
+        p_role: accessTemplate.role,
+      });
+      if (rpcError) {
+        return { success: false, error: rpcErrorMessage(rpcError) };
+      }
+
+      if (accessTemplate.permissions) {
+        const { error: permError } = await supabase
+          .from('branch_members')
+          .update({
+            permissions: accessTemplate.permissions as unknown as Json,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', createdUserId)
+          .eq('branch_id', input.branchId)
+          .is('deleted_at', null);
+        if (permError) {
+          return { success: false, error: rpcErrorMessage(permError) };
+        }
+      }
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('professionals')
+      .insert({
+        organization_id: session.organizationId,
+        user_id: createdUserId,
+        profile_id: createdUserId,
+        first_name: input.firstName,
+        last_name: input.lastName,
+        document_number: emptyToNull(input.documentNumber),
+        tax_id: emptyToNull(input.taxId),
+        professional_license: emptyToNull(input.professionalLicense),
+        professional_license_jurisdiction: emptyToNull(input.professionalLicenseJurisdiction),
+        specialty: emptyToNull(input.specialty),
+        phone: emptyToNull(input.phone),
+        email: emptyToNull(input.email || input.accessEmail),
+        address: emptyToNull(input.address),
+        date_of_birth: emptyToNull(input.dateOfBirth),
+        avatar_url: emptyToNull(input.avatarUrl),
+        relationship_type: input.relationshipType,
+        start_date: emptyToNull(input.startDate),
+        end_date: emptyToNull(input.endDate),
+        is_active: input.isActive ?? true,
+        invoice_required: input.invoiceRequired ?? false,
+        notes: emptyToNull(input.notes),
+        created_by: session.userId,
+      })
+      .select('*')
+      .single();
+
+    if (error) {
+      return { success: false, error: rpcErrorMessage(error) };
+    }
+
+    if (branchIds.length > 0) {
+      const branchRows = branchIds.map((branchId) => ({
+        organization_id: session.organizationId,
+        professional_id: data.id,
+        branch_id: branchId,
+        is_active: true,
+      }));
+      const { error: branchError } = await supabase.from('professional_branches').insert(branchRows);
+      if (branchError) {
+        return { success: false, error: rpcErrorMessage(branchError) };
+      }
+    }
+
+    if (createdUserId && (input.scheduleWeekdays?.length ?? 0) > 0) {
+      const startTime = normalizeScheduleTime(input.scheduleStartTime ?? '09:00');
+      const endTime = normalizeScheduleTime(input.scheduleEndTime ?? '18:00');
+      for (const weekday of input.scheduleWeekdays) {
+        const { error: scheduleError } = await supabase.rpc('upsert_professional_schedule', {
+          p_branch_id: input.branchId,
+          p_user_id: createdUserId,
+          p_weekday: weekday,
+          p_start_time: startTime,
+          p_end_time: endTime,
+          p_slot_duration_minutes: input.scheduleSlotMinutes ?? 30,
+          p_allowed_appointment_types: null,
+          p_is_active: true,
+          p_id: null,
+        });
+        if (scheduleError) {
+          return {
+            success: false,
+            error: `Profesional creado, pero falló la agenda: ${rpcErrorMessage(scheduleError)}`,
+          };
+        }
+      }
+      revalidatePath('/agenda');
+    }
+
+    revalidateProfessionalsModule();
+    revalidatePath('/configuracion');
+    revalidatePath(`/profesionales/${data.id}`);
+
+    return {
+      success: true,
+      data: {
+        ...mapProfessional(data as Record<string, unknown>),
+        temporaryPassword,
+      },
+    };
   } catch (error) {
     return actionError(error);
   }

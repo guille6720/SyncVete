@@ -1,19 +1,23 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import {
-  canWriteProfessionals,
-} from '@/actions/professionals';
-import { getAssignableStaff } from '@/actions/appointments';
+import { canWriteProfessionals } from '@/actions/professionals';
 import { getUserBranches } from '@/actions/settings';
-import { ProfessionalForm } from '@/components/professionals/professional-form';
+import { getSessionContext } from '@/actions/auth';
+import { ProfessionalCreateWizard } from '@/components/professionals/professional-create-wizard';
 import { Button } from '@/components/ui/button';
+import { hasPermission } from '@sincvete/shared';
 
 export default async function NuevoProfesionalPage() {
-  const canWrite = await canWriteProfessionals();
+  const [canWrite, session, branches] = await Promise.all([
+    canWriteProfessionals(),
+    getSessionContext(),
+    getUserBranches(),
+  ]);
   if (!canWrite) redirect('/profesionales');
 
-  const [branches, staff] = await Promise.all([getUserBranches(), getAssignableStaff()]);
+  const canManageUsers = Boolean(session && hasPermission(session.permissions, 'users:manage'));
+  const defaultBranchId = session?.branchId ?? branches[0]?.id ?? null;
 
   return (
     <div className="space-y-4">
@@ -27,14 +31,15 @@ export default async function NuevoProfesionalPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Nuevo profesional</h1>
         <p className="text-muted-foreground">
-          Alta de veterinario u otro profesional para compensación operativa
+          Datos, usuario/contraseña, permisos por especialidad y agenda inicial. Después configurás
+          honorarios y liquidaciones en la ficha.
         </p>
       </div>
 
-      <ProfessionalForm
-        mode="create"
+      <ProfessionalCreateWizard
         branches={branches}
-        staff={staff.map((member) => ({ userId: member.userId, fullName: member.fullName }))}
+        defaultBranchId={defaultBranchId}
+        canManageUsers={canManageUsers}
       />
     </div>
   );

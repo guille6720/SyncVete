@@ -11,13 +11,28 @@ import {
 interface ProfessionalsListProps {
   professionals: ProfessionalListRow[];
   currency?: string;
+  canWrite?: boolean;
 }
 
-export function ProfessionalsList({ professionals, currency = 'ARS' }: ProfessionalsListProps) {
+export function ProfessionalsList({
+  professionals,
+  currency = 'ARS',
+  canWrite = false,
+}: ProfessionalsListProps) {
   if (professionals.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-        Todavía no hay profesionales registrados.
+        <p>Todavía no hay profesionales registrados.</p>
+        {canWrite ? (
+          <p className="mt-3">
+            <Link
+              href="/profesionales/nuevo"
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              Crear el primero
+            </Link>
+          </p>
+        ) : null}
       </div>
     );
   }
