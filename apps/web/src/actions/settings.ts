@@ -759,27 +759,34 @@ export async function getUserBranches(): Promise<
 }
 
 const loadUserBranches = cache(async () => {
-  const session = await requireSession();
-  const supabase = await createServerClient();
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  return navPerfTime('branches.total', async () => {
+    const session = await requireSession();
+    const supabase = await createServerClient();
 
-  const { data: memberships } = await supabase
-    .from('branch_members')
-    .select('branch_id')
-    .eq('user_id', session.userId)
-    .eq('is_active', true)
-    .is('deleted_at', null);
+    const { data: memberships } = await navPerfTime('branches.memberships', async () =>
+      supabase
+        .from('branch_members')
+        .select('branch_id')
+        .eq('user_id', session.userId)
+        .eq('is_active', true)
+        .is('deleted_at', null)
+    );
 
-  const branchIds = (memberships ?? []).map((m) => m.branch_id);
-  if (branchIds.length === 0) return [];
+    const branchIds = (memberships ?? []).map((m) => m.branch_id);
+    if (branchIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from('branches')
-    .select('id, name, code, is_main, is_active')
-    .in('id', branchIds)
-    .is('deleted_at', null)
-    .order('is_main', { ascending: false })
-    .order('name');
+    const { data, error } = await navPerfTime('branches.select', async () =>
+      supabase
+        .from('branches')
+        .select('id, name, code, is_main, is_active')
+        .in('id', branchIds)
+        .is('deleted_at', null)
+        .order('is_main', { ascending: false })
+        .order('name')
+    );
 
-  if (error) throw error;
-  return data ?? [];
+    if (error) throw error;
+    return data ?? [];
+  });
 });

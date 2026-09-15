@@ -17,6 +17,8 @@ import { AppUpdateBanner } from '@/components/layout/app-update-banner';
 import { InstallAppButton } from '@/components/pwa/install-app-button';
 import { CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { PerfNavProbe, markNavPerfClick } from '@/components/layout/perf-nav-probe';
+import type { SvPerfReport } from '@/lib/perf/nav-timing';
 
 const CommandPalette = dynamic(
   () => import('./command-palette').then((mod) => ({ default: mod.CommandPalette })),
@@ -41,6 +43,8 @@ interface AppShellProps {
   /** Streamed notification bell; falls back to unreadNotifications when omitted. */
   notificationBellSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
+  /** Staging/dev navigation timing report from clinic layout. */
+  perfReport?: SvPerfReport | null;
 }
 
 export function AppShell({
@@ -56,6 +60,7 @@ export function AppShell({
   billingBannerSlot = null,
   notificationBellSlot = null,
   showMySettlementsNav = false,
+  perfReport = null,
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -188,7 +193,10 @@ export function AppShell({
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           onNavigate={(href, isActive) => {
-            if (!isActive) setPendingHref(href);
+            if (!isActive) {
+              markNavPerfClick(href);
+              setPendingHref(href);
+            }
             setSidebarOpen(false);
           }}
         />
@@ -244,6 +252,7 @@ export function AppShell({
           {children}
         </main>
       </div>
+      <PerfNavProbe report={perfReport} />
     </div>
   );
 }

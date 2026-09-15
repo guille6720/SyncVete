@@ -58,14 +58,22 @@ function profileToSession(profile: BootstrapProfile): SessionContext['profile'] 
  * cookie validation / revocation semantics (not getClaims-only).
  */
 export const getSessionContext = cache(async (): Promise<SessionContext | null> => {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  return navPerfTime('session.total', async () => {
+    const supabase = await createServerClient();
+    const user = await navPerfTime('session.getUser', async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      return authUser;
+    });
 
-  if (!user) return null;
+    if (!user) return null;
 
-  const { data: bootstrapRaw, error: bootstrapError } = await supabase.rpc('get_session_bootstrap');
+    const { data: bootstrapRaw, error: bootstrapError } = await navPerfTime(
+      'session.bootstrap',
+      async () => supabase.rpc('get_session_bootstrap')
+    );
 
   if (!bootstrapError && bootstrapRaw) {
     const bootstrap = bootstrapRaw as unknown as SessionBootstrap;
@@ -185,4 +193,5 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
     ownerId: portalOwnerId,
     isPlatformAdmin,
   };
+  });
 });

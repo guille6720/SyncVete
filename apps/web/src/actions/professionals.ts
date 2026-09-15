@@ -425,8 +425,11 @@ const loadProfessionalForCurrentUser = cache(async (): Promise<Professional | nu
 });
 
 export async function hasLinkedProfessionalProfile(): Promise<boolean> {
-  const professional = await loadProfessionalForCurrentUser();
-  return professional != null;
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  return navPerfTime('professional.linkCheck', async () => {
+    const professional = await loadProfessionalForCurrentUser();
+    return professional != null;
+  });
 }
 
 export async function listProfessionalBranches(

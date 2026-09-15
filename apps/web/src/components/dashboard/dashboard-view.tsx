@@ -193,8 +193,11 @@ export async function DashboardView() {
   const session = await getSessionContext();
   if (!session) return null;
 
-  const context = await getDashboardContext();
-  const commercial = await getClinicCommercialShell(session.organizationId);
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  const context = await navPerfTime('page.dashboard.context', () => getDashboardContext());
+  const commercial = await navPerfTime('page.dashboard.commercialShell', () =>
+    getClinicCommercialShell(session.organizationId)
+  );
 
   return (
     <div className="relative space-y-6">
