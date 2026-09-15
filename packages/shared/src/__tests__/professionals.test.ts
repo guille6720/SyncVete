@@ -435,7 +435,7 @@ describe('professionals money helpers', () => {
     );
     expect(csv).toContain('Reporte liquidaciones a profesionales');
     expect(csv).toContain('Pérez, Ana');
-    expect(csv).toContain('Aprobada');
+    expect(csv).toContain('Confirmada');
   });
 
   it('validates bulk settlement ids', () => {

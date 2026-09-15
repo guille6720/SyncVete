@@ -39,6 +39,10 @@ export function mapSettlementRow(row: Record<string, unknown>): ProfessionalSett
     cancelled_at: row.cancelled_at ? String(row.cancelled_at) : null,
     cancelled_by: row.cancelled_by ? String(row.cancelled_by) : null,
     cancellation_reason: row.cancellation_reason ? String(row.cancellation_reason) : null,
+    calculation_snapshot:
+      row.calculation_snapshot && typeof row.calculation_snapshot === 'object'
+        ? (row.calculation_snapshot as Record<string, unknown>)
+        : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     deleted_at: row.deleted_at ? String(row.deleted_at) : null,

@@ -11,51 +11,91 @@ import {
   canReadProfessionals,
   canWriteProfessionals,
   getProfessional,
+  getProfessionalAccessState,
   getProfessionalSettlementSummary,
   listProfessionalBranches,
 } from '@/actions/professionals';
-import { ProfessionalSummaryStrip } from '@/components/professionals/professional-summary-strip';
-import { getAssignableStaff } from '@/actions/appointments';
+import { canManageAppointments, getAssignableStaff } from '@/actions/appointments';
+import {
+  listProfessionalSchedules,
+  listProfessionalTimeBlocks,
+} from '@/actions/appointment-availability';
 import { getOrganization, getUserBranches } from '@/actions/settings';
-import { CompensationPanel } from '@/components/professionals/compensation-panel';
-import { ProfessionalSettlementsLink } from '@/components/professionals/professional-settlements-link';
-import { ProfessionalForm } from '@/components/professionals/professional-form';
-import { parseOrganizationSettings, PROFESSIONAL_RELATIONSHIP_LABELS } from '@sincvete/shared';
+import { canReadAudit } from '@/actions/audit';
+import { getSessionContext } from '@/lib/session';
+import { hasPermission, parseOrganizationSettings, formatDateParam } from '@sincvete/shared';
+import { ProfessionalProfileClient } from '@/components/professionals/professional-profile-client';
+import { ProfessionalHistoryPanel } from '@/components/professionals/professional-history-panel';
+import type { ProfessionalProfileTab } from '@/components/professionals/professional-profile-tabs';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-export default async function ProfesionalDetailPage({ params }: PageProps) {
+const PROFILE_TABS: ProfessionalProfileTab[] = [
+  'resumen',
+  'datos',
+  'agenda',
+  'honorarios',
+  'liquidaciones',
+  'acceso',
+  'historial',
+];
+
+export default async function ProfesionalDetailPage({ params, searchParams }: PageProps) {
   const canRead = await canReadProfessionals();
   if (!canRead) redirect('/dashboard');
 
-  const { id } = await params;
+  const [{ id }, query] = await Promise.all([params, searchParams]);
   if (!UUID_RE.test(id)) notFound();
 
   const professional = await getProfessional(id);
   if (!professional) notFound();
 
-  const [branches, professionalBranches, staff, canWrite, canReadComp, canWriteComp, canReadSettlements, organization, settlementSummary] =
-    await Promise.all([
-      getUserBranches(),
-      listProfessionalBranches(id),
-      getAssignableStaff(),
-      canWriteProfessionals(),
-      canReadProfessionalCompensation(),
-      canWriteProfessionalCompensation(),
-      canReadProfessionalSettlements(),
-      getOrganization(),
-      canReadProfessionalSettlements().then((allowed) =>
-        allowed ? getProfessionalSettlementSummary(id) : null
-      ),
-    ]);
+  const today = formatDateParam(new Date());
+  const [year, month, day] = today.split('-').map(Number);
+  const toDate = new Date(Date.UTC(year, month - 1, day + 60, 12));
+  const to = toDate.toISOString().slice(0, 10);
+
+  const [
+    session,
+    branches,
+    professionalBranches,
+    staff,
+    canWrite,
+    canReadComp,
+    canWriteComp,
+    canReadSettlements,
+    canWriteAppointments,
+    canAudit,
+    organization,
+    settlementSummary,
+    access,
+  ] = await Promise.all([
+    getSessionContext(),
+    getUserBranches(),
+    listProfessionalBranches(id),
+    getAssignableStaff(),
+    canWriteProfessionals(),
+    canReadProfessionalCompensation(),
+    canWriteProfessionalCompensation(),
+    canReadProfessionalSettlements(),
+    canManageAppointments(),
+    canReadAudit(),
+    getOrganization(),
+    canReadProfessionalSettlements().then((allowed) =>
+      allowed ? getProfessionalSettlementSummary(id) : null
+    ),
+    getProfessionalAccessState(id),
+  ]);
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
   const branchIds = professionalBranches.map((row) => row.branch_id);
+  const canManageUsers = Boolean(session && hasPermission(session.permissions, 'users:manage'));
 
   let schemes: Awaited<ReturnType<typeof listCompensationSchemes>> = [];
   const rulesByScheme: Record<string, Awaited<ReturnType<typeof listCompensationRules>>> = {};
@@ -69,61 +109,56 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
     );
   }
 
-  const recentSettlements = canReadSettlements
-    ? (await listSettlements({ professionalId: id, page: 1, pageSize: 5 })).data
-    : [];
+  const [recentSettlements, schedules, blocks] = await Promise.all([
+    canReadSettlements
+      ? listSettlements({ professionalId: id, page: 1, pageSize: 5 }).then((result) => result.data)
+      : Promise.resolve([]),
+    professional.user_id
+      ? listProfessionalSchedules({ userId: professional.user_id }).catch(() => [])
+      : Promise.resolve([]),
+    professional.user_id
+      ? listProfessionalTimeBlocks({ userId: professional.user_id, from: today, to }).catch(() => [])
+      : Promise.resolve([]),
+  ]);
+
+  const defaultTab = PROFILE_TABS.includes(query.tab as ProfessionalProfileTab)
+    ? (query.tab as ProfessionalProfileTab)
+    : 'resumen';
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {professional.last_name}, {professional.first_name}
-        </h1>
-        <p className="text-muted-foreground">
-          {PROFESSIONAL_RELATIONSHIP_LABELS[professional.relationship_type]}
-          {professional.specialty ? ` · ${professional.specialty}` : ''}
-        </p>
-      </div>
-
-      {settlementSummary ? (
-        <ProfessionalSummaryStrip
-          professionalId={id}
-          summary={settlementSummary}
-          currency={currency}
-          canCalculate={canWriteComp}
-        />
-      ) : null}
-
-      {canWrite && (
-        <ProfessionalForm
-          mode="edit"
-          professional={professional}
-          branches={branches}
-          branchIds={branchIds}
-          staff={staff.map((member) => ({ userId: member.userId, fullName: member.fullName }))}
-        />
-      )}
-
-      {canReadComp && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Compensación</h2>
-          <CompensationPanel
-            professionalId={id}
-            schemes={schemes}
-            rulesByScheme={rulesByScheme}
-            canWrite={canWriteComp}
-            currency={currency}
-          />
-        </div>
-      )}
-
-      {canReadSettlements && (
-        <ProfessionalSettlementsLink
-          professionalId={id}
-          recentSettlements={recentSettlements}
-          currency={currency}
-        />
-      )}
-    </div>
+    <ProfessionalProfileClient
+      professional={professional}
+      branches={branches}
+      branchIds={branchIds}
+      staff={staff}
+      canWrite={canWrite}
+      canReadComp={canReadComp}
+      canWriteComp={canWriteComp}
+      canReadSettlements={canReadSettlements}
+      canManageUsers={canManageUsers}
+      canWriteAppointments={canWriteAppointments}
+      currency={currency}
+      settlementSummary={settlementSummary}
+      schemes={schemes}
+      rulesByScheme={rulesByScheme}
+      recentSettlements={recentSettlements}
+      access={
+        access ?? {
+          userId: null,
+          membershipId: null,
+          role: null,
+          isActive: null,
+          email: professional.email,
+          fullName: null,
+        }
+      }
+      schedules={schedules}
+      blocks={blocks}
+      defaultBranchId={session?.branchId}
+      defaultTab={defaultTab}
+      historySlot={
+        <ProfessionalHistoryPanel professionalId={id} canReadAudit={canAudit} />
+      }
+    />
   );
 }

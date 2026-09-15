@@ -96,11 +96,11 @@ export type SettlementStatus = (typeof SETTLEMENT_STATUSES)[number];
 
 export const SETTLEMENT_STATUS_LABELS: Record<SettlementStatus, string> = {
   draft: 'Borrador',
-  review: 'En revisión',
-  approved: 'Aprobada',
+  review: 'Calculada / En revisión',
+  approved: 'Confirmada',
   partially_paid: 'Pago parcial',
   paid: 'Pagada',
-  cancelled: 'Cancelada',
+  cancelled: 'Anulada',
 };
 
 export const SETTLEMENT_STATUS_VARIANT: Record<

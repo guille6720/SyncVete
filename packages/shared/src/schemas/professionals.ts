@@ -21,6 +21,31 @@ export const professionalCreateSchema = z.object({
   professionalLicense: z.string().trim().max(80).optional().nullable(),
   professionalLicenseJurisdiction: z.string().trim().max(80).optional().nullable(),
   specialty: z.string().trim().max(120).optional().nullable(),
+  phone: z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' ? null : value)),
+  email: z
+    .union([z.string().trim().email().max(255), z.literal('')])
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' || value == null ? null : value)),
+  address: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' ? null : value)),
+  dateOfBirth: z.string().date().optional().nullable(),
+  avatarUrl: z
+    .union([z.string().trim().url().max(500), z.literal('')])
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' || value == null ? null : value)),
   relationshipType: z.enum(PROFESSIONAL_RELATIONSHIP_TYPES),
   startDate: z.string().date().optional().nullable(),
   endDate: z.string().date().optional().nullable(),
