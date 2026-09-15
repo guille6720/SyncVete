@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run --passWithNoTests",
     "test:e2e": "playwright test",
-    "build:manual": "npx tsx --tsconfig scripts/tsconfig.json scripts/build-manual.ts"
+    "build:manual": "npx tsx --tsconfig scripts/tsconfig.json scripts/build-manual.ts",
+    "build:manual:superadmin": "npx tsx --tsconfig scripts/tsconfig.json scripts/build-superadmin-manual.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
