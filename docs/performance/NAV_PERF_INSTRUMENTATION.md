@@ -25,8 +25,8 @@ Temporary measurement only. No behavioral optimizations in this pass.
 | `branches.*` | `getUserBranches` (memberships + branches) |
 | `entitlements.input` | Features/subscription/overrides/addons load |
 | `entitlements.hrefs` | Resolve entitled nav hrefs |
-| `professional.linkCheck` | Linked professional row check |
-| `layout.parallelShell` | Parallel branches + entitlements + professional |
+| `professional.linkCheck` | Streamed settlements-nav flag (non-critical) |
+| `layout.parallelShell` | Parallel branches + entitled hrefs (critical only) |
 | `layout.total` | Entire clinic layout critical path |
 | `page.dashboard.*` | Extra blocking work on Dashboard only |
 

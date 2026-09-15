@@ -18,6 +18,7 @@ import { InstallAppButton } from '@/components/pwa/install-app-button';
 import { CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { PerfNavProbe, markNavPerfClick } from '@/components/layout/perf-nav-probe';
+import { SettlementsNavProvider } from '@/components/layout/settlements-nav-context';
 import type { SvPerfReport } from '@/lib/perf/nav-timing';
 
 const CommandPalette = dynamic(
@@ -42,6 +43,8 @@ interface AppShellProps {
   billingBannerSlot?: React.ReactNode;
   /** Streamed notification bell; falls back to unreadNotifications when omitted. */
   notificationBellSlot?: React.ReactNode;
+  /** Streamed settlements-nav flag (non-critical). */
+  settlementsNavFlagSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
   /** Staging/dev navigation timing report from clinic layout. */
   perfReport?: SvPerfReport | null;
@@ -59,6 +62,7 @@ export function AppShell({
   entitledHrefs = null,
   billingBannerSlot = null,
   notificationBellSlot = null,
+  settlementsNavFlagSlot = null,
   showMySettlementsNav = false,
   perfReport = null,
 }: AppShellProps) {
@@ -97,12 +101,13 @@ export function AppShell({
   }
 
   return (
+    <SettlementsNavProvider initial={showMySettlementsNav}>
     <div className="flex min-h-dvh" style={{ background: 'var(--shell-bg)' }}>
+      {settlementsNavFlagSlot}
       <AppUpdateBanner />
       <CommandPalette
         entitledHrefs={entitledHrefs}
         isPlatformAdmin={isPlatformAdmin}
-        showMySettlementsNav={showMySettlementsNav}
       />
 
       {pendingHref ? (
@@ -189,7 +194,6 @@ export function AppShell({
 
         <ClinicSidebarNav
           entitledHrefs={entitledHrefs}
-          showMySettlementsNav={showMySettlementsNav}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           onNavigate={(href, isActive) => {
@@ -254,5 +258,6 @@ export function AppShell({
       </div>
       <PerfNavProbe report={perfReport} />
     </div>
+    </SettlementsNavProvider>
   );
 }

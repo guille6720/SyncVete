@@ -16,7 +16,7 @@ import { getOrganization } from '@/actions/settings';
 import { parseOrganizationSettings } from '@sincvete/shared';
 import { DashboardSettlementsSnapshot } from '@/components/dashboard/dashboard-settlements-snapshot';
 import { getSessionContext } from '@/lib/session';
-import { getClinicCommercialShell } from '@/lib/entitlements';
+import { getClinicEntitledHrefs } from '@/lib/entitlements';
 import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity-feed';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { DashboardQuickActions } from '@/components/dashboard/dashboard-quick-actions';
@@ -194,9 +194,8 @@ export async function DashboardView() {
   if (!session) return null;
 
   const { navPerfTime } = await import('@/lib/perf/nav-timing');
-  const context = await navPerfTime('page.dashboard.context', () => getDashboardContext());
-  const commercial = await navPerfTime('page.dashboard.commercialShell', () =>
-    getClinicCommercialShell(session.organizationId)
+  const [context, entitledHrefs] = await navPerfTime('page.dashboard.context', async () =>
+    Promise.all([getDashboardContext(), getClinicEntitledHrefs(session.organizationId)])
   );
 
   return (
@@ -213,21 +212,21 @@ export async function DashboardView() {
       <DashboardHeader session={session} context={context} />
       <DashboardQuickActions
         canWritePatients={context?.canWritePatients ?? false}
-        entitledHrefs={commercial.entitledHrefs}
+        entitledHrefs={entitledHrefs}
       />
       <Suspense fallback={<DashboardPrioritySkeleton />}>
-        <DashboardPrioritySection entitledHrefs={commercial.entitledHrefs} />
+        <DashboardPrioritySection entitledHrefs={entitledHrefs} />
       </Suspense>
       <Suspense fallback={<DashboardWaitingRoomSkeleton />}>
-        <DashboardWaitingRoomSection entitledHrefs={commercial.entitledHrefs} />
+        <DashboardWaitingRoomSection entitledHrefs={entitledHrefs} />
       </Suspense>
       <Suspense fallback={<DashboardSettlementsSkeleton />}>
-        <DashboardSettlementsSection entitledHrefs={commercial.entitledHrefs} />
+        <DashboardSettlementsSection entitledHrefs={entitledHrefs} />
       </Suspense>
       <Suspense fallback={<DashboardSecondarySkeleton />}>
         <DashboardSecondarySection
           canViewActivity={context?.canViewActivity ?? false}
-          entitledHrefs={commercial.entitledHrefs}
+          entitledHrefs={entitledHrefs}
         />
       </Suspense>
     </div>

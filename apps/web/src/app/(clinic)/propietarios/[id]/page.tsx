@@ -4,7 +4,7 @@ import { getOwnerPortalStatus } from '@/actions/portal';
 import { canSendWhatsApp } from '@/actions/whatsapp';
 import { listOwnerWaitingRoomHistory, canReadWaitingRoom } from '@/actions/waiting-room';
 import { OwnerDetail } from '@/components/owners/owner-detail';
-import { FEATURES, canUseFeature, getClinicCommercialShell } from '@/lib/entitlements';
+import { FEATURES, canUseFeature, getClinicEntitledHrefs } from '@/lib/entitlements';
 import { getSessionContext } from '@/lib/session';
 import { isClinicPathEntitled } from '@sincvete/shared';
 
@@ -18,7 +18,7 @@ export default async function PropietarioDetailPage({ params }: OwnerPageProps) 
 
   const { id } = await params;
   const session = await getSessionContext();
-  const [owner, canWrite, portalStatus, canWhatsApp, portalEnabled, commercial, canReadWr] =
+  const [owner, canWrite, portalStatus, canWhatsApp, portalEnabled, entitledHrefs, canReadWr] =
     await Promise.all([
       getOwner(id),
       canManageOwners(),
@@ -27,14 +27,14 @@ export default async function PropietarioDetailPage({ params }: OwnerPageProps) 
       session
         ? canUseFeature({ organizationId: session.organizationId, featureKey: FEATURES.OWNER_PORTAL })
         : Promise.resolve(false),
-      session ? getClinicCommercialShell(session.organizationId) : Promise.resolve({ entitledHrefs: null }),
+      session ? getClinicEntitledHrefs(session.organizationId) : Promise.resolve(null),
       canReadWaitingRoom(),
     ]);
 
   if (!owner) notFound();
 
   const waitingRoomHistory =
-    canReadWr && isClinicPathEntitled('/sala-espera', commercial.entitledHrefs)
+    canReadWr && isClinicPathEntitled('/sala-espera', entitledHrefs)
       ? await listOwnerWaitingRoomHistory(id)
       : [];
 
@@ -45,7 +45,7 @@ export default async function PropietarioDetailPage({ params }: OwnerPageProps) 
       canSendWhatsApp={canWhatsApp}
       portalEnabled={portalEnabled}
       portalStatus={portalStatus}
-      entitledHrefs={commercial.entitledHrefs}
+      entitledHrefs={entitledHrefs}
       waitingRoomHistory={waitingRoomHistory}
     />
   );
