@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
   linkProfessionalUser,
+  provisionProfessionalAccess,
   setProfessionalMembershipActive,
 } from '@/actions/professionals';
 import { inviteTeamMember } from '@/actions/settings';
@@ -14,7 +15,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { ROLE_LABELS, type Role } from '@sincvete/shared';
+import {
+  PROFESSIONAL_ACCESS_TEMPLATES,
+  PROFESSIONAL_ACCESS_TEMPLATE_HINTS,
+  PROFESSIONAL_ACCESS_TEMPLATE_LABELS,
+  ROLE_LABELS,
+  type ProfessionalAccessTemplate,
+  type Role,
+} from '@sincvete/shared';
 
 interface StaffOption {
   userId: string;
@@ -45,6 +53,12 @@ interface ProfessionalAccessPanelProps {
   canManageUsers: boolean;
 }
 
+function generatePassword(length = 12): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
+  const bytes = crypto.getRandomValues(new Uint8Array(length));
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+}
+
 export function ProfessionalAccessPanel({
   professionalId,
   access,
@@ -58,7 +72,18 @@ export function ProfessionalAccessPanel({
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [shownPassword, setShownPassword] = useState<string | null>(null);
   const [linkUserId, setLinkUserId] = useState(access.userId ?? '');
+  const [template, setTemplate] = useState<ProfessionalAccessTemplate>('veterinarian');
+  const [passwordMode, setPasswordMode] = useState<'auto' | 'manual'>('auto');
+  const [generatedPassword, setGeneratedPassword] = useState('');
+  const [manualPassword, setManualPassword] = useState('');
+
+  useEffect(() => {
+    if (passwordMode === 'auto' && !generatedPassword) {
+      setGeneratedPassword(generatePassword());
+    }
+  }, [passwordMode, generatedPassword]);
 
   const run = (fn: () => Promise<void>) => {
     startTransition(() => {
@@ -87,6 +112,24 @@ export function ProfessionalAccessPanel({
     });
   };
 
+  const handleProvision = (formData: FormData) => {
+    if (!canManageUsers) return;
+    run(async () => {
+      const result = await provisionProfessionalAccess(professionalId, formData);
+      if (!result.success) {
+        setError(result.error ?? 'No se pudo crear el acceso');
+        return;
+      }
+      if (result.data?.temporaryPassword) {
+        setShownPassword(result.data.temporaryPassword);
+        setMessage('Acceso creado y vinculado. Copiá la contraseña ahora (no se vuelve a mostrar).');
+      } else {
+        setShownPassword(null);
+        setMessage('Usuario existente agregado al equipo y vinculado al profesional.');
+      }
+    });
+  };
+
   const handleInvite = (formData: FormData) => {
     if (!canManageUsers) return;
     run(async () => {
@@ -95,9 +138,26 @@ export function ProfessionalAccessPanel({
         setError(result.error ?? 'No se pudo invitar');
         return;
       }
-      setMessage(
-        'Invitación enviada. Cuando acepte, vinculá el usuario desde esta pestaña.'
-      );
+      if (result.data?.userId) {
+        const link = await linkProfessionalUser(professionalId, result.data.userId);
+        if (!link.success) {
+          setError(
+            result.data.mode === 'existing_added'
+              ? 'Se agregó al equipo, pero no se pudo vincular al profesional. Usá “Guardar vínculo”.'
+              : 'Invitación ok, pero no se pudo vincular. Usá “Guardar vínculo”.'
+          );
+          return;
+        }
+      }
+      if (result.data?.mode === 'existing_added') {
+        setMessage(
+          'Ese email ya tenía cuenta: se agregó al equipo y se vinculó. No se envía mail. Ya puede iniciar sesión con su contraseña actual.'
+        );
+      } else {
+        setMessage(
+          'Usuario creado y vinculado. Si el mail de Supabase no llega, usá “Crear acceso con contraseña” o Recuperar contraseña.'
+        );
+      }
     });
   };
 
@@ -119,8 +179,8 @@ export function ProfessionalAccessPanel({
         <CardHeader>
           <CardTitle>Acceso a SyncVete</CardTitle>
           <CardDescription>
-            Vinculá un usuario del equipo o invitá por email (rol Veterinario). El reset de
-            contraseña se hace desde Configuración → Equipo o “Recuperar contraseña”.
+            Preferí crear usuario y contraseña acá (sin depender del mail). El reset también está en
+            Recuperar contraseña.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -176,8 +236,8 @@ export function ProfessionalAccessPanel({
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Este profesional todavía no tiene usuario vinculado. Sin vínculo no podrá
-              configurar agenda propia ni ver liquidaciones del portal.
+              Este profesional todavía no tiene usuario vinculado. Sin vínculo no podrá configurar
+              agenda propia ni ver liquidaciones del portal.
             </p>
           )}
 
@@ -206,16 +266,138 @@ export function ProfessionalAccessPanel({
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}
           {message ? <p className="text-sm text-emerald-600">{message}</p> : null}
+          {shownPassword ? (
+            <div className="rounded-md border border-emerald-300 bg-emerald-50 p-3 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
+              <p className="font-medium">Contraseña temporal</p>
+              <p className="mt-1 font-mono text-base tracking-wide">{shownPassword}</p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
+
+      {canManageUsers && !access.userId && branches.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Crear acceso con contraseña</CardTitle>
+            <CardDescription>
+              Crea el usuario, lo agrega al equipo y lo vincula al profesional. No necesita mail de
+              invitación.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={handleProvision} className="grid max-w-xl gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="accessEmail">Email de acceso</Label>
+                <Input
+                  id="accessEmail"
+                  name="accessEmail"
+                  type="email"
+                  required
+                  defaultValue={access.email ?? ''}
+                  placeholder="vet@clinica.com"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="accessTemplate">Perfil / permisos</Label>
+                <Select
+                  id="accessTemplate"
+                  name="accessTemplate"
+                  value={template}
+                  onChange={(event) =>
+                    setTemplate(event.target.value as ProfessionalAccessTemplate)
+                  }
+                >
+                  {PROFESSIONAL_ACCESS_TEMPLATES.map((item) => (
+                    <option key={item} value={item}>
+                      {PROFESSIONAL_ACCESS_TEMPLATE_LABELS[item]}
+                    </option>
+                  ))}
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  {PROFESSIONAL_ACCESS_TEMPLATE_HINTS[template]}
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="branchId">Sucursal</Label>
+                <Select
+                  id="branchId"
+                  name="branchId"
+                  required
+                  defaultValue={defaultBranchId ?? branches[0]?.id}
+                >
+                  {branches.map((branch) => (
+                    <option key={branch.id} value={branch.id}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="passwordMode">Contraseña</Label>
+                <Select
+                  id="passwordMode"
+                  name="passwordMode"
+                  value={passwordMode}
+                  onChange={(event) => {
+                    const mode = event.target.value as 'auto' | 'manual';
+                    setPasswordMode(mode);
+                    if (mode === 'auto') setGeneratedPassword(generatePassword());
+                  }}
+                >
+                  <option value="auto">Generar automáticamente</option>
+                  <option value="manual">Definir manualmente</option>
+                </Select>
+              </div>
+              {passwordMode === 'manual' ? (
+                <div className="space-y-2">
+                  <Label htmlFor="password">Contraseña temporal</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="text"
+                    minLength={8}
+                    required
+                    value={manualPassword}
+                    onChange={(event) => setManualPassword(event.target.value)}
+                  />
+                </div>
+              ) : (
+                <>
+                  <input type="hidden" name="password" value={generatedPassword} />
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                    <p className="font-medium">Contraseña generada</p>
+                    <p className="mt-1 font-mono tracking-wide">{generatedPassword}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-2"
+                      onClick={() => setGeneratedPassword(generatePassword())}
+                    >
+                      Regenerar
+                    </Button>
+                  </div>
+                </>
+              )}
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="forcePasswordChange" value="true" defaultChecked />
+                Forzar cambio de contraseña en el próximo ingreso
+              </label>
+              <Button type="submit" disabled={pending}>
+                {pending ? 'Creando...' : 'Crear acceso y vincular'}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {canManageUsers && branches.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Invitar nuevo usuario</CardTitle>
+            <CardTitle>Invitar por email (opcional)</CardTitle>
             <CardDescription>
-              Crea una invitación al equipo (Veterinario). Después vinculá el usuario al
-              profesional.
+              Depende del SMTP de Supabase. Si el mail no llega, usá crear acceso con contraseña
+              arriba.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -247,7 +429,7 @@ export function ProfessionalAccessPanel({
                 </Select>
               </div>
               <input type="hidden" name="role" value="veterinarian" />
-              <Button type="submit" disabled={pending}>
+              <Button type="submit" variant="outline" disabled={pending}>
                 {pending ? 'Invitando...' : 'Invitar como Veterinario'}
               </Button>
             </form>

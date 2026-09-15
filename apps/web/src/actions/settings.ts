@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { cache } from 'react';
+import { headers } from 'next/headers';
 import {
   branchListSchema,
   branchSchema,
@@ -22,6 +23,7 @@ import {
   type PaginatedResult,
   type TeamMemberRow,
   APP_TIMEZONE,
+  APP_CANONICAL_HOST,
 } from '@sincvete/shared';
 import type { Role } from '@sincvete/shared';
 import type { Json } from '@sincvete/db';
@@ -481,9 +483,9 @@ export async function updateTeamMember(
 }
 
 export async function inviteTeamMember(
-  _prev: ActionResult | null,
+  _prev: ActionResult<{ mode: 'existing_added' | 'invited'; userId: string }> | null,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResult<{ mode: 'existing_added' | 'invited'; userId: string }>> {
   try {
     const session = await requirePermission('users:manage');
     const parsed = inviteMemberSchema.safeParse({
@@ -501,12 +503,31 @@ export async function inviteTeamMember(
     }
 
     const supabaseForLimit = await createServerClient();
-    const service = await createServiceClient();
+    let service;
+    try {
+      service = await createServiceClient();
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Falta SUPABASE_SERVICE_ROLE_KEY para invitar usuarios',
+      };
+    }
 
-    const { data: existingUsers } = await service.auth.admin.listUsers({
+    const { data: existingUsers, error: listError } = await service.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
     });
+    if (listError) {
+      return {
+        success: false,
+        error: /invalid api key/i.test(listError.message)
+          ? 'Clave de servicio de Supabase inválida. Revisá SUPABASE_SERVICE_ROLE_KEY en Vercel.'
+          : listError.message,
+      };
+    }
 
     const existingUser = existingUsers.users.find(
       (u) => u.email?.toLowerCase() === parsed.data.email
@@ -562,8 +583,9 @@ export async function inviteTeamMember(
       }
     }
 
+    const supabase = await createServerClient();
+
     if (existingUser) {
-      const supabase = await createServerClient();
       const { error: rpcError } = await supabase.rpc('add_team_member', {
         p_user_id: existingUser.id,
         p_branch_id: parsed.data.branchId,
@@ -575,10 +597,13 @@ export async function inviteTeamMember(
       }
 
       revalidatePath('/configuracion');
-      return { success: true, data: undefined };
+      revalidatePath('/profesionales');
+      return {
+        success: true,
+        data: { mode: 'existing_added', userId: existingUser.id },
+      };
     }
 
-    const supabase = await createServerClient();
     const { error: inviteInsertError } = await supabase.from('organization_invitations').insert({
       organization_id: session.organizationId,
       branch_id: parsed.data.branchId,
@@ -594,23 +619,67 @@ export async function inviteTeamMember(
       return { success: false, error: 'No se pudo crear la invitación' };
     }
 
-    const { error: inviteError } = await service.auth.admin.inviteUserByEmail(parsed.data.email, {
-      data: {
-        organization_id: session.organizationId,
-        branch_id: parsed.data.branchId,
-        role: parsed.data.role,
-      },
-    });
+    const headerStore = await headers();
+    const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
+    const forwardedHost = headerStore.get('x-forwarded-host');
+    const host = forwardedHost ?? headerStore.get('host');
+    const proto = headerStore.get('x-forwarded-proto') ?? 'https';
+    const origin =
+      configured ||
+      (host && !host.includes('localhost')
+        ? `${proto}://${host}`
+        : process.env.NODE_ENV === 'production'
+          ? `https://${APP_CANONICAL_HOST}`
+          : 'http://localhost:3000');
+
+    const { data: invited, error: inviteError } = await service.auth.admin.inviteUserByEmail(
+      parsed.data.email,
+      {
+        redirectTo: `${origin}/login`,
+        data: {
+          organization_id: session.organizationId,
+          branch_id: parsed.data.branchId,
+          role: parsed.data.role,
+        },
+      }
+    );
 
     if (inviteError) {
       return {
         success: false,
-        error: 'Invitación registrada pero no se pudo enviar el email',
+        error:
+          'No se pudo enviar el email de invitación (SMTP de Supabase). Usá “Crear acceso con contraseña” en el profesional, o configurá Auth → SMTP en Supabase.',
       };
     }
 
+    const invitedUserId = invited.user?.id;
+    if (!invitedUserId) {
+      return {
+        success: false,
+        error: 'Invitación creada pero no se obtuvo el usuario. Revisá Auth en Supabase.',
+      };
+    }
+
+    // Attach to org immediately so login works even if the email is delayed/lost.
+    const { error: rpcError } = await supabase.rpc('add_team_member', {
+      p_user_id: invitedUserId,
+      p_branch_id: parsed.data.branchId,
+      p_role: parsed.data.role,
+    });
+    if (rpcError) {
+      return { success: false, error: rpcError.message };
+    }
+
+    await supabase
+      .from('organization_invitations')
+      .update({ status: 'accepted', deleted_at: new Date().toISOString() })
+      .eq('organization_id', session.organizationId)
+      .eq('email', parsed.data.email)
+      .eq('status', 'pending');
+
     revalidatePath('/configuracion');
-    return { success: true };
+    revalidatePath('/profesionales');
+    return { success: true, data: { mode: 'invited', userId: invitedUserId } };
   } catch (error) {
     return actionError(error);
   }
