@@ -103,9 +103,11 @@ export function TeamPanel({
             {inviteState?.error && <p className="text-sm text-destructive">{inviteState.error}</p>}
             {inviteState?.success && (
               <p className="text-sm text-emerald-600">
-                {inviteState.data?.mode === 'existing_added'
-                  ? 'Ese email ya tenía cuenta: se agregó al equipo (sin enviar mail). Ya puede iniciar sesión.'
-                  : 'Usuario invitado y agregado al equipo. Si el mail no llega, pedile que use Recuperar contraseña o creá acceso con contraseña desde Profesionales.'}
+                {inviteState.data?.mode === 'existing_notified'
+                  ? 'El usuario ya tenía una cuenta. Se agregó al equipo y enviamos una notificación por email.'
+                  : inviteState.data?.mode === 'existing_linked_email_failed'
+                    ? 'El usuario fue agregado al equipo, pero no pudimos enviar el email. Reintentá el envío.'
+                    : 'Invitación enviada. El profesional recibirá un email para activar su acceso.'}
               </p>
             )}
             <Button type="submit" disabled={invitePending}>

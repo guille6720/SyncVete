@@ -7,6 +7,7 @@ import {
   branchListSchema,
   branchSchema,
   buildPaginatedResult,
+  buildTeamAccessEmail,
   inviteMemberSchema,
   mergeOrganizationSettings,
   organizationSettingsSchema,
@@ -23,9 +24,8 @@ import {
   type PaginatedResult,
   type TeamMemberRow,
   APP_TIMEZONE,
-  APP_CANONICAL_HOST,
+  type Role,
 } from '@sincvete/shared';
-import type { Role } from '@sincvete/shared';
 import type { Json } from '@sincvete/db';
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { PermissionError, requirePermission, requireSession } from '@/lib/permissions';
@@ -36,6 +36,12 @@ import {
   getSeatUsageMeters,
   planRestrictionResult,
 } from '@/lib/entitlements';
+import { resolveAppOrigin } from '@/lib/mail/config';
+import { sendTransactionalEmail } from '@/lib/mail/send';
+import {
+  recordTeamAccessEmailLog,
+  wasTeamAccessEmailRecentlySent,
+} from '@/lib/mail/rate-limit';
 
 function actionError<T = void>(error: unknown): ActionResult<T> {
   const planError = planRestrictionResult<T>(error);
@@ -482,10 +488,16 @@ export async function updateTeamMember(
   }
 }
 
+export type InviteTeamMemberResult = {
+  mode: 'invited' | 'existing_notified' | 'existing_linked_email_failed';
+  userId: string;
+  emailSent: boolean;
+};
+
 export async function inviteTeamMember(
-  _prev: ActionResult<{ mode: 'existing_added' | 'invited'; userId: string }> | null,
+  _prev: ActionResult<InviteTeamMemberResult> | null,
   formData: FormData
-): Promise<ActionResult<{ mode: 'existing_added' | 'invited'; userId: string }>> {
+): Promise<ActionResult<InviteTeamMemberResult>> {
   try {
     const session = await requirePermission('users:manage');
     const parsed = inviteMemberSchema.safeParse({
@@ -501,6 +513,11 @@ export async function inviteTeamMember(
         fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
       };
     }
+
+    const professionalName =
+      String(formData.get('professionalName') || '').trim() ||
+      parsed.data.email.split('@')[0] ||
+      'hola';
 
     const supabaseForLimit = await createServerClient();
     let service;
@@ -584,6 +601,10 @@ export async function inviteTeamMember(
     }
 
     const supabase = await createServerClient();
+    const organization = await getOrganization();
+    const clinicName = organization?.name?.trim() || 'Tu clínica';
+    const headerStore = await headers();
+    const origin = resolveAppOrigin(headerStore);
 
     if (existingUser) {
       const { error: rpcError } = await supabase.rpc('add_team_member', {
@@ -596,11 +617,51 @@ export async function inviteTeamMember(
         return { success: false, error: rpcError.message };
       }
 
+      const recent = await wasTeamAccessEmailRecentlySent({
+        organizationId: session.organizationId,
+        recipientEmail: parsed.data.email,
+        messageType: 'existing_access',
+      });
+
+      let emailSent = recent;
+      if (!recent) {
+        const mail = buildTeamAccessEmail({
+          kind: 'existing_access',
+          professionalName:
+            (existingUser.user_metadata?.full_name as string | undefined)?.trim() ||
+            professionalName,
+          clinicName,
+          role: parsed.data.role as Role,
+          appOrigin: origin,
+        });
+        const sendResult = await sendTransactionalEmail({
+          to: parsed.data.email,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+          messageType: 'existing_access',
+        });
+        emailSent = sendResult.ok;
+        await recordTeamAccessEmailLog({
+          organizationId: session.organizationId,
+          recipientEmail: parsed.data.email,
+          messageType: 'existing_access',
+          provider: sendResult.provider,
+          ok: sendResult.ok,
+          providerMessageId: sendResult.ok ? sendResult.providerMessageId : null,
+          error: sendResult.ok ? null : sendResult.error,
+        });
+      }
+
       revalidatePath('/configuracion');
       revalidatePath('/profesionales');
       return {
         success: true,
-        data: { mode: 'existing_added', userId: existingUser.id },
+        data: {
+          mode: emailSent ? 'existing_notified' : 'existing_linked_email_failed',
+          userId: existingUser.id,
+          emailSent,
+        },
       };
     }
 
@@ -619,19 +680,7 @@ export async function inviteTeamMember(
       return { success: false, error: 'No se pudo crear la invitación' };
     }
 
-    const headerStore = await headers();
-    const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-    const forwardedHost = headerStore.get('x-forwarded-host');
-    const host = forwardedHost ?? headerStore.get('host');
-    const proto = headerStore.get('x-forwarded-proto') ?? 'https';
-    const origin =
-      configured ||
-      (host && !host.includes('localhost')
-        ? `${proto}://${host}`
-        : process.env.NODE_ENV === 'production'
-          ? `https://${APP_CANONICAL_HOST}`
-          : 'http://localhost:3000');
-
+    // New users: Supabase Auth invite email via project Custom SMTP (no plaintext password).
     const { data: invited, error: inviteError } = await service.auth.admin.inviteUserByEmail(
       parsed.data.email,
       {
@@ -640,15 +689,28 @@ export async function inviteTeamMember(
           organization_id: session.organizationId,
           branch_id: parsed.data.branchId,
           role: parsed.data.role,
+          full_name: professionalName,
         },
       }
     );
 
     if (inviteError) {
+      await supabase
+        .from('organization_invitations')
+        .update({ status: 'revoked', deleted_at: new Date().toISOString() })
+        .eq('organization_id', session.organizationId)
+        .eq('email', parsed.data.email)
+        .eq('status', 'pending');
+      console.error('[invite] inviteUserByEmail failed', {
+        messageType: 'new_invite',
+        recipientDomain: parsed.data.email.split('@')[1] ?? 'unknown',
+        at: new Date().toISOString(),
+        error: inviteError.message.slice(0, 200),
+      });
       return {
         success: false,
         error:
-          'No se pudo enviar el email de invitación (SMTP de Supabase). Usá “Crear acceso con contraseña” en el profesional, o configurá Auth → SMTP en Supabase.',
+          'No se pudo enviar el email de invitación (SMTP de Supabase Auth). Revisá Auth → SMTP en Staging o reintentá.',
       };
     }
 
@@ -660,7 +722,7 @@ export async function inviteTeamMember(
       };
     }
 
-    // Attach to org immediately so login works even if the email is delayed/lost.
+    // Attach to org immediately so login works even if the email is delayed.
     const { error: rpcError } = await supabase.rpc('add_team_member', {
       p_user_id: invitedUserId,
       p_branch_id: parsed.data.branchId,
@@ -677,9 +739,22 @@ export async function inviteTeamMember(
       .eq('email', parsed.data.email)
       .eq('status', 'pending');
 
+    await recordTeamAccessEmailLog({
+      organizationId: session.organizationId,
+      recipientEmail: parsed.data.email,
+      messageType: 'new_invite',
+      provider: 'supabase_auth_invite',
+      ok: true,
+      providerMessageId: invitedUserId,
+      error: null,
+    });
+
     revalidatePath('/configuracion');
     revalidatePath('/profesionales');
-    return { success: true, data: { mode: 'invited', userId: invitedUserId } };
+    return {
+      success: true,
+      data: { mode: 'invited', userId: invitedUserId, emailSent: true },
+    };
   } catch (error) {
     return actionError(error);
   }

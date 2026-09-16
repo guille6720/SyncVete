@@ -142,21 +142,24 @@ export function ProfessionalAccessPanel({
         const link = await linkProfessionalUser(professionalId, result.data.userId);
         if (!link.success) {
           setError(
-            result.data.mode === 'existing_added'
+            result.data.mode === 'existing_notified' ||
+              result.data.mode === 'existing_linked_email_failed'
               ? 'Se agregó al equipo, pero no se pudo vincular al profesional. Usá “Guardar vínculo”.'
               : 'Invitación ok, pero no se pudo vincular. Usá “Guardar vínculo”.'
           );
           return;
         }
       }
-      if (result.data?.mode === 'existing_added') {
+      if (result.data?.mode === 'existing_notified') {
         setMessage(
-          'Ese email ya tenía cuenta: se agregó al equipo y se vinculó. No se envía mail. Ya puede iniciar sesión con su contraseña actual.'
+          'El usuario ya tenía una cuenta. Se agregó al equipo y enviamos una notificación por email.'
+        );
+      } else if (result.data?.mode === 'existing_linked_email_failed') {
+        setMessage(
+          'El usuario fue agregado al equipo, pero no pudimos enviar el email. Reintentá el envío.'
         );
       } else {
-        setMessage(
-          'Usuario creado y vinculado. Si el mail de Supabase no llega, usá “Crear acceso con contraseña” o Recuperar contraseña.'
-        );
+        setMessage('Invitación enviada. El profesional recibirá un email para activar su acceso.');
       }
     });
   };
@@ -394,14 +397,16 @@ export function ProfessionalAccessPanel({
       {canManageUsers && branches.length > 0 ? (
         <Card>
           <CardHeader>
-            <CardTitle>Invitar por email (opcional)</CardTitle>
+            <CardTitle>Invitar por email</CardTitle>
             <CardDescription>
-              Depende del SMTP de Supabase. Si el mail no llega, usá crear acceso con contraseña
-              arriba.
+              Si el email es nuevo, SyncVete envía una invitación para activar el acceso. Si ya tiene
+              cuenta, se agrega al equipo y se notifica por email (sin crear otro usuario ni enviar
+              contraseña).
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form action={handleInvite} className="grid max-w-xl gap-3">
+              <input type="hidden" name="professionalName" value={access.fullName ?? ''} />
               <div className="space-y-2">
                 <Label htmlFor="inviteEmail">Email</Label>
                 <Input
