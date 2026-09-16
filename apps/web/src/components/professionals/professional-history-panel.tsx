@@ -28,6 +28,9 @@ export async function ProfessionalHistoryPanel({
     pageSize: 25,
     entityType: 'professionals',
     search: professionalId,
+  }).catch((error) => {
+    console.warn('[profesionales.history] listAuditLogs failed:', error instanceof Error ? error.message : error);
+    return { data: [], total: 0, page: 1, pageSize: 25 };
   });
 
   return (

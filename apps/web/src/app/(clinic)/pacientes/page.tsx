@@ -20,12 +20,15 @@ async function PatientsListSection({
   species: (typeof PATIENT_SPECIES)[number] | undefined;
   canWrite: boolean;
 }) {
-  const data = await listPatients({
-    page,
-    pageSize: PATIENT_LIST_PAGE_SIZE,
-    search: search || undefined,
-    species,
-  });
+  const { svPerfOperation } = await import('@/lib/perf/nav-timing');
+  const data = await svPerfOperation('/pacientes', 'listPatients', () =>
+    listPatients({
+      page,
+      pageSize: PATIENT_LIST_PAGE_SIZE,
+      search: search || undefined,
+      species,
+    })
+  );
 
   return (
     <PatientsList

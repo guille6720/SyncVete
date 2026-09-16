@@ -14,15 +14,23 @@ import { Button } from '@/components/ui/button';
 import { formatMeteredUsage, isQuotaNearLimit, parseOrganizationSettings } from '@sincvete/shared';
 
 export default async function ProfesionalesPage() {
-  const [canRead, session] = await Promise.all([canReadProfessionals(), getSessionContext()]);
+  const { svPerfOperation } = await import('@/lib/perf/nav-timing');
+  const [canRead, session] = await svPerfOperation('/profesionales', 'authz', () =>
+    Promise.all([canReadProfessionals(), getSessionContext()])
+  );
   if (!canRead) redirect('/dashboard');
 
-  const [professionals, canWrite, seats, organization] = await Promise.all([
-    listProfessionalsWithSummary(),
-    canWriteProfessionals(),
-    session ? getSeatUsageMeters(session.organizationId).catch(() => []) : Promise.resolve([]),
-    getOrganization(),
-  ]);
+  const [professionals, canWrite, seats, organization] = await svPerfOperation(
+    '/profesionales',
+    'parallelList',
+    () =>
+      Promise.all([
+        listProfessionalsWithSummary(),
+        canWriteProfessionals(),
+        session ? getSeatUsageMeters(session.organizationId).catch(() => []) : Promise.resolve([]),
+        getOrganization(),
+      ])
+  );
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
   const professionalsSeat = seats.find((meter) => meter.featureKey === 'professionals.max');

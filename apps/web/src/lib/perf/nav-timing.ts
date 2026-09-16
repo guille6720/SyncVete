@@ -61,6 +61,29 @@ export async function navPerfTime<T>(name: string, fn: () => Promise<T>): Promis
   }
 }
 
+/**
+ * Structured per-operation log for route navigation debugging.
+ * Example: [SV_PERF] route=/profesionales/[id] operation=getProfessional duration_ms=42
+ */
+export async function svPerfOperation<T>(
+  route: string,
+  operation: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const enabled = isNavPerfEnabled();
+  if (!enabled) return fn();
+  const start = performance.now();
+  try {
+    return await fn();
+  } finally {
+    const durationMs = Math.round((performance.now() - start) * 10) / 10;
+    navPerfMark(`${route}.${operation}`, durationMs);
+    console.info(
+      `[SV_PERF] route=${route} operation=${operation} duration_ms=${durationMs}`
+    );
+  }
+}
+
 export function getNavPerfReport(): SvPerfReport | null {
   const bag = getNavPerfBag();
   if (!bag.enabled) return null;

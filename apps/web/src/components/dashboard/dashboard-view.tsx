@@ -193,9 +193,14 @@ export async function DashboardView() {
   const session = await getSessionContext();
   if (!session) return null;
 
-  const { navPerfTime } = await import('@/lib/perf/nav-timing');
-  const [context, entitledHrefs] = await navPerfTime('page.dashboard.context', async () =>
-    Promise.all([getDashboardContext(), getClinicEntitledHrefs(session.organizationId)])
+  const { navPerfTime, svPerfOperation } = await import('@/lib/perf/nav-timing');
+  const [context, entitledHrefs] = await svPerfOperation(
+    '/dashboard',
+    'context+entitledHrefs',
+    async () =>
+      navPerfTime('page.dashboard.context', async () =>
+        Promise.all([getDashboardContext(), getClinicEntitledHrefs(session.organizationId)])
+      )
   );
 
   return (

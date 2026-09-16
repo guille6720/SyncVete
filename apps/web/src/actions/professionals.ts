@@ -208,12 +208,13 @@ export async function listProfessionals(input: { activeOnly?: boolean } = {}): P
 }
 
 export async function listProfessionalsWithSummary(): Promise<ProfessionalListRow[]> {
+  const { svPerfOperation } = await import('@/lib/perf/nav-timing');
+  return svPerfOperation('/profesionales', 'listProfessionalsWithSummary', async () => {
   const professionals = await listProfessionals();
   if (professionals.length === 0) return [];
 
   const supabase = await createServerClient();
   const professionalIds = professionals.map((row) => row.id);
-  const today = new Date().toISOString().slice(0, 10);
 
   const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }, { data: payments, error: paymentsError }] =
     await Promise.all([
@@ -235,10 +236,30 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
         .is('deleted_at', null)
         .order('paid_at', { ascending: false }),
     ]);
+
+  const schemaMissing = [settlementsError, schemesError, paymentsError].some(
+    (err) =>
+      err &&
+      /schema cache|does not exist|Could not find the (table|function)/i.test(err.message)
+  );
+  if (schemaMissing) {
+    console.warn('[professionals] summary tables missing — returning identity-only list');
+    return professionals.map((professional) => ({
+      ...professional,
+      openBalance: 0,
+      pendingSettlementCount: 0,
+      approvedUnpaidCount: 0,
+      activeSchemeName: null,
+      lastPaymentAmount: null,
+      lastPaymentDate: null,
+      lastPaymentSettlementId: null,
+    }));
+  }
   if (settlementsError) throw settlementsError;
   if (schemesError) throw schemesError;
   if (paymentsError) throw paymentsError;
 
+  const today = new Date().toISOString().slice(0, 10);
   const openBalanceByPro = new Map<string, number>();
   const pendingCountByPro = new Map<string, number>();
   const approvedUnpaidByPro = new Map<string, number>();
@@ -296,6 +317,7 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
       lastPaymentDate: last?.paidAt ?? null,
       lastPaymentSettlementId: last?.settlementId ?? null,
     };
+  });
   });
 }
 

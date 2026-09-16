@@ -91,6 +91,7 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
     session?.branchId
   );
 
+  const { svPerfOperation } = await import('@/lib/perf/nav-timing');
   const [
     canWrite,
     canWhatsApp,
@@ -99,17 +100,19 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
     branches,
     entries,
     weekAppointments,
-  ] = await Promise.all([
-    canManageWaitingRoom(),
-    canSendWhatsApp(),
-    canManageConsultations(),
-    getOrganization(),
-    getUserBranches(),
-    listWaitingRoom({ date: selectedDate, branchId: listBranchId }),
-    isToday
-      ? listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[])
-      : Promise.resolve([] as AppointmentListRow[]),
-  ]);
+  ] = await svPerfOperation('/sala-espera', 'parallelBoard', () =>
+    Promise.all([
+      canManageWaitingRoom(),
+      canSendWhatsApp(),
+      canManageConsultations(),
+      getOrganization(),
+      getUserBranches(),
+      listWaitingRoom({ date: selectedDate, branchId: listBranchId }),
+      isToday
+        ? listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[])
+        : Promise.resolve([] as AppointmentListRow[]),
+    ])
+  );
 
   const orgSettings = parseOrganizationSettings(organization?.settings);
   const roomPresets = orgSettings.waitingRoomRooms ?? [];
