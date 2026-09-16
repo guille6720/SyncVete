@@ -7,6 +7,7 @@ import {
   professionalOnboardingSchema,
   professionalUpdateSchema,
   resolveProfessionalAccessTemplate,
+  mapProfessionalsWriteDbError,
   type ActionResult,
   type Professional,
   type ProfessionalBranch,
@@ -54,10 +55,18 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   const planError = planRestrictionResult<T>(error);
   if (planError) return planError;
   if (error instanceof PermissionError) {
+    if (/professionals:write/i.test(error.message) || error.message === 'No tenés permisos para esta acción') {
+      // requirePermission uses generic message; map professionals write failures in callers when known.
+      return { success: false, error: error.message };
+    }
     return { success: false, error: error.message };
   }
-  console.error(error);
+  console.error('[professionals]', error instanceof Error ? error.message : 'unknown');
   return { success: false, error: 'Ocurrió un error inesperado' };
+}
+
+function mapWriteFailure(error: { message?: string; code?: string } | null): string {
+  return mapProfessionalsWriteDbError(error);
 }
 
 function rpcErrorMessage(error: { message?: string } | null): string {
@@ -473,7 +482,17 @@ export async function createProfessional(
   formData: FormData
 ): Promise<ActionResult<Professional>> {
   try {
-    await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    try {
+      await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    } catch (error) {
+      if (error instanceof PermissionError) {
+        return {
+          success: false,
+          error: 'No tenés permisos para crear profesionales en esta clínica.',
+        };
+      }
+      throw error;
+    }
     const session = await getSessionContext();
     if (!session) return { success: false, error: 'Sesión inválida' };
 
@@ -548,7 +567,8 @@ export async function createProfessional(
     );
 
     if (error) {
-      return { success: false, error: rpcErrorMessage(error) };
+      console.error('[professionals.create] insert failed', (error as { code?: string }).code ?? '', (error.message ?? '').slice(0, 180));
+      return { success: false, error: mapWriteFailure(error) };
     }
 
     if (parsed.data.branchIds.length > 0) {
@@ -560,7 +580,17 @@ export async function createProfessional(
       }));
       const { error: branchError } = await supabase.from('professional_branches').insert(branchRows);
       if (branchError) {
-        return { success: false, error: rpcErrorMessage(branchError) };
+        console.error(
+          '[professionals.create] branches failed',
+          branchError.code ?? '',
+          (branchError.message ?? '').slice(0, 180)
+        );
+        // Compensate: soft-delete the professional row we just created.
+        await supabase
+          .from('professionals')
+          .update({ deleted_at: new Date().toISOString(), is_active: false })
+          .eq('id', data.id);
+        return { success: false, error: mapWriteFailure(branchError) };
       }
     }
 
@@ -997,12 +1027,81 @@ function normalizeScheduleTime(value: string): string {
   return value.length === 5 ? `${value}:00` : value;
 }
 
+async function compensateFailedProfessionalAccess(params: {
+  newlyCreatedAuthUserId: string | null;
+  linkedUserId: string | null;
+  membershipBranchId: string | null;
+  membershipCreated: boolean;
+  professionalId: string | null;
+}): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+    if (params.professionalId) {
+      await supabase
+        .from('professionals')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', params.professionalId);
+      await supabase
+        .from('professional_branches')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('professional_id', params.professionalId);
+    }
+
+    if (params.membershipCreated && params.linkedUserId && params.membershipBranchId) {
+      await supabase
+        .from('branch_members')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('user_id', params.linkedUserId)
+        .eq('branch_id', params.membershipBranchId)
+        .is('deleted_at', null);
+    }
+
+    if (params.newlyCreatedAuthUserId) {
+      try {
+        const service = await createServiceClient();
+        // Soft-delete profile before auth user (FK).
+        await supabase
+          .from('profiles')
+          .update({ deleted_at: new Date().toISOString(), is_active: false })
+          .eq('id', params.newlyCreatedAuthUserId);
+        await service.auth.admin.deleteUser(params.newlyCreatedAuthUserId);
+      } catch (cleanupError) {
+        console.error(
+          '[professionals.onboarding] auth cleanup failed',
+          cleanupError instanceof Error ? cleanupError.message : 'unknown'
+        );
+      }
+    }
+  } catch (cleanupError) {
+    console.error(
+      '[professionals.onboarding] compensate failed',
+      cleanupError instanceof Error ? cleanupError.message : 'unknown'
+    );
+  }
+}
+
 export async function createProfessionalOnboarding(
   _prev: ActionResult<ProfessionalOnboardingResult> | null,
   formData: FormData
 ): Promise<ActionResult<ProfessionalOnboardingResult>> {
+  let newlyCreatedAuthUserId: string | null = null;
+  let linkedUserId: string | null = null;
+  let membershipCreated = false;
+  let membershipBranchId: string | null = null;
+  let professionalId: string | null = null;
+
   try {
-    await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    try {
+      await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    } catch (error) {
+      if (error instanceof PermissionError) {
+        return {
+          success: false,
+          error: 'No tenés permisos para crear profesionales en esta clínica.',
+        };
+      }
+      throw error;
+    }
     const session = await getSessionContext();
     if (!session) return { success: false, error: 'Sesión inválida' };
 
@@ -1061,7 +1160,17 @@ export async function createProfessionalOnboarding(
     const accessTemplate = resolveProfessionalAccessTemplate(input.accessTemplate);
 
     if (input.createPlatformAccess) {
-      await requirePermission('users:manage');
+      try {
+        await requirePermission('users:manage');
+      } catch (error) {
+        if (error instanceof PermissionError) {
+          return {
+            success: false,
+            error: 'No tenés permisos para crear acceso de plataforma para profesionales.',
+          };
+        }
+        throw error;
+      }
 
       const accessEmail = String(input.accessEmail || input.email || '')
         .trim()
@@ -1197,7 +1306,11 @@ export async function createProfessionalOnboarding(
           };
         }
         createdUserId = created.user.id;
+        newlyCreatedAuthUserId = created.user.id;
       }
+
+      linkedUserId = createdUserId;
+      membershipBranchId = input.branchId;
 
       const supabase = await createServerClient();
       const { error: rpcError } = await supabase.rpc('add_team_member', {
@@ -1206,8 +1319,16 @@ export async function createProfessionalOnboarding(
         p_role: accessTemplate.role,
       });
       if (rpcError) {
-        return { success: false, error: rpcErrorMessage(rpcError) };
+        await compensateFailedProfessionalAccess({
+          newlyCreatedAuthUserId,
+          linkedUserId,
+          membershipBranchId,
+          membershipCreated: false,
+          professionalId: null,
+        });
+        return { success: false, error: mapWriteFailure(rpcError) };
       }
+      membershipCreated = true;
 
       if (accessTemplate.permissions) {
         const { error: permError } = await supabase
@@ -1220,7 +1341,14 @@ export async function createProfessionalOnboarding(
           .eq('branch_id', input.branchId)
           .is('deleted_at', null);
         if (permError) {
-          return { success: false, error: rpcErrorMessage(permError) };
+          await compensateFailedProfessionalAccess({
+            newlyCreatedAuthUserId,
+            linkedUserId,
+            membershipBranchId,
+            membershipCreated,
+            professionalId: null,
+          });
+          return { success: false, error: mapWriteFailure(permError) };
         }
       }
     }
@@ -1256,9 +1384,22 @@ export async function createProfessionalOnboarding(
       }
     );
 
-    if (error) {
-      return { success: false, error: rpcErrorMessage(error) };
+    if (error || !data) {
+      console.error(
+        '[professionals.onboarding] insert failed',
+        (error as { code?: string } | null)?.code ?? '',
+        (error?.message ?? '').slice(0, 180)
+      );
+      await compensateFailedProfessionalAccess({
+        newlyCreatedAuthUserId,
+        linkedUserId,
+        membershipBranchId,
+        membershipCreated,
+        professionalId: null,
+      });
+      return { success: false, error: mapWriteFailure(error) };
     }
+    professionalId = String(data.id);
 
     if (branchIds.length > 0) {
       const branchRows = branchIds.map((branchId) => ({
@@ -1269,7 +1410,14 @@ export async function createProfessionalOnboarding(
       }));
       const { error: branchError } = await supabase.from('professional_branches').insert(branchRows);
       if (branchError) {
-        return { success: false, error: rpcErrorMessage(branchError) };
+        await compensateFailedProfessionalAccess({
+          newlyCreatedAuthUserId,
+          linkedUserId,
+          membershipBranchId,
+          membershipCreated,
+          professionalId,
+        });
+        return { success: false, error: mapWriteFailure(branchError) };
       }
     }
 
@@ -1289,10 +1437,12 @@ export async function createProfessionalOnboarding(
           p_id: null,
         });
         if (scheduleError) {
-          return {
-            success: false,
-            error: `Profesional creado, pero falló la agenda: ${rpcErrorMessage(scheduleError)}`,
-          };
+          // Professional + access already committed; agenda can be fixed later.
+          console.error(
+            '[professionals.onboarding] schedule failed',
+            (scheduleError.message ?? '').slice(0, 180)
+          );
+          break;
         }
       }
       revalidatePath('/agenda');
@@ -1310,6 +1460,19 @@ export async function createProfessionalOnboarding(
       },
     };
   } catch (error) {
+    await compensateFailedProfessionalAccess({
+      newlyCreatedAuthUserId,
+      linkedUserId,
+      membershipBranchId,
+      membershipCreated,
+      professionalId,
+    });
+    if (error instanceof PermissionError) {
+      return {
+        success: false,
+        error: 'No tenés permisos para crear profesionales en esta clínica.',
+      };
+    }
     return actionError(error);
   }
 }
