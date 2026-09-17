@@ -37,16 +37,19 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
   const assignedUserId = params.assigned?.trim() || undefined;
   const query = params.q?.trim() || undefined;
 
-  const bootstrap = await getAgendaBootstrap({
-    from: range.from,
-    to: range.to,
-    weekStart: range.weekStart,
-    selectedDate: range.selectedDate,
-    branchId,
-    status,
-    assignedUserId,
-    query,
-  });
+  const { svPerfOperation } = await import('@/lib/perf/nav-timing');
+  const bootstrap = await svPerfOperation('/agenda', 'getAgendaBootstrap', () =>
+    getAgendaBootstrap({
+      from: range.from,
+      to: range.to,
+      weekStart: range.weekStart,
+      selectedDate: range.selectedDate,
+      branchId,
+      status,
+      assignedUserId,
+      query,
+    })
+  );
   if (!bootstrap) redirect('/dashboard');
 
   return (

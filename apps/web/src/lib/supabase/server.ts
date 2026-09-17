@@ -35,7 +35,12 @@ export async function createServiceClient() {
   const key = readServerEnv('SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !key) {
     throw new Error(
-      'Falta SUPABASE_SERVICE_ROLE_KEY (o la URL de Supabase) en Vercel. Superadmin la usa para registrarte en platform_admins.'
+      'Falta SUPABASE_SERVICE_ROLE_KEY (o la URL de Supabase) en Vercel. Sin esa clave no se puede crear usuarios de profesionales.'
+    );
+  }
+  if (/localhost|127\.0\.0\.1/.test(url) && process.env.VERCEL) {
+    throw new Error(
+      'NEXT_PUBLIC_SUPABASE_URL apunta a localhost en Vercel. Usá la URL del proyecto Supabase cloud (staging/prod).'
     );
   }
   const { createClient } = await import('@supabase/supabase-js');

@@ -3,10 +3,9 @@ import { Suspense } from 'react';
 import {
   listConsultationQueue,
   listConsultations,
-  canManageConsultations,
-  canReadConsultations,
-  canReadConsultationHistory,
 } from '@/actions/consultations';
+import { getSessionContext } from '@/lib/session';
+import { canUseFeature, FEATURES } from '@/lib/entitlements';
 import { ConsultationsQueue } from '@/components/consultations/consultations-queue';
 import { ConsultationsHistory } from '@/components/consultations/consultations-history';
 import { CONSULTATION_STATUSES, type ConsultationStatus } from '@sincvete/shared';
@@ -41,8 +40,19 @@ async function ConsultationsHistorySection({
 }
 
 export default async function ConsultasPage({ searchParams }: ConsultasPageProps) {
-  const [canRead, params] = await Promise.all([canReadConsultations(), searchParams]);
-  if (!canRead) redirect('/dashboard');
+  const [session, params] = await Promise.all([getSessionContext(), searchParams]);
+  if (!session) redirect('/login');
+
+  const canReadPerm =
+    session.permissions.includes('clinical:read') ||
+    session.permissions.includes('appointments:read');
+  if (!canReadPerm) redirect('/dashboard');
+
+  const hasConsultationsFeature = await canUseFeature({
+    organizationId: session.organizationId,
+    featureKey: FEATURES.CONSULTATIONS,
+  });
+  if (!hasConsultationsFeature) redirect('/dashboard');
 
   const page = Math.max(1, Number(params.page) || 1);
   const search = params.search?.trim() ?? '';
@@ -51,11 +61,10 @@ export default async function ConsultasPage({ searchParams }: ConsultasPageProps
     ? (statusParam as ConsultationStatus)
     : undefined;
 
-  const [queue, canWrite, canHistory] = await Promise.all([
-    listConsultationQueue(),
-    canManageConsultations(),
-    canReadConsultationHistory(),
-  ]);
+  const canWrite = session.permissions.includes('clinical:write');
+  const canHistory = session.permissions.includes('clinical:read');
+
+  const queue = await listConsultationQueue();
 
   return (
     <div className="space-y-8">

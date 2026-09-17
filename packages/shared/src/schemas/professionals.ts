@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   COMPENSATION_FREQUENCIES,
   COMPENSATION_RULE_TYPES,
+  PROFESSIONAL_ACCESS_TEMPLATES,
   PROFESSIONAL_RELATIONSHIP_TYPES,
   SETTLEMENT_ADJUSTMENT_TYPES,
   SETTLEMENT_STATUSES,
@@ -21,6 +22,31 @@ export const professionalCreateSchema = z.object({
   professionalLicense: z.string().trim().max(80).optional().nullable(),
   professionalLicenseJurisdiction: z.string().trim().max(80).optional().nullable(),
   specialty: z.string().trim().max(120).optional().nullable(),
+  phone: z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' ? null : value)),
+  email: z
+    .union([z.string().trim().email().max(255), z.literal('')])
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' || value == null ? null : value)),
+  address: z
+    .string()
+    .trim()
+    .max(500)
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' ? null : value)),
+  dateOfBirth: z.string().date().optional().nullable(),
+  avatarUrl: z
+    .union([z.string().trim().url().max(500), z.literal('')])
+    .optional()
+    .nullable()
+    .transform((value) => (value === '' || value == null ? null : value)),
   relationshipType: z.enum(PROFESSIONAL_RELATIONSHIP_TYPES),
   startDate: z.string().date().optional().nullable(),
   endDate: z.string().date().optional().nullable(),
@@ -226,6 +252,54 @@ export const bulkRegisterProfessionalPaymentsSchema = bulkPaymentCommonSchema.an
   ])
 );
 
+export const professionalOnboardingSchema = professionalCreateSchema
+  .extend({
+    branchId: z.string().uuid('Elegí una sucursal'),
+    accessTemplate: z.enum(PROFESSIONAL_ACCESS_TEMPLATES).default('veterinarian'),
+    createPlatformAccess: z.boolean().default(true),
+    accessEmail: z.union([z.string().trim().email().max(255), z.literal('')]).optional().nullable(),
+    passwordMode: z.enum(['auto', 'manual']).default('auto'),
+    password: z.string().min(8).max(72).optional().nullable(),
+    forcePasswordChange: z.boolean().default(true),
+    scheduleWeekdays: z.array(z.coerce.number().int().min(1).max(7)).optional().default([]),
+    scheduleStartTime: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .optional()
+      .default('09:00'),
+    scheduleEndTime: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .optional()
+      .default('18:00'),
+    scheduleSlotMinutes: z.coerce.number().int().min(5).max(240).optional().default(30),
+  })
+  .superRefine((value, ctx) => {
+    if ((value.scheduleWeekdays?.length ?? 0) > 0 && !value.createPlatformAccess) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Para crear la agenda inicial necesitás crear el acceso a la plataforma',
+        path: ['createPlatformAccess'],
+      });
+    }
+    if (!value.createPlatformAccess) return;
+    const email = value.accessEmail || value.email;
+    if (!email) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Indicá un email para el acceso',
+        path: ['accessEmail'],
+      });
+    }
+    if (value.passwordMode === 'manual' && (!value.password || value.password.length < 8)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'La contraseña debe tener al menos 8 caracteres',
+        path: ['password'],
+      });
+    }
+  });
+
 export type ProfessionalCreateInput = z.infer<typeof professionalCreateSchema>;
 export type ProfessionalUpdateInput = z.infer<typeof professionalUpdateSchema>;
 export type CompensationSchemeCreateInput = z.infer<typeof compensationSchemeCreateSchema>;
@@ -237,3 +311,4 @@ export type RestoreSettlementOmissionInput = z.infer<typeof restoreSettlementOmi
 export type ReturnSettlementToDraftInput = z.infer<typeof returnSettlementToDraftSchema>;
 export type CloneCompensationSchemeInput = z.infer<typeof cloneCompensationSchemeSchema>;
 export type LinkProfessionalPaymentToCashInput = z.infer<typeof linkProfessionalPaymentToCashSchema>;
+export type ProfessionalOnboardingInput = z.infer<typeof professionalOnboardingSchema>;

@@ -2,10 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { cache } from 'react';
+import { headers } from 'next/headers';
 import {
   branchListSchema,
   branchSchema,
   buildPaginatedResult,
+  buildTeamAccessEmail,
   inviteMemberSchema,
   mergeOrganizationSettings,
   organizationSettingsSchema,
@@ -22,8 +24,8 @@ import {
   type PaginatedResult,
   type TeamMemberRow,
   APP_TIMEZONE,
+  type Role,
 } from '@sincvete/shared';
-import type { Role } from '@sincvete/shared';
 import type { Json } from '@sincvete/db';
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { PermissionError, requirePermission, requireSession } from '@/lib/permissions';
@@ -34,6 +36,12 @@ import {
   getSeatUsageMeters,
   planRestrictionResult,
 } from '@/lib/entitlements';
+import { resolveAppOrigin } from '@/lib/mail/config';
+import { sendTransactionalEmail } from '@/lib/mail/send';
+import {
+  recordTeamAccessEmailLog,
+  wasTeamAccessEmailRecentlySent,
+} from '@/lib/mail/rate-limit';
 
 function actionError<T = void>(error: unknown): ActionResult<T> {
   const planError = planRestrictionResult<T>(error);
@@ -480,10 +488,16 @@ export async function updateTeamMember(
   }
 }
 
+export type InviteTeamMemberResult = {
+  mode: 'invited' | 'existing_notified' | 'existing_linked_email_failed';
+  userId: string;
+  emailSent: boolean;
+};
+
 export async function inviteTeamMember(
-  _prev: ActionResult | null,
+  _prev: ActionResult<InviteTeamMemberResult> | null,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<ActionResult<InviteTeamMemberResult>> {
   try {
     const session = await requirePermission('users:manage');
     const parsed = inviteMemberSchema.safeParse({
@@ -500,13 +514,37 @@ export async function inviteTeamMember(
       };
     }
 
-    const supabaseForLimit = await createServerClient();
-    const service = await createServiceClient();
+    const professionalName =
+      String(formData.get('professionalName') || '').trim() ||
+      parsed.data.email.split('@')[0] ||
+      'hola';
 
-    const { data: existingUsers } = await service.auth.admin.listUsers({
+    const supabaseForLimit = await createServerClient();
+    let service;
+    try {
+      service = await createServiceClient();
+    } catch (error) {
+      return {
+        success: false,
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Falta SUPABASE_SERVICE_ROLE_KEY para invitar usuarios',
+      };
+    }
+
+    const { data: existingUsers, error: listError } = await service.auth.admin.listUsers({
       page: 1,
       perPage: 1000,
     });
+    if (listError) {
+      return {
+        success: false,
+        error: /invalid api key/i.test(listError.message)
+          ? 'Clave de servicio de Supabase inválida. Revisá SUPABASE_SERVICE_ROLE_KEY en Vercel.'
+          : listError.message,
+      };
+    }
 
     const existingUser = existingUsers.users.find(
       (u) => u.email?.toLowerCase() === parsed.data.email
@@ -562,8 +600,13 @@ export async function inviteTeamMember(
       }
     }
 
+    const supabase = await createServerClient();
+    const organization = await getOrganization();
+    const clinicName = organization?.name?.trim() || 'Tu clínica';
+    const headerStore = await headers();
+    const origin = resolveAppOrigin(headerStore);
+
     if (existingUser) {
-      const supabase = await createServerClient();
       const { error: rpcError } = await supabase.rpc('add_team_member', {
         p_user_id: existingUser.id,
         p_branch_id: parsed.data.branchId,
@@ -574,11 +617,54 @@ export async function inviteTeamMember(
         return { success: false, error: rpcError.message };
       }
 
+      const recent = await wasTeamAccessEmailRecentlySent({
+        organizationId: session.organizationId,
+        recipientEmail: parsed.data.email,
+        messageType: 'existing_access',
+      });
+
+      let emailSent = recent;
+      if (!recent) {
+        const mail = buildTeamAccessEmail({
+          kind: 'existing_access',
+          professionalName:
+            (existingUser.user_metadata?.full_name as string | undefined)?.trim() ||
+            professionalName,
+          clinicName,
+          role: parsed.data.role as Role,
+          appOrigin: origin,
+        });
+        const sendResult = await sendTransactionalEmail({
+          to: parsed.data.email,
+          subject: mail.subject,
+          text: mail.text,
+          html: mail.html,
+          messageType: 'existing_access',
+        });
+        emailSent = sendResult.ok;
+        await recordTeamAccessEmailLog({
+          organizationId: session.organizationId,
+          recipientEmail: parsed.data.email,
+          messageType: 'existing_access',
+          provider: sendResult.provider,
+          ok: sendResult.ok,
+          providerMessageId: sendResult.ok ? sendResult.providerMessageId : null,
+          error: sendResult.ok ? null : sendResult.error,
+        });
+      }
+
       revalidatePath('/configuracion');
-      return { success: true, data: undefined };
+      revalidatePath('/profesionales');
+      return {
+        success: true,
+        data: {
+          mode: emailSent ? 'existing_notified' : 'existing_linked_email_failed',
+          userId: existingUser.id,
+          emailSent,
+        },
+      };
     }
 
-    const supabase = await createServerClient();
     const { error: inviteInsertError } = await supabase.from('organization_invitations').insert({
       organization_id: session.organizationId,
       branch_id: parsed.data.branchId,
@@ -594,23 +680,81 @@ export async function inviteTeamMember(
       return { success: false, error: 'No se pudo crear la invitación' };
     }
 
-    const { error: inviteError } = await service.auth.admin.inviteUserByEmail(parsed.data.email, {
-      data: {
-        organization_id: session.organizationId,
-        branch_id: parsed.data.branchId,
-        role: parsed.data.role,
-      },
-    });
+    // New users: Supabase Auth invite email via project Custom SMTP (no plaintext password).
+    const { data: invited, error: inviteError } = await service.auth.admin.inviteUserByEmail(
+      parsed.data.email,
+      {
+        redirectTo: `${origin}/login`,
+        data: {
+          organization_id: session.organizationId,
+          branch_id: parsed.data.branchId,
+          role: parsed.data.role,
+          full_name: professionalName,
+        },
+      }
+    );
 
     if (inviteError) {
+      await supabase
+        .from('organization_invitations')
+        .update({ status: 'revoked', deleted_at: new Date().toISOString() })
+        .eq('organization_id', session.organizationId)
+        .eq('email', parsed.data.email)
+        .eq('status', 'pending');
+      console.error('[invite] inviteUserByEmail failed', {
+        messageType: 'new_invite',
+        recipientDomain: parsed.data.email.split('@')[1] ?? 'unknown',
+        at: new Date().toISOString(),
+        error: inviteError.message.slice(0, 200),
+      });
       return {
         success: false,
-        error: 'Invitación registrada pero no se pudo enviar el email',
+        error:
+          'No se pudo enviar el email de invitación (SMTP de Supabase Auth). Revisá Auth → SMTP en Staging o reintentá.',
       };
     }
 
+    const invitedUserId = invited.user?.id;
+    if (!invitedUserId) {
+      return {
+        success: false,
+        error: 'Invitación creada pero no se obtuvo el usuario. Revisá Auth en Supabase.',
+      };
+    }
+
+    // Attach to org immediately so login works even if the email is delayed.
+    const { error: rpcError } = await supabase.rpc('add_team_member', {
+      p_user_id: invitedUserId,
+      p_branch_id: parsed.data.branchId,
+      p_role: parsed.data.role,
+    });
+    if (rpcError) {
+      return { success: false, error: rpcError.message };
+    }
+
+    await supabase
+      .from('organization_invitations')
+      .update({ status: 'accepted', deleted_at: new Date().toISOString() })
+      .eq('organization_id', session.organizationId)
+      .eq('email', parsed.data.email)
+      .eq('status', 'pending');
+
+    await recordTeamAccessEmailLog({
+      organizationId: session.organizationId,
+      recipientEmail: parsed.data.email,
+      messageType: 'new_invite',
+      provider: 'supabase_auth_invite',
+      ok: true,
+      providerMessageId: invitedUserId,
+      error: null,
+    });
+
     revalidatePath('/configuracion');
-    return { success: true };
+    revalidatePath('/profesionales');
+    return {
+      success: true,
+      data: { mode: 'invited', userId: invitedUserId, emailSent: true },
+    };
   } catch (error) {
     return actionError(error);
   }
@@ -690,27 +834,34 @@ export async function getUserBranches(): Promise<
 }
 
 const loadUserBranches = cache(async () => {
-  const session = await requireSession();
-  const supabase = await createServerClient();
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  return navPerfTime('branches.total', async () => {
+    const session = await requireSession();
+    const supabase = await createServerClient();
 
-  const { data: memberships } = await supabase
-    .from('branch_members')
-    .select('branch_id')
-    .eq('user_id', session.userId)
-    .eq('is_active', true)
-    .is('deleted_at', null);
+    const { data: memberships } = await navPerfTime('branches.memberships', async () =>
+      supabase
+        .from('branch_members')
+        .select('branch_id')
+        .eq('user_id', session.userId)
+        .eq('is_active', true)
+        .is('deleted_at', null)
+    );
 
-  const branchIds = (memberships ?? []).map((m) => m.branch_id);
-  if (branchIds.length === 0) return [];
+    const branchIds = (memberships ?? []).map((m) => m.branch_id);
+    if (branchIds.length === 0) return [];
 
-  const { data, error } = await supabase
-    .from('branches')
-    .select('id, name, code, is_main, is_active')
-    .in('id', branchIds)
-    .is('deleted_at', null)
-    .order('is_main', { ascending: false })
-    .order('name');
+    const { data, error } = await navPerfTime('branches.select', async () =>
+      supabase
+        .from('branches')
+        .select('id, name, code, is_main, is_active')
+        .in('id', branchIds)
+        .is('deleted_at', null)
+        .order('is_main', { ascending: false })
+        .order('name')
+    );
 
-  if (error) throw error;
-  return data ?? [];
+    if (error) throw error;
+    return data ?? [];
+  });
 });

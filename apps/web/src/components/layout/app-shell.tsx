@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { LogOut, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -14,8 +15,16 @@ import { BrandLogo } from '@/components/brand/syncvete-logo';
 import { ThemeControls } from '@/components/theme/theme-controls';
 import { AppUpdateBanner } from '@/components/layout/app-update-banner';
 import { InstallAppButton } from '@/components/pwa/install-app-button';
-import { CommandPalette, CommandPaletteTrigger } from './command-palette';
+import { CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
+import { PerfNavProbe, markNavPerfClick } from '@/components/layout/perf-nav-probe';
+import { SettlementsNavProvider } from '@/components/layout/settlements-nav-context';
+import type { SvPerfReport } from '@/lib/perf/nav-timing';
+
+const CommandPalette = dynamic(
+  () => import('./command-palette').then((mod) => ({ default: mod.CommandPalette })),
+  { ssr: false }
+);
 
 /** Prefer hover/focus Next.js prefetch; avoid mounting a storm of heavy modules. */
 const IDLE_PREFETCH_HREFS = ['/dashboard', '/agenda'] as const;
@@ -32,7 +41,13 @@ interface AppShellProps {
   entitledHrefs?: string[] | null;
   /** Streamed commercial banner (non-critical). Prefer over blocking layout awaits. */
   billingBannerSlot?: React.ReactNode;
+  /** Streamed notification bell; falls back to unreadNotifications when omitted. */
+  notificationBellSlot?: React.ReactNode;
+  /** Streamed settlements-nav flag (non-critical). */
+  settlementsNavFlagSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
+  /** Staging/dev navigation timing report from clinic layout. */
+  perfReport?: SvPerfReport | null;
 }
 
 export function AppShell({
@@ -46,7 +61,10 @@ export function AppShell({
   isPlatformAdmin = false,
   entitledHrefs = null,
   billingBannerSlot = null,
+  notificationBellSlot = null,
+  settlementsNavFlagSlot = null,
   showMySettlementsNav = false,
+  perfReport = null,
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -83,12 +101,13 @@ export function AppShell({
   }
 
   return (
+    <SettlementsNavProvider initial={showMySettlementsNav}>
     <div className="flex min-h-dvh" style={{ background: 'var(--shell-bg)' }}>
+      {settlementsNavFlagSlot}
       <AppUpdateBanner />
       <CommandPalette
         entitledHrefs={entitledHrefs}
         isPlatformAdmin={isPlatformAdmin}
-        showMySettlementsNav={showMySettlementsNav}
       />
 
       {pendingHref ? (
@@ -175,11 +194,13 @@ export function AppShell({
 
         <ClinicSidebarNav
           entitledHrefs={entitledHrefs}
-          showMySettlementsNav={showMySettlementsNav}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           onNavigate={(href, isActive) => {
-            if (!isActive) setPendingHref(href);
+            if (!isActive) {
+              markNavPerfClick(href);
+              setPendingHref(href);
+            }
             setSidebarOpen(false);
           }}
         />
@@ -226,7 +247,7 @@ export function AppShell({
                 <BranchSelector branches={branches} activeBranchId={activeBranchId ?? null} />
               </div>
             )}
-            <NotificationBell unreadCount={unreadNotifications} />
+            {notificationBellSlot ?? <NotificationBell unreadCount={unreadNotifications} />}
           </div>
         </header>
 
@@ -235,6 +256,8 @@ export function AppShell({
           {children}
         </main>
       </div>
+      <PerfNavProbe report={perfReport} />
     </div>
+    </SettlementsNavProvider>
   );
 }

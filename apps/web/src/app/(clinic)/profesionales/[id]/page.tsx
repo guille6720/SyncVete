@@ -1,124 +1,58 @@
+import { Suspense } from 'react';
 import { notFound, redirect } from 'next/navigation';
+import { canReadProfessionals, getProfessional } from '@/actions/professionals';
 import {
-  canReadProfessionalCompensation,
-  canReadProfessionalSettlements,
-  canWriteProfessionalCompensation,
-  listCompensationRules,
-  listCompensationSchemes,
-  listSettlements,
-} from '@/actions/professional-settlements';
-import {
-  canReadProfessionals,
-  canWriteProfessionals,
-  getProfessional,
-  getProfessionalSettlementSummary,
-  listProfessionalBranches,
-} from '@/actions/professionals';
-import { ProfessionalSummaryStrip } from '@/components/professionals/professional-summary-strip';
-import { getAssignableStaff } from '@/actions/appointments';
-import { getOrganization, getUserBranches } from '@/actions/settings';
-import { CompensationPanel } from '@/components/professionals/compensation-panel';
-import { ProfessionalSettlementsLink } from '@/components/professionals/professional-settlements-link';
-import { ProfessionalForm } from '@/components/professionals/professional-form';
-import { parseOrganizationSettings, PROFESSIONAL_RELATIONSHIP_LABELS } from '@sincvete/shared';
+  ProfessionalDetailBody,
+  ProfessionalDetailBodyFallback,
+} from '@/components/professionals/professional-detail-body';
+import type { ProfessionalProfileTab } from '@/components/professionals/professional-profile-tabs';
+import { svPerfOperation } from '@/lib/perf/nav-timing';
 
 interface PageProps {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }
 
-export default async function ProfesionalDetailPage({ params }: PageProps) {
-  const canRead = await canReadProfessionals();
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const PROFILE_TABS: ProfessionalProfileTab[] = [
+  'resumen',
+  'datos',
+  'agenda',
+  'honorarios',
+  'liquidaciones',
+  'acceso',
+  'historial',
+];
+
+const ROUTE = '/profesionales/[id]';
+
+/**
+ * Critical path only: authz + professional identity.
+ * Secondary tabs (settlements, agenda, compensation, staff) stream in Suspense.
+ */
+export default async function ProfesionalDetailPage({ params, searchParams }: PageProps) {
+  const canRead = await svPerfOperation(ROUTE, 'canReadProfessionals', () =>
+    canReadProfessionals()
+  );
   if (!canRead) redirect('/dashboard');
 
-  const { id } = await params;
-  const professional = await getProfessional(id);
+  const [{ id }, query] = await Promise.all([params, searchParams]);
+  if (!UUID_RE.test(id)) notFound();
+
+  const professional = await svPerfOperation(ROUTE, 'getProfessional', () =>
+    getProfessional(id)
+  );
   if (!professional) notFound();
 
-  const [branches, professionalBranches, staff, canWrite, canReadComp, canWriteComp, canReadSettlements, organization, settlementSummary] =
-    await Promise.all([
-      getUserBranches(),
-      listProfessionalBranches(id),
-      getAssignableStaff(),
-      canWriteProfessionals(),
-      canReadProfessionalCompensation(),
-      canWriteProfessionalCompensation(),
-      canReadProfessionalSettlements(),
-      getOrganization(),
-      canReadProfessionalSettlements().then((allowed) =>
-        allowed ? getProfessionalSettlementSummary(id) : null
-      ),
-    ]);
-
-  const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
-  const branchIds = professionalBranches.map((row) => row.branch_id);
-
-  let schemes: Awaited<ReturnType<typeof listCompensationSchemes>> = [];
-  const rulesByScheme: Record<string, Awaited<ReturnType<typeof listCompensationRules>>> = {};
-
-  if (canReadComp) {
-    schemes = await listCompensationSchemes(id);
-    await Promise.all(
-      schemes.map(async (scheme) => {
-        rulesByScheme[scheme.id] = await listCompensationRules(scheme.id);
-      })
-    );
-  }
-
-  const recentSettlements = canReadSettlements
-    ? (await listSettlements({ professionalId: id, page: 1, pageSize: 5 })).data
-    : [];
+  const defaultTab = PROFILE_TABS.includes(query.tab as ProfessionalProfileTab)
+    ? (query.tab as ProfessionalProfileTab)
+    : 'resumen';
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">
-          {professional.last_name}, {professional.first_name}
-        </h1>
-        <p className="text-muted-foreground">
-          {PROFESSIONAL_RELATIONSHIP_LABELS[professional.relationship_type]}
-          {professional.specialty ? ` · ${professional.specialty}` : ''}
-        </p>
-      </div>
-
-      {settlementSummary ? (
-        <ProfessionalSummaryStrip
-          professionalId={id}
-          summary={settlementSummary}
-          currency={currency}
-          canCalculate={canWriteComp}
-        />
-      ) : null}
-
-      {canWrite && (
-        <ProfessionalForm
-          mode="edit"
-          professional={professional}
-          branches={branches}
-          branchIds={branchIds}
-          staff={staff.map((member) => ({ userId: member.userId, fullName: member.fullName }))}
-        />
-      )}
-
-      {canReadComp && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold">Compensación</h2>
-          <CompensationPanel
-            professionalId={id}
-            schemes={schemes}
-            rulesByScheme={rulesByScheme}
-            canWrite={canWriteComp}
-            currency={currency}
-          />
-        </div>
-      )}
-
-      {canReadSettlements && (
-        <ProfessionalSettlementsLink
-          professionalId={id}
-          recentSettlements={recentSettlements}
-          currency={currency}
-        />
-      )}
-    </div>
+    <Suspense fallback={<ProfessionalDetailBodyFallback professional={professional} />}>
+      <ProfessionalDetailBody professional={professional} defaultTab={defaultTab} />
+    </Suspense>
   );
 }

@@ -8,6 +8,7 @@ import {
   appointmentSchema,
   computeEndTime,
   fromLocalDateTimeInput,
+  hasPermission,
   type ActionResult,
   type Appointment,
   type AppointmentListRow,
@@ -519,9 +520,12 @@ export async function deleteAppointment(appointmentId: string): Promise<ActionRe
 
 /** Request-scoped staff list for agenda forms (not patient PHI). */
 const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => {
-  await requirePermission('appointments:read');
+  // Soft-fail: used from professional profile and other modules that may lack appointments:read.
+  // Never throw PermissionError here — callers treat empty list as "no staff available".
   const session = await getSessionContext();
-  if (!session) return [];
+  if (!session || !hasPermission(session.permissions, 'appointments:read')) {
+    return [];
+  }
 
   const supabase = await createServerClient();
   type StaffRow = {

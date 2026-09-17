@@ -186,9 +186,47 @@ export const MANUAL_CSS = `
     font-size: 13px;
     color: var(--sv-muted);
   }
+  .sv-cover-superadmin {
+    background: linear-gradient(135deg, #0f172a 0%, #134e4a 45%, #0d9488 100%);
+  }
+  .sv-cover-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 220px;
+    height: 220px;
+    border-radius: 18px;
+    background: rgba(15, 23, 42, .55);
+    border: 1px solid rgba(153, 246, 228, .35);
+    color: #99f6e4;
+    font: 700 64px/1 Georgia, serif;
+    letter-spacing: .04em;
+    box-shadow: 0 16px 40px rgba(0,0,0,.28);
+  }
+  .sv-figure {
+    margin: 18px 0 8px;
+  }
+  .sv-figure svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 14px;
+    box-shadow: 0 10px 28px rgba(15, 118, 110, .12);
+  }
+  .sv-figure figcaption {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--sv-muted);
+  }
+  .sv-section code {
+    font-size: 12px;
+    background: var(--sv-soft);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
   @media (max-width: 720px) {
     .sv-cover, .sv-split, .sv-toc, .sv-grid-2 { grid-template-columns: 1fr; }
-    .sv-cover img, .sv-split img { width: 100%; height: auto; aspect-ratio: 1; }
+    .sv-cover img, .sv-split img, .sv-cover-badge { width: 100%; height: auto; aspect-ratio: 1; }
     .sv-cover h1 { font-size: 28px; }
   }
   @media print {

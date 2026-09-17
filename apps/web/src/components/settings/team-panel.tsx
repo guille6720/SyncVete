@@ -102,7 +102,13 @@ export function TeamPanel({
             </div>
             {inviteState?.error && <p className="text-sm text-destructive">{inviteState.error}</p>}
             {inviteState?.success && (
-              <p className="text-sm text-emerald-600">Invitación procesada correctamente</p>
+              <p className="text-sm text-emerald-600">
+                {inviteState.data?.mode === 'existing_notified'
+                  ? 'El usuario ya tenía una cuenta. Se agregó al equipo y enviamos una notificación por email.'
+                  : inviteState.data?.mode === 'existing_linked_email_failed'
+                    ? 'El usuario fue agregado al equipo, pero no pudimos enviar el email. Reintentá el envío.'
+                    : 'Invitación enviada. El profesional recibirá un email para activar su acceso.'}
+              </p>
             )}
             <Button type="submit" disabled={invitePending}>
               {invitePending ? 'Enviando...' : 'Invitar'}

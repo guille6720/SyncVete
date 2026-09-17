@@ -35,6 +35,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { cn } from '@/lib/utils';
 import { isClinicPathEntitled } from '@sincvete/shared';
+import { useShowMySettlementsNav } from '@/components/layout/settlements-nav-context';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, keywords: 'inicio home' },
@@ -114,7 +115,7 @@ const PREFETCH_ON_OPEN = ['/dashboard', '/agenda', '/pacientes'] as const;
 export function CommandPalette({
   entitledHrefs = null,
   isPlatformAdmin = false,
-  showMySettlementsNav = false,
+  showMySettlementsNav: showMySettlementsNavProp,
 }: {
   entitledHrefs?: string[] | null;
   isPlatformAdmin?: boolean;
@@ -123,6 +124,8 @@ export function CommandPalette({
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const showMySettlementsNavStreamed = useShowMySettlementsNav(false);
+  const showMySettlementsNav = showMySettlementsNavProp ?? showMySettlementsNavStreamed;
 
   const navigate = useCallback(
     (href: string) => {

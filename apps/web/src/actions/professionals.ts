@@ -1,22 +1,34 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { cache } from 'react';
 import {
   professionalCreateSchema,
+  professionalOnboardingSchema,
   professionalUpdateSchema,
+  resolveProfessionalAccessTemplate,
+  mapProfessionalsWriteDbError,
   type ActionResult,
   type Professional,
   type ProfessionalBranch,
   type ProfessionalListRow,
   type ProfessionalSettlementSummary,
 } from '@sincvete/shared';
-import { createServerClient } from '@/lib/supabase/server';
+import type { Json } from '@sincvete/db';
+import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import {
   PermissionError,
   canPermissionAndFeature,
+  requirePermission,
   requirePermissionAndFeature,
 } from '@/lib/permissions';
-import { FEATURES, planRestrictionResult, canUseFeature } from '@/lib/entitlements';
+import {
+  FEATURES,
+  assertWithinLimit,
+  getSeatUsageMeters,
+  planRestrictionResult,
+  canUseFeature,
+} from '@/lib/entitlements';
 import { getSessionContext } from '@/actions/auth';
 import type { Database } from '@sincvete/db';
 
@@ -43,16 +55,105 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   const planError = planRestrictionResult<T>(error);
   if (planError) return planError;
   if (error instanceof PermissionError) {
+    if (/professionals:write/i.test(error.message) || error.message === 'No tenés permisos para esta acción') {
+      // requirePermission uses generic message; map professionals write failures in callers when known.
+      return { success: false, error: error.message };
+    }
     return { success: false, error: error.message };
   }
-  console.error(error);
+  console.error('[professionals]', error instanceof Error ? error.message : 'unknown');
   return { success: false, error: 'Ocurrió un error inesperado' };
+}
+
+function mapWriteFailure(error: { message?: string; code?: string } | null): string {
+  return mapProfessionalsWriteDbError(error);
 }
 
 function rpcErrorMessage(error: { message?: string } | null): string {
   const message = error?.message?.trim();
   if (!message) return 'No se pudo completar la operación';
   return message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
+}
+
+function isMissingProfessionalsProfileColumnError(error: { message?: string } | null): boolean {
+  const message = error?.message ?? '';
+  return /Could not find the '(phone|email|address|date_of_birth|avatar_url|created_by)' column of 'professionals'/i.test(
+    message
+  );
+}
+
+function mapAuthAdminError(error: { message?: string } | null | undefined): string {
+  const message = error?.message?.trim() || 'No se pudo completar la operación de Auth';
+  if (/invalid api key/i.test(message)) {
+    return 'Clave de servicio de Supabase inválida. En Vercel, SUPABASE_SERVICE_ROLE_KEY debe ser la service_role del mismo proyecto que NEXT_PUBLIC_SUPABASE_URL (sin comillas). Después hacé Redeploy.';
+  }
+  if (/jwt|not authorized|forbidden/i.test(message)) {
+    return 'La service role no autoriza crear usuarios. Verificá SUPABASE_SERVICE_ROLE_KEY en Vercel y redeploy.';
+  }
+  return message;
+}
+
+type ProfessionalBaseInsert = {
+  organization_id: string;
+  user_id: string | null;
+  profile_id: string | null;
+  first_name: string;
+  last_name: string;
+  document_number: string | null;
+  tax_id: string | null;
+  professional_license: string | null;
+  professional_license_jurisdiction: string | null;
+  specialty: string | null;
+  relationship_type: Professional['relationship_type'];
+  start_date: string | null;
+  end_date: string | null;
+  is_active: boolean;
+  invoice_required: boolean;
+  notes: string | null;
+  created_by: string;
+};
+
+type ProfessionalProfilePatch = {
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  date_of_birth: string | null;
+  avatar_url: string | null;
+};
+
+/** Insert compatible with DBs that still lack 20260915000000 profile columns. */
+async function insertProfessionalWithOptionalProfile(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  base: ProfessionalBaseInsert,
+  profile: ProfessionalProfilePatch
+) {
+  const withProfile = { ...base, ...profile };
+  const firstAttempt = await supabase.from('professionals').insert(withProfile).select('*').single();
+
+  if (!firstAttempt.error) {
+    return firstAttempt;
+  }
+
+  if (!isMissingProfessionalsProfileColumnError(firstAttempt.error)) {
+    return firstAttempt;
+  }
+
+  // Fallback: core columns only (migration not applied yet).
+  const { created_by: _createdBy, ...legacyBase } = base;
+  const legacyAttempt = await supabase.from('professionals').insert(legacyBase).select('*').single();
+  if (legacyAttempt.error || !legacyAttempt.data) {
+    return {
+      data: null,
+      error: {
+        message:
+          'Falta la migración de campos de profesionales (phone/email/address). Ejecutá en Supabase SQL: supabase/migrations/20260915000000_professionals_profile_fields.sql',
+      },
+    };
+  }
+
+  // Best-effort profile patch once columns exist partially; ignore schema misses.
+  await supabase.from('professionals').update(profile).eq('id', legacyAttempt.data.id);
+  return legacyAttempt;
 }
 
 function mapProfessional(row: Record<string, unknown>): Professional {
@@ -70,12 +171,18 @@ function mapProfessional(row: Record<string, unknown>): Professional {
       ? String(row.professional_license_jurisdiction)
       : null,
     specialty: row.specialty ? String(row.specialty) : null,
+    phone: row.phone ? String(row.phone) : null,
+    email: row.email ? String(row.email) : null,
+    address: row.address ? String(row.address) : null,
+    date_of_birth: row.date_of_birth ? String(row.date_of_birth) : null,
+    avatar_url: row.avatar_url ? String(row.avatar_url) : null,
     relationship_type: row.relationship_type as Professional['relationship_type'],
     start_date: row.start_date ? String(row.start_date) : null,
     end_date: row.end_date ? String(row.end_date) : null,
     is_active: Boolean(row.is_active),
     invoice_required: Boolean(row.invoice_required),
     notes: row.notes ? String(row.notes) : null,
+    created_by: row.created_by ? String(row.created_by) : null,
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
     deleted_at: row.deleted_at ? String(row.deleted_at) : null,
@@ -110,12 +217,13 @@ export async function listProfessionals(input: { activeOnly?: boolean } = {}): P
 }
 
 export async function listProfessionalsWithSummary(): Promise<ProfessionalListRow[]> {
+  const { svPerfOperation } = await import('@/lib/perf/nav-timing');
+  return svPerfOperation('/profesionales', 'listProfessionalsWithSummary', async () => {
   const professionals = await listProfessionals();
   if (professionals.length === 0) return [];
 
   const supabase = await createServerClient();
   const professionalIds = professionals.map((row) => row.id);
-  const today = new Date().toISOString().slice(0, 10);
 
   const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }, { data: payments, error: paymentsError }] =
     await Promise.all([
@@ -137,10 +245,30 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
         .is('deleted_at', null)
         .order('paid_at', { ascending: false }),
     ]);
+
+  const schemaMissing = [settlementsError, schemesError, paymentsError].some(
+    (err) =>
+      err &&
+      /schema cache|does not exist|Could not find the (table|function)/i.test(err.message)
+  );
+  if (schemaMissing) {
+    console.warn('[professionals] summary tables missing — returning identity-only list');
+    return professionals.map((professional) => ({
+      ...professional,
+      openBalance: 0,
+      pendingSettlementCount: 0,
+      approvedUnpaidCount: 0,
+      activeSchemeName: null,
+      lastPaymentAmount: null,
+      lastPaymentDate: null,
+      lastPaymentSettlementId: null,
+    }));
+  }
   if (settlementsError) throw settlementsError;
   if (schemesError) throw schemesError;
   if (paymentsError) throw paymentsError;
 
+  const today = new Date().toISOString().slice(0, 10);
   const openBalanceByPro = new Map<string, number>();
   const pendingCountByPro = new Map<string, number>();
   const approvedUnpaidByPro = new Map<string, number>();
@@ -198,6 +326,7 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
       lastPaymentDate: last?.paidAt ?? null,
       lastPaymentSettlementId: last?.settlementId ?? null,
     };
+  });
   });
 }
 
@@ -276,6 +405,12 @@ export async function getProfessionalSettlementSummary(
 }
 
 export async function getProfessional(id: string): Promise<Professional | null> {
+  if (
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)
+  ) {
+    return null;
+  }
+
   await requirePermissionAndFeature('professionals:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
   const supabase = await createServerClient();
   const { data, error } = await supabase
@@ -289,6 +424,10 @@ export async function getProfessional(id: string): Promise<Professional | null> 
 }
 
 export async function getProfessionalForCurrentUser(): Promise<Professional | null> {
+  return loadProfessionalForCurrentUser();
+}
+
+const loadProfessionalForCurrentUser = cache(async (): Promise<Professional | null> => {
   const session = await getSessionContext();
   if (!session?.userId) return null;
 
@@ -314,11 +453,14 @@ export async function getProfessionalForCurrentUser(): Promise<Professional | nu
     throw error;
   }
   return data ? mapProfessional(data as Record<string, unknown>) : null;
-}
+});
 
 export async function hasLinkedProfessionalProfile(): Promise<boolean> {
-  const professional = await getProfessionalForCurrentUser();
-  return professional != null;
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  return navPerfTime('professional.linkCheck', async () => {
+    const professional = await loadProfessionalForCurrentUser();
+    return professional != null;
+  });
 }
 
 export async function listProfessionalBranches(
@@ -340,7 +482,17 @@ export async function createProfessional(
   formData: FormData
 ): Promise<ActionResult<Professional>> {
   try {
-    await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    try {
+      await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    } catch (error) {
+      if (error instanceof PermissionError) {
+        return {
+          success: false,
+          error: 'No tenés permisos para crear profesionales en esta clínica.',
+        };
+      }
+      throw error;
+    }
     const session = await getSessionContext();
     if (!session) return { success: false, error: 'Sesión inválida' };
 
@@ -354,6 +506,11 @@ export async function createProfessional(
       professionalLicense: formData.get('professionalLicense') || null,
       professionalLicenseJurisdiction: formData.get('professionalLicenseJurisdiction') || null,
       specialty: formData.get('specialty') || null,
+      phone: formData.get('phone') || null,
+      email: formData.get('email') || null,
+      address: formData.get('address') || null,
+      dateOfBirth: formData.get('dateOfBirth') || null,
+      avatarUrl: formData.get('avatarUrl') || null,
       relationshipType: formData.get('relationshipType'),
       startDate: formData.get('startDate') || null,
       endDate: formData.get('endDate') || null,
@@ -371,32 +528,47 @@ export async function createProfessional(
       };
     }
 
+    const emptyToNull = (value: string | null | undefined) => {
+      if (value == null || value === '') return null;
+      return value;
+    };
+
     const supabase = await createServerClient();
-    const { data, error } = await supabase
-      .from('professionals')
-      .insert({
+    const { data, error } = await insertProfessionalWithOptionalProfile(
+      supabase,
+      {
         organization_id: session.organizationId,
         user_id: parsed.data.userId ?? null,
         profile_id: parsed.data.profileId ?? null,
         first_name: parsed.data.firstName,
         last_name: parsed.data.lastName,
-        document_number: parsed.data.documentNumber ?? null,
-        tax_id: parsed.data.taxId ?? null,
-        professional_license: parsed.data.professionalLicense ?? null,
-        professional_license_jurisdiction: parsed.data.professionalLicenseJurisdiction ?? null,
-        specialty: parsed.data.specialty ?? null,
+        document_number: emptyToNull(parsed.data.documentNumber),
+        tax_id: emptyToNull(parsed.data.taxId),
+        professional_license: emptyToNull(parsed.data.professionalLicense),
+        professional_license_jurisdiction: emptyToNull(
+          parsed.data.professionalLicenseJurisdiction
+        ),
+        specialty: emptyToNull(parsed.data.specialty),
         relationship_type: parsed.data.relationshipType,
-        start_date: parsed.data.startDate ?? null,
-        end_date: parsed.data.endDate ?? null,
+        start_date: emptyToNull(parsed.data.startDate),
+        end_date: emptyToNull(parsed.data.endDate),
         is_active: parsed.data.isActive ?? true,
         invoice_required: parsed.data.invoiceRequired ?? false,
-        notes: parsed.data.notes ?? null,
-      })
-      .select('*')
-      .single();
+        notes: emptyToNull(parsed.data.notes),
+        created_by: session.userId,
+      },
+      {
+        phone: emptyToNull(parsed.data.phone),
+        email: emptyToNull(parsed.data.email),
+        address: emptyToNull(parsed.data.address),
+        date_of_birth: emptyToNull(parsed.data.dateOfBirth),
+        avatar_url: emptyToNull(parsed.data.avatarUrl),
+      }
+    );
 
     if (error) {
-      return { success: false, error: rpcErrorMessage(error) };
+      console.error('[professionals.create] insert failed', (error as { code?: string }).code ?? '', (error.message ?? '').slice(0, 180));
+      return { success: false, error: mapWriteFailure(error) };
     }
 
     if (parsed.data.branchIds.length > 0) {
@@ -408,7 +580,17 @@ export async function createProfessional(
       }));
       const { error: branchError } = await supabase.from('professional_branches').insert(branchRows);
       if (branchError) {
-        return { success: false, error: rpcErrorMessage(branchError) };
+        console.error(
+          '[professionals.create] branches failed',
+          branchError.code ?? '',
+          (branchError.message ?? '').slice(0, 180)
+        );
+        // Compensate: soft-delete the professional row we just created.
+        await supabase
+          .from('professionals')
+          .update({ deleted_at: new Date().toISOString(), is_active: false })
+          .eq('id', data.id);
+        return { success: false, error: mapWriteFailure(branchError) };
       }
     }
 
@@ -437,6 +619,11 @@ export async function updateProfessional(
       professionalLicense: formData.get('professionalLicense') || undefined,
       professionalLicenseJurisdiction: formData.get('professionalLicenseJurisdiction') || undefined,
       specialty: formData.get('specialty') || undefined,
+      phone: formData.get('phone') || undefined,
+      email: formData.get('email') || undefined,
+      address: formData.get('address') || undefined,
+      dateOfBirth: formData.get('dateOfBirth') || undefined,
+      avatarUrl: formData.get('avatarUrl') || undefined,
       relationshipType: formData.get('relationshipType') || undefined,
       startDate: formData.get('startDate') || undefined,
       endDate: formData.get('endDate') || undefined,
@@ -462,25 +649,37 @@ export async function updateProfessional(
       };
     }
 
+    const emptyToNull = (value: string | null | undefined) => {
+      if (value == null || value === '') return null;
+      return value;
+    };
+
     const { id, branchIds, ...fields } = parsed.data;
     const patch: ProfessionalUpdate = {};
     if (fields.userId !== undefined) patch.user_id = fields.userId;
     if (fields.profileId !== undefined) patch.profile_id = fields.profileId;
     if (fields.firstName !== undefined) patch.first_name = fields.firstName;
     if (fields.lastName !== undefined) patch.last_name = fields.lastName;
-    if (fields.documentNumber !== undefined) patch.document_number = fields.documentNumber;
-    if (fields.taxId !== undefined) patch.tax_id = fields.taxId;
-    if (fields.professionalLicense !== undefined) patch.professional_license = fields.professionalLicense;
-    if (fields.professionalLicenseJurisdiction !== undefined) {
-      patch.professional_license_jurisdiction = fields.professionalLicenseJurisdiction;
+    if (fields.documentNumber !== undefined) patch.document_number = emptyToNull(fields.documentNumber);
+    if (fields.taxId !== undefined) patch.tax_id = emptyToNull(fields.taxId);
+    if (fields.professionalLicense !== undefined) {
+      patch.professional_license = emptyToNull(fields.professionalLicense);
     }
-    if (fields.specialty !== undefined) patch.specialty = fields.specialty;
+    if (fields.professionalLicenseJurisdiction !== undefined) {
+      patch.professional_license_jurisdiction = emptyToNull(fields.professionalLicenseJurisdiction);
+    }
+    if (fields.specialty !== undefined) patch.specialty = emptyToNull(fields.specialty);
+    if (fields.phone !== undefined) patch.phone = emptyToNull(fields.phone);
+    if (fields.email !== undefined) patch.email = emptyToNull(fields.email);
+    if (fields.address !== undefined) patch.address = emptyToNull(fields.address);
+    if (fields.dateOfBirth !== undefined) patch.date_of_birth = emptyToNull(fields.dateOfBirth);
+    if (fields.avatarUrl !== undefined) patch.avatar_url = emptyToNull(fields.avatarUrl);
     if (fields.relationshipType !== undefined) patch.relationship_type = fields.relationshipType;
-    if (fields.startDate !== undefined) patch.start_date = fields.startDate;
-    if (fields.endDate !== undefined) patch.end_date = fields.endDate;
+    if (fields.startDate !== undefined) patch.start_date = emptyToNull(fields.startDate);
+    if (fields.endDate !== undefined) patch.end_date = emptyToNull(fields.endDate);
     if (fields.isActive !== undefined) patch.is_active = fields.isActive;
     if (fields.invoiceRequired !== undefined) patch.invoice_required = fields.invoiceRequired;
-    if (fields.notes !== undefined) patch.notes = fields.notes;
+    if (fields.notes !== undefined) patch.notes = emptyToNull(fields.notes);
 
     const supabase = await createServerClient();
     const { data, error } = await supabase
@@ -520,6 +719,760 @@ export async function updateProfessional(
     revalidateProfessionalsModule();
     return { success: true, data: mapProfessional(data as Record<string, unknown>) };
   } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getProfessionalAccessState(professionalId: string): Promise<{
+  userId: string | null;
+  membershipId: string | null;
+  role: string | null;
+  isActive: boolean | null;
+  email: string | null;
+  fullName: string | null;
+} | null> {
+  const professional = await getProfessional(professionalId);
+  if (!professional) return null;
+  if (!professional.user_id) {
+    return {
+      userId: null,
+      membershipId: null,
+      role: null,
+      isActive: null,
+      email: professional.email,
+      fullName: `${professional.first_name} ${professional.last_name}`.trim(),
+    };
+  }
+
+  const supabase = await createServerClient();
+  const [{ data: membership }, { data: profile }] = await Promise.all([
+    supabase
+      .from('branch_members')
+      .select('id, role, is_active')
+      .eq('user_id', professional.user_id)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', professional.user_id)
+      .maybeSingle(),
+  ]);
+
+  return {
+    userId: professional.user_id,
+    membershipId: membership?.id ? String(membership.id) : null,
+    role: membership?.role ? String(membership.role) : null,
+    isActive: membership ? Boolean(membership.is_active) : null,
+    email: professional.email,
+    fullName: profile?.full_name ? String(profile.full_name) : null,
+  };
+}
+
+export async function linkProfessionalUser(
+  professionalId: string,
+  userId: string | null
+): Promise<ActionResult<Professional>> {
+  try {
+    await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    if (userId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+      return { success: false, error: 'Usuario inválido' };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('professionals')
+      .update({
+        user_id: userId,
+        profile_id: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', professionalId)
+      .is('deleted_at', null)
+      .select('*')
+      .single();
+
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    revalidateProfessionalsModule();
+    return { success: true, data: mapProfessional(data as Record<string, unknown>) };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function provisionProfessionalAccess(
+  professionalId: string,
+  formData: FormData
+): Promise<ActionResult<{ temporaryPassword?: string; userId: string }>> {
+  try {
+    await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    await requirePermission('users:manage');
+    const session = await getSessionContext();
+    if (!session) return { success: false, error: 'Sesión inválida' };
+
+    const professional = await getProfessional(professionalId);
+    if (!professional) return { success: false, error: 'Profesional no encontrado' };
+
+    const email = String(formData.get('accessEmail') || professional.email || '')
+      .trim()
+      .toLowerCase();
+    const branchId = String(formData.get('branchId') || session.branchId || '');
+    const passwordMode = String(formData.get('passwordMode') || 'auto') as 'auto' | 'manual';
+    const manualPassword = String(formData.get('password') || '');
+    const accessTemplateRaw = String(formData.get('accessTemplate') || 'veterinarian');
+    const forcePasswordChange =
+      formData.get('forcePasswordChange') === 'true' ||
+      formData.get('forcePasswordChange') === 'on';
+
+    if (!email || !email.includes('@')) {
+      return { success: false, error: 'Indicá un email de acceso' };
+    }
+    if (!/^[0-9a-f-]{36}$/i.test(branchId)) {
+      return { success: false, error: 'Elegí una sucursal' };
+    }
+
+    const accessTemplate = resolveProfessionalAccessTemplate(
+      (['veterinarian', 'veterinarian_admin', 'specialist', 'surgeon', 'external'].includes(
+        accessTemplateRaw
+      )
+        ? accessTemplateRaw
+        : 'veterinarian') as Parameters<typeof resolveProfessionalAccessTemplate>[0]
+    );
+
+    let temporaryPassword: string | undefined =
+      passwordMode === 'manual' && manualPassword.length >= 8
+        ? manualPassword
+        : generateTemporaryPassword();
+
+    if (passwordMode === 'manual' && manualPassword.length < 8) {
+      return { success: false, error: 'La contraseña debe tener al menos 8 caracteres' };
+    }
+
+    let service;
+    try {
+      service = await createServiceClient();
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : mapAuthAdminError(null),
+      };
+    }
+
+    const supabaseForLimit = await createServerClient();
+    const { data: listed, error: listError } = await service.auth.admin.listUsers({
+      page: 1,
+      perPage: 1000,
+    });
+    if (listError) return { success: false, error: mapAuthAdminError(listError) };
+
+    const existingUser = listed.users.find((u) => u.email?.toLowerCase() === email);
+    let userId: string;
+
+    if (existingUser) {
+      userId = existingUser.id;
+      temporaryPassword = undefined;
+      const updatePayload: {
+        email_confirm: boolean;
+        password?: string;
+        user_metadata: Record<string, unknown>;
+      } = {
+        email_confirm: true,
+        user_metadata: {
+          ...(existingUser.user_metadata ?? {}),
+          full_name: `${professional.first_name} ${professional.last_name}`.trim(),
+          force_password_change: forcePasswordChange,
+        },
+      };
+      if (passwordMode === 'manual') {
+        updatePayload.password = manualPassword;
+        temporaryPassword = manualPassword;
+      }
+      const { error: passwordError } = await service.auth.admin.updateUserById(
+        userId,
+        updatePayload
+      );
+      if (passwordError) {
+        return { success: false, error: mapAuthAdminError(passwordError) };
+      }
+    } else {
+      const [{ count: profileCount }, { count: inviteCount }] = await Promise.all([
+        supabaseForLimit
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('is_active', true)
+          .is('deleted_at', null),
+        supabaseForLimit
+          .from('organization_invitations')
+          .select('id', { count: 'exact', head: true })
+          .eq('status', 'pending')
+          .is('deleted_at', null),
+      ]);
+      await assertWithinLimit({
+        organizationId: session.organizationId,
+        featureKey: FEATURES.USERS_MAX,
+        currentCount: (profileCount ?? 0) + (inviteCount ?? 0),
+      });
+
+      if (accessTemplate.role === 'veterinarian') {
+        const seats = await getSeatUsageMeters(session.organizationId);
+        const meter = seats.find((item) => item.featureKey === FEATURES.PROFESSIONALS_MAX);
+        if (meter) {
+          await assertWithinLimit({
+            organizationId: session.organizationId,
+            featureKey: FEATURES.PROFESSIONALS_MAX,
+            currentCount: meter.used,
+          });
+        }
+      }
+
+      const { data: created, error: createError } = await service.auth.admin.createUser({
+        email,
+        password: temporaryPassword,
+        email_confirm: true,
+        user_metadata: {
+          full_name: `${professional.first_name} ${professional.last_name}`.trim(),
+          force_password_change: forcePasswordChange,
+          organization_id: session.organizationId,
+          branch_id: branchId,
+          role: accessTemplate.role,
+        },
+      });
+      if (createError || !created.user) {
+        return {
+          success: false,
+          error: mapAuthAdminError(createError) || 'No se pudo crear el usuario',
+        };
+      }
+      userId = created.user.id;
+    }
+
+    const supabase = await createServerClient();
+    const { error: rpcError } = await supabase.rpc('add_team_member', {
+      p_user_id: userId,
+      p_branch_id: branchId,
+      p_role: accessTemplate.role,
+    });
+    if (rpcError) return { success: false, error: rpcErrorMessage(rpcError) };
+
+    if (accessTemplate.permissions) {
+      await supabase
+        .from('branch_members')
+        .update({
+          permissions: accessTemplate.permissions as unknown as Json,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('user_id', userId)
+        .eq('branch_id', branchId)
+        .is('deleted_at', null);
+    }
+
+    const linkResult = await linkProfessionalUser(professionalId, userId);
+    if (!linkResult.success) {
+      return { success: false, error: linkResult.error ?? 'No se pudo vincular el profesional' };
+    }
+
+    // Best-effort contact email on professional row
+    await supabase
+      .from('professionals')
+      .update({ email, updated_at: new Date().toISOString() })
+      .eq('id', professionalId);
+
+    revalidateProfessionalsModule();
+    revalidatePath('/configuracion');
+    return { success: true, data: { userId, temporaryPassword } };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function setProfessionalMembershipActive(
+  membershipId: string,
+  isActive: boolean
+): Promise<ActionResult> {
+  try {
+    await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    await requirePermission('users:manage');
+
+    const supabase = await createServerClient();
+    const { error } = await supabase
+      .from('branch_members')
+      .update({
+        is_active: isActive,
+        deleted_at: isActive ? null : new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', membershipId);
+
+    if (error) return { success: false, error: rpcErrorMessage(error) };
+    revalidateProfessionalsModule();
+    revalidatePath('/configuracion');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+type ProfessionalOnboardingResult = Professional & { temporaryPassword?: string };
+
+function generateTemporaryPassword(length = 12): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$';
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join('');
+}
+
+function normalizeScheduleTime(value: string): string {
+  return value.length === 5 ? `${value}:00` : value;
+}
+
+async function compensateFailedProfessionalAccess(params: {
+  newlyCreatedAuthUserId: string | null;
+  linkedUserId: string | null;
+  membershipBranchId: string | null;
+  membershipCreated: boolean;
+  professionalId: string | null;
+}): Promise<void> {
+  try {
+    const supabase = await createServerClient();
+    if (params.professionalId) {
+      await supabase
+        .from('professionals')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', params.professionalId);
+      await supabase
+        .from('professional_branches')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('professional_id', params.professionalId);
+    }
+
+    if (params.membershipCreated && params.linkedUserId && params.membershipBranchId) {
+      await supabase
+        .from('branch_members')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('user_id', params.linkedUserId)
+        .eq('branch_id', params.membershipBranchId)
+        .is('deleted_at', null);
+    }
+
+    if (params.newlyCreatedAuthUserId) {
+      try {
+        const service = await createServiceClient();
+        // Soft-delete profile before auth user (FK).
+        await supabase
+          .from('profiles')
+          .update({ deleted_at: new Date().toISOString(), is_active: false })
+          .eq('id', params.newlyCreatedAuthUserId);
+        await service.auth.admin.deleteUser(params.newlyCreatedAuthUserId);
+      } catch (cleanupError) {
+        console.error(
+          '[professionals.onboarding] auth cleanup failed',
+          cleanupError instanceof Error ? cleanupError.message : 'unknown'
+        );
+      }
+    }
+  } catch (cleanupError) {
+    console.error(
+      '[professionals.onboarding] compensate failed',
+      cleanupError instanceof Error ? cleanupError.message : 'unknown'
+    );
+  }
+}
+
+export async function createProfessionalOnboarding(
+  _prev: ActionResult<ProfessionalOnboardingResult> | null,
+  formData: FormData
+): Promise<ActionResult<ProfessionalOnboardingResult>> {
+  let newlyCreatedAuthUserId: string | null = null;
+  let linkedUserId: string | null = null;
+  let membershipCreated = false;
+  let membershipBranchId: string | null = null;
+  let professionalId: string | null = null;
+
+  try {
+    try {
+      await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    } catch (error) {
+      if (error instanceof PermissionError) {
+        return {
+          success: false,
+          error: 'No tenés permisos para crear profesionales en esta clínica.',
+        };
+      }
+      throw error;
+    }
+    const session = await getSessionContext();
+    if (!session) return { success: false, error: 'Sesión inválida' };
+
+    const createPlatformAccessRaw = formData.get('createPlatformAccess');
+    const createPlatformAccess =
+      createPlatformAccessRaw === 'true' || createPlatformAccessRaw === 'on';
+
+    const parsed = professionalOnboardingSchema.safeParse({
+      firstName: formData.get('firstName'),
+      lastName: formData.get('lastName'),
+      documentNumber: formData.get('documentNumber') || null,
+      professionalLicense: formData.get('professionalLicense') || null,
+      specialty: formData.get('specialty') || null,
+      phone: formData.get('phone') || null,
+      email: formData.get('email') || null,
+      relationshipType: formData.get('relationshipType'),
+      isActive: formData.get('isActive') === 'true' || formData.get('isActive') === 'on',
+      notes: formData.get('notes') || null,
+      branchId: formData.get('branchId'),
+      branchIds: formData.getAll('branchIds').map(String).filter(Boolean),
+      accessTemplate: formData.get('accessTemplate') || 'veterinarian',
+      createPlatformAccess,
+      accessEmail: formData.get('accessEmail') || null,
+      passwordMode: formData.get('passwordMode') || 'auto',
+      password: formData.get('password') || null,
+      forcePasswordChange:
+        formData.get('forcePasswordChange') === 'true' ||
+        formData.get('forcePasswordChange') === 'on',
+      scheduleWeekdays: formData.getAll('scheduleWeekdays').map(String).filter(Boolean),
+      scheduleStartTime: formData.get('scheduleStartTime') || '09:00',
+      scheduleEndTime: formData.get('scheduleEndTime') || '18:00',
+      scheduleSlotMinutes: formData.get('scheduleSlotMinutes') || 30,
+    });
+
+    if (!parsed.success) {
+      const firstIssue = parsed.error.issues[0]?.message;
+      return {
+        success: false,
+        error: firstIssue || 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    const input = parsed.data;
+    const emptyToNull = (value: string | null | undefined) => {
+      if (value == null || value === '') return null;
+      return value;
+    };
+
+    const branchIds = Array.from(
+      new Set([input.branchId, ...(input.branchIds ?? [])].filter(Boolean))
+    );
+
+    let temporaryPassword: string | undefined;
+    let createdUserId: string | null = null;
+    const accessTemplate = resolveProfessionalAccessTemplate(input.accessTemplate);
+
+    if (input.createPlatformAccess) {
+      try {
+        await requirePermission('users:manage');
+      } catch (error) {
+        if (error instanceof PermissionError) {
+          return {
+            success: false,
+            error: 'No tenés permisos para crear acceso de plataforma para profesionales.',
+          };
+        }
+        throw error;
+      }
+
+      const accessEmail = String(input.accessEmail || input.email || '')
+        .trim()
+        .toLowerCase();
+      if (!accessEmail) {
+        return { success: false, error: 'Indicá un email para el acceso' };
+      }
+
+      const supabaseForLimit = await createServerClient();
+      let service;
+      try {
+        service = await createServiceClient();
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : mapAuthAdminError(null),
+        };
+      }
+
+      const { data: existingUsers, error: listError } = await service.auth.admin.listUsers({
+        page: 1,
+        perPage: 1000,
+      });
+      if (listError) {
+        return { success: false, error: mapAuthAdminError(listError) };
+      }
+      const existingUser = existingUsers.users.find(
+        (u) => u.email?.toLowerCase() === accessEmail
+      );
+
+      if (existingUser) {
+        const { data: existingProfile } = await supabaseForLimit
+          .from('profiles')
+          .select('id, organization_id')
+          .eq('id', existingUser.id)
+          .is('deleted_at', null)
+          .maybeSingle();
+
+        if (
+          existingProfile?.organization_id &&
+          existingProfile.organization_id !== session.organizationId
+        ) {
+          return {
+            success: false,
+            error: 'Ese email ya pertenece a otra organización',
+          };
+        }
+
+        if (!existingProfile) {
+          const [{ count: profileCount }, { count: inviteCount }] = await Promise.all([
+            supabaseForLimit
+              .from('profiles')
+              .select('id', { count: 'exact', head: true })
+              .eq('is_active', true)
+              .is('deleted_at', null),
+            supabaseForLimit
+              .from('organization_invitations')
+              .select('id', { count: 'exact', head: true })
+              .eq('status', 'pending')
+              .is('deleted_at', null),
+          ]);
+          await assertWithinLimit({
+            organizationId: session.organizationId,
+            featureKey: FEATURES.USERS_MAX,
+            currentCount: (profileCount ?? 0) + (inviteCount ?? 0),
+          });
+        }
+
+        createdUserId = existingUser.id;
+        temporaryPassword = undefined;
+        const { error: metaError } = await service.auth.admin.updateUserById(existingUser.id, {
+          user_metadata: {
+            ...(existingUser.user_metadata ?? {}),
+            full_name: `${input.firstName} ${input.lastName}`.trim(),
+          },
+        });
+        if (metaError) {
+          return { success: false, error: mapAuthAdminError(metaError) };
+        }
+      } else {
+        temporaryPassword =
+          input.passwordMode === 'manual' && input.password
+            ? input.password
+            : generateTemporaryPassword();
+
+        const [{ count: profileCount }, { count: inviteCount }] = await Promise.all([
+          supabaseForLimit
+            .from('profiles')
+            .select('id', { count: 'exact', head: true })
+            .eq('is_active', true)
+            .is('deleted_at', null),
+          supabaseForLimit
+            .from('organization_invitations')
+            .select('id', { count: 'exact', head: true })
+            .eq('status', 'pending')
+            .is('deleted_at', null),
+        ]);
+        await assertWithinLimit({
+          organizationId: session.organizationId,
+          featureKey: FEATURES.USERS_MAX,
+          currentCount: (profileCount ?? 0) + (inviteCount ?? 0),
+        });
+
+        if (accessTemplate.role === 'veterinarian') {
+          const seats = await getSeatUsageMeters(session.organizationId);
+          const meter = seats.find((item) => item.featureKey === FEATURES.PROFESSIONALS_MAX);
+          if (meter) {
+            await assertWithinLimit({
+              organizationId: session.organizationId,
+              featureKey: FEATURES.PROFESSIONALS_MAX,
+              currentCount: meter.used,
+            });
+          }
+        }
+
+        const { data: created, error: createError } = await service.auth.admin.createUser({
+          email: accessEmail,
+          password: temporaryPassword,
+          email_confirm: true,
+          user_metadata: {
+            full_name: `${input.firstName} ${input.lastName}`.trim(),
+            force_password_change: input.forcePasswordChange,
+            organization_id: session.organizationId,
+            branch_id: input.branchId,
+            role: accessTemplate.role,
+          },
+        });
+
+        if (createError || !created.user) {
+          return {
+            success: false,
+            error: mapAuthAdminError(createError) || 'No se pudo crear el usuario',
+          };
+        }
+        createdUserId = created.user.id;
+        newlyCreatedAuthUserId = created.user.id;
+      }
+
+      linkedUserId = createdUserId;
+      membershipBranchId = input.branchId;
+
+      const supabase = await createServerClient();
+      const { error: rpcError } = await supabase.rpc('add_team_member', {
+        p_user_id: createdUserId,
+        p_branch_id: input.branchId,
+        p_role: accessTemplate.role,
+      });
+      if (rpcError) {
+        await compensateFailedProfessionalAccess({
+          newlyCreatedAuthUserId,
+          linkedUserId,
+          membershipBranchId,
+          membershipCreated: false,
+          professionalId: null,
+        });
+        return { success: false, error: mapWriteFailure(rpcError) };
+      }
+      membershipCreated = true;
+
+      if (accessTemplate.permissions) {
+        const { error: permError } = await supabase
+          .from('branch_members')
+          .update({
+            permissions: accessTemplate.permissions as unknown as Json,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', createdUserId)
+          .eq('branch_id', input.branchId)
+          .is('deleted_at', null);
+        if (permError) {
+          await compensateFailedProfessionalAccess({
+            newlyCreatedAuthUserId,
+            linkedUserId,
+            membershipBranchId,
+            membershipCreated,
+            professionalId: null,
+          });
+          return { success: false, error: mapWriteFailure(permError) };
+        }
+      }
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await insertProfessionalWithOptionalProfile(
+      supabase,
+      {
+        organization_id: session.organizationId,
+        user_id: createdUserId,
+        profile_id: createdUserId,
+        first_name: input.firstName,
+        last_name: input.lastName,
+        document_number: emptyToNull(input.documentNumber),
+        tax_id: emptyToNull(input.taxId),
+        professional_license: emptyToNull(input.professionalLicense),
+        professional_license_jurisdiction: emptyToNull(input.professionalLicenseJurisdiction),
+        specialty: emptyToNull(input.specialty),
+        relationship_type: input.relationshipType,
+        start_date: emptyToNull(input.startDate),
+        end_date: emptyToNull(input.endDate),
+        is_active: input.isActive ?? true,
+        invoice_required: input.invoiceRequired ?? false,
+        notes: emptyToNull(input.notes),
+        created_by: session.userId,
+      },
+      {
+        phone: emptyToNull(input.phone),
+        email: emptyToNull(input.email || input.accessEmail),
+        address: emptyToNull(input.address),
+        date_of_birth: emptyToNull(input.dateOfBirth),
+        avatar_url: emptyToNull(input.avatarUrl),
+      }
+    );
+
+    if (error || !data) {
+      console.error(
+        '[professionals.onboarding] insert failed',
+        (error as { code?: string } | null)?.code ?? '',
+        (error?.message ?? '').slice(0, 180)
+      );
+      await compensateFailedProfessionalAccess({
+        newlyCreatedAuthUserId,
+        linkedUserId,
+        membershipBranchId,
+        membershipCreated,
+        professionalId: null,
+      });
+      return { success: false, error: mapWriteFailure(error) };
+    }
+    professionalId = String(data.id);
+
+    if (branchIds.length > 0) {
+      const branchRows = branchIds.map((branchId) => ({
+        organization_id: session.organizationId,
+        professional_id: data.id,
+        branch_id: branchId,
+        is_active: true,
+      }));
+      const { error: branchError } = await supabase.from('professional_branches').insert(branchRows);
+      if (branchError) {
+        await compensateFailedProfessionalAccess({
+          newlyCreatedAuthUserId,
+          linkedUserId,
+          membershipBranchId,
+          membershipCreated,
+          professionalId,
+        });
+        return { success: false, error: mapWriteFailure(branchError) };
+      }
+    }
+
+    if (createdUserId && (input.scheduleWeekdays?.length ?? 0) > 0) {
+      const startTime = normalizeScheduleTime(input.scheduleStartTime ?? '09:00');
+      const endTime = normalizeScheduleTime(input.scheduleEndTime ?? '18:00');
+      for (const weekday of input.scheduleWeekdays) {
+        const { error: scheduleError } = await supabase.rpc('upsert_professional_schedule', {
+          p_branch_id: input.branchId,
+          p_user_id: createdUserId,
+          p_weekday: weekday,
+          p_start_time: startTime,
+          p_end_time: endTime,
+          p_slot_duration_minutes: input.scheduleSlotMinutes ?? 30,
+          p_allowed_appointment_types: null,
+          p_is_active: true,
+          p_id: null,
+        });
+        if (scheduleError) {
+          // Professional + access already committed; agenda can be fixed later.
+          console.error(
+            '[professionals.onboarding] schedule failed',
+            (scheduleError.message ?? '').slice(0, 180)
+          );
+          break;
+        }
+      }
+      revalidatePath('/agenda');
+    }
+
+    revalidateProfessionalsModule();
+    revalidatePath('/configuracion');
+    revalidatePath(`/profesionales/${data.id}`);
+
+    return {
+      success: true,
+      data: {
+        ...mapProfessional(data as Record<string, unknown>),
+        temporaryPassword,
+      },
+    };
+  } catch (error) {
+    await compensateFailedProfessionalAccess({
+      newlyCreatedAuthUserId,
+      linkedUserId,
+      membershipBranchId,
+      membershipCreated,
+      professionalId,
+    });
+    if (error instanceof PermissionError) {
+      return {
+        success: false,
+        error: 'No tenés permisos para crear profesionales en esta clínica.',
+      };
+    }
     return actionError(error);
   }
 }

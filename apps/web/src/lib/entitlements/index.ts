@@ -83,6 +83,8 @@ function featureKeyFromJoin(features: NestedFeature): string | null {
  * Request-scoped via React.cache — never reuse across tenants.
  */
 export const loadOrganizationEntitlementInput = cache(async (organizationId: string) => {
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  return navPerfTime('entitlements.input', async () => {
   const supabase = await createServerClient();
   // Subscription expiry is scheduled (service_role job) — never write on page reads.
 
@@ -236,6 +238,7 @@ export const loadOrganizationEntitlementInput = cache(async (organizationId: str
     trialEndsAt: activeSub?.trial_ends_at ?? null,
     endsAt: activeSub?.ends_at ?? null,
   };
+  });
 });
 
 export const getOrganizationEntitlements = cache(
@@ -427,14 +430,17 @@ export type ClinicCommercialShell = {
  */
 export const getClinicEntitledHrefs = cache(
   async (organizationId: string): Promise<string[] | null> => {
-    try {
-      const input = await loadOrganizationEntitlementInput(organizationId);
-      if (input.schemaUnavailable) return null;
-      return getEntitledClinicHrefs(resolveOrganizationEntitlements(input));
-    } catch (error) {
-      console.error('[entitlements] entitled hrefs failed open', error);
-      return null;
-    }
+    const { navPerfTime } = await import('@/lib/perf/nav-timing');
+    return navPerfTime('entitlements.hrefs', async () => {
+      try {
+        const input = await loadOrganizationEntitlementInput(organizationId);
+        if (input.schemaUnavailable) return null;
+        return getEntitledClinicHrefs(resolveOrganizationEntitlements(input));
+      } catch (error) {
+        console.error('[entitlements] entitled hrefs failed open', error);
+        return null;
+      }
+    });
   }
 );
 

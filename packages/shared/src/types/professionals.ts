@@ -20,12 +20,18 @@ export interface Professional {
   professional_license: string | null;
   professional_license_jurisdiction: string | null;
   specialty: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string | null;
+  date_of_birth: string | null;
+  avatar_url: string | null;
   relationship_type: ProfessionalRelationshipType;
   start_date: string | null;
   end_date: string | null;
   is_active: boolean;
   invoice_required: boolean;
   notes: string | null;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -97,6 +103,7 @@ export interface ProfessionalSettlement {
   cancelled_at: string | null;
   cancelled_by: string | null;
   cancellation_reason: string | null;
+  calculation_snapshot: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

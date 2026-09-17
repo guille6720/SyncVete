@@ -37,7 +37,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           <span className="sv-kicker">Manual de uso</span>
           <h1>Todo el día de la clínica, en un solo lugar</h1>
           <p>
-            Guía práctica para entrar, cargar pacientes, atender consultas, cobrar y configurar el plan.
+            Guía práctica para entrar, cargar pacientes, atender consultas, liquidar profesionales, cobrar y configurar el plan.
             Los módulos que ves en el menú dependen del plan y de tu rol.
           </p>
         </div>
@@ -53,10 +53,11 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
         <a href="#lab">7. Laboratorio e imágenes</a>
         <a href="#stock">8. Inventario y farmacia</a>
         <a href="#cobros">9. Facturación y caja</a>
-        <a href="#ops">10. Reportes, avisos e IA</a>
-        <a href="#config">11. Configuración y plan</a>
-        <a href="#import-export">11b. Importar / Exportar</a>
-        <a href="#roles">12. Roles y portal del tutor</a>
+        <a href="#profesionales">10. Profesionales y liquidaciones</a>
+        <a href="#ops">11. Reportes, avisos e IA</a>
+        <a href="#config">12. Configuración y plan</a>
+        <a href="#import-export">12b. Importar / Exportar</a>
+        <a href="#roles">13. Roles y portal del tutor</a>
       </nav>
 
       <section className="sv-section" id="inicio">
@@ -112,7 +113,9 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           <div>
             <p>
               La agenda es el calendario operativo de la clínica. Podés ver el día, la semana o el mes, filtrar por
-              profesional, sucursal o estado, y abrir un turno en el panel lateral sin salir de la vista.
+              profesional, sucursal o estado, y abrir un turno en el panel lateral sin salir de la vista. Los horarios
+              semanales y bloqueos (vacaciones, ausencias) se configuran en <em>Agenda → Disponibilidad</em> o desde la
+              ficha del profesional (pestaña Agenda), si tiene usuario vinculado.
             </p>
             <ul className="sv-steps">
               <li>
@@ -266,8 +269,88 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
         <MockBilling />
       </section>
 
+      <section className="sv-section" id="profesionales">
+        <h2>10. Profesionales y liquidaciones</h2>
+        <p>
+          El módulo <strong>Profesionales</strong> concentra el perfil laboral de veterinarios y otros
+          profesionales: datos, acceso a la app, agenda, honorarios y liquidaciones. No reemplaza la pestaña
+          Equipo de Configuración (usuarios y asientos del plan), sino que se vincula con ella.
+        </p>
+
+        <h3>Alta y ficha del profesional</h3>
+        <ul className="sv-steps">
+          <li>
+            Entrá a <strong>Profesionales</strong> (o <strong>Nuevo profesional</strong>) y completá nombre,
+            apellido, DNI, matrícula, especialidad, teléfono, email, dirección y observaciones.
+          </li>
+          <li>
+            Asigná sucursales y marcá si está <em>Activo</em>. Guardá: se abre la ficha con pestañas.
+          </li>
+          <li>
+            Pestañas de la ficha:{' '}
+            <strong>Resumen</strong>, <strong>Datos</strong>, <strong>Agenda</strong>, <strong>Honorarios</strong>,{' '}
+            <strong>Liquidaciones</strong>, <strong>Acceso</strong> e <strong>Historial</strong>.
+          </li>
+        </ul>
+
+        <h3>Acceso a SyncVete</h3>
+        <ul className="sv-steps">
+          <li>
+            En <strong>Acceso</strong> vinculá un usuario del equipo que ya exista, o invitá por email como
+            Veterinario (usa el mismo flujo de invitaciones que Configuración → Equipo).
+          </li>
+          <li>
+            Sin usuario vinculado no se puede configurar la agenda propia ni el portal de “Mis liquidaciones”.
+          </li>
+          <li>
+            Activá o desactivá la membresía desde esta pestaña. Para resetear la contraseña usá{' '}
+            <em>Recuperar contraseña</em> o Configuración → Equipo.
+          </li>
+        </ul>
+
+        <h3>Agenda del profesional</h3>
+        <p>
+          Con el usuario vinculado, la pestaña <strong>Agenda</strong> permite cargar franjas semanales (varios
+          tramos por día), duración de slot y bloqueos (vacaciones, licencia, bloqueo manual). Lo mismo está en
+          Agenda → Disponibilidad para toda la clínica.
+        </p>
+
+        <h3>Honorarios</h3>
+        <p>
+          En <strong>Honorarios</strong> armá esquemas y reglas: monto fijo, por actividad/consulta, o porcentaje.
+          Podés combinar varias reglas en el mismo esquema (sueldo base + porcentaje de cirugías, etc.). Las reglas
+          vigentes alimentan el cálculo de liquidaciones.
+        </p>
+
+        <h3>Liquidaciones</h3>
+        <ul className="sv-steps">
+          <li>
+            En <strong>Liquidaciones</strong> (menú) o desde la ficha del profesional elegí período y calculá.
+            El sistema toma automáticamente consultas, cirugías, vacunas, laboratorio, farmacia y demás fuentes
+            configuradas: no hace falta cargar a mano cada atención.
+          </li>
+          <li>
+            Revisá el detalle, agregá ajustes (bono, descuento, adelanto, corrección) si hace falta y enviá a
+            revisión o confirmá.
+          </li>
+          <li>
+            Estados útiles: <em>Borrador</em>, <em>Calculada / En revisión</em>, <em>Confirmada</em>,{' '}
+            <em>Pagada</em>, <em>Anulada</em>. Al confirmar se congela un snapshot de montos e ítems: si después
+            cambia el precio de un servicio, esa liquidación no se recalcula sola.
+          </li>
+          <li>
+            Registrá el pago desde la liquidación. El profesional vinculado ve su historial en{' '}
+            <strong>Mis liquidaciones</strong>.
+          </li>
+        </ul>
+        <div className="sv-callout">
+          Tip: primero creá el profesional, vinculá acceso, configurá honorarios y recién después calculá el
+          período. Si falta esquema vigente, el cálculo no tiene base.
+        </div>
+      </section>
+
       <section className="sv-section" id="ops">
-        <h2>10. Reportes, avisos e IA</h2>
+        <h2>11. Reportes, avisos e IA</h2>
         <div className="sv-grid-2">
           <div className="sv-card">
             <strong>Reportes</strong>
@@ -295,7 +378,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       </section>
 
       <section className="sv-section" id="config">
-        <h2>11. Configuración y plan</h2>
+        <h2>12. Configuración y plan</h2>
         <div className="sv-split">
           <Figure src={ILLUSTRATIONS.config} alt="Persona configurando la clínica en una notebook" />
           <div>
@@ -312,7 +395,8 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
                 <strong>Sucursales:</strong> altas y sucursal principal.
               </li>
               <li>
-                <strong>Equipo:</strong> invitaciones y asientos del plan.
+                <strong>Equipo:</strong> invitaciones y asientos del plan. Para el perfil laboral (honorarios,
+                liquidaciones, agenda del vet) usá también el módulo <strong>Profesionales</strong>.
               </li>
               <li>
                 <strong>Roles:</strong> qué puede hacer cada perfil.
@@ -330,7 +414,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       </section>
 
       <section className="sv-section" id="import-export">
-        <h2>11b. Importar / Exportar datos</h2>
+        <h2>12b. Importar / Exportar datos</h2>
         <p>
           En <strong>Configuración → Importar / Exportar</strong> podés migrar propietarios, pacientes, historias,
           vacunas, laboratorio, cirugías, recetas, internaciones y adjuntos (ZIP SyncVete).
@@ -510,7 +594,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       </section>
 
       <section className="sv-section" id="roles">
-        <h2>12. Roles y portal del tutor</h2>
+        <h2>13. Roles y portal del tutor</h2>
         <table className="sv-roles">
           <thead>
             <tr>
@@ -521,11 +605,16 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           <tbody>
             <tr>
               <td>Propietario / Administrador</td>
-              <td>Clínica, plan, sucursales, equipo y operación completa.</td>
+              <td>
+                Clínica, plan, sucursales, equipo, profesionales, liquidaciones y operación completa.
+              </td>
             </tr>
             <tr>
               <td>Veterinario</td>
-              <td>Pacientes, agenda, clínica, recetas e IA. Sin administrar el plan.</td>
+              <td>
+                Pacientes, agenda, clínica, recetas e IA. Si está vinculado como profesional, también ve{' '}
+                <em>Mis liquidaciones</em>. Sin administrar el plan.
+              </td>
             </tr>
             <tr>
               <td>Enfermero/a</td>

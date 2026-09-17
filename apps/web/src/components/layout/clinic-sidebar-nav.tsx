@@ -15,9 +15,11 @@ import {
   type ClinicSidebarNavItem,
 } from '@/components/layout/clinic-sidebar-nav-catalog';
 import type { DashboardNavGroupId } from '@/components/dashboard/dashboard-nav-catalog';
+import { useShowMySettlementsNav } from '@/components/layout/settlements-nav-context';
 
 interface ClinicSidebarNavProps {
   entitledHrefs?: string[] | null;
+  /** Optional override; defaults to streamed SettlementsNavProvider value. */
   showMySettlementsNav?: boolean;
   isPlatformAdmin?: boolean;
   pendingHref: string | null;
@@ -75,12 +77,14 @@ function NavLink({
 
 export function ClinicSidebarNav({
   entitledHrefs = null,
-  showMySettlementsNav = false,
+  showMySettlementsNav: showMySettlementsNavProp,
   isPlatformAdmin = false,
   pendingHref,
   onNavigate,
 }: ClinicSidebarNavProps) {
   const pathname = usePathname();
+  const showMySettlementsNavStreamed = useShowMySettlementsNav(false);
+  const showMySettlementsNav = showMySettlementsNavProp ?? showMySettlementsNavStreamed;
 
   const visible = useMemo(
     () =>

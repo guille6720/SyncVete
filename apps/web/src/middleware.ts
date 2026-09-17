@@ -30,7 +30,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
-  let supabaseResponse = NextResponse.next({ request });
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-sv-pathname', request.nextUrl.pathname);
+
+  let supabaseResponse = NextResponse.next({
+    request: { headers: requestHeaders },
+  });
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +47,9 @@ export async function middleware(request: NextRequest) {
         },
         setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
+          supabaseResponse = NextResponse.next({
+            request: { headers: requestHeaders },
+          });
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
           );
@@ -96,10 +103,13 @@ export async function middleware(request: NextRequest) {
   // (pueden entrar a la app desde el header /login → /home)
 
   if (process.env.VERCEL_ENV === 'preview' || process.env.SYNC_VETE_PERF_TIMING === '1') {
+    const existing = supabaseResponse.headers.get('Server-Timing');
+    const mwTiming = `mw-auth;desc="middleware getUser";dur=${authMs.toFixed(1)}`;
     supabaseResponse.headers.set(
       'Server-Timing',
-      `mw-auth;desc="middleware getUser";dur=${authMs.toFixed(1)}`
+      existing ? `${existing}, ${mwTiming}` : mwTiming
     );
+    supabaseResponse.headers.set('x-sv-mw-auth-ms', authMs.toFixed(1));
   }
 
   return supabaseResponse;

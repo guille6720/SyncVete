@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -35,6 +36,7 @@ import { getOrganization, getUserBranches } from '@/actions/settings';
 import { getSessionContext } from '@/lib/session';
 import { WaitingRoomBoard } from '@/components/waiting-room/waiting-room-board';
 import { WaitingRoomOpsDashboard } from '@/components/waiting-room/waiting-room-ops-dashboard';
+import { RouteLoading } from '@/components/layout/route-loading';
 import { Button } from '@/components/ui/button';
 
 interface SalaEsperaPageProps {
@@ -69,7 +71,11 @@ function salaEsperaHref(opts: {
 }
 
 export default async function SalaEsperaPage({ searchParams }: SalaEsperaPageProps) {
-  const [canRead, params] = await Promise.all([canReadWaitingRoom(), searchParams]);
+  const [canRead, params, session] = await Promise.all([
+    canReadWaitingRoom(),
+    searchParams,
+    getSessionContext(),
+  ]);
   if (!canRead) redirect('/dashboard');
 
   const today = formatDateParam(new Date());
@@ -80,33 +86,39 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
   const prevDate = addDaysIso(selectedDate, -1);
   const nextDate = addDaysIso(selectedDate, 1);
   const weekStart = getWeekStartDate(selectedDate);
+  const listBranchId = resolveWaitingRoomListBranchId(
+    boardFilters.branchId,
+    session?.branchId
+  );
 
-  const [canWrite, canWhatsApp, canStartConsultation, organization, session, branches] =
-    await Promise.all([
+  const { svPerfOperation } = await import('@/lib/perf/nav-timing');
+  const [
+    canWrite,
+    canWhatsApp,
+    canStartConsultation,
+    organization,
+    branches,
+    entries,
+    weekAppointments,
+  ] = await svPerfOperation('/sala-espera', 'parallelBoard', () =>
+    Promise.all([
       canManageWaitingRoom(),
       canSendWhatsApp(),
       canManageConsultations(),
       getOrganization(),
-      getSessionContext(),
       getUserBranches(),
-    ]);
+      listWaitingRoom({ date: selectedDate, branchId: listBranchId }),
+      isToday
+        ? listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[])
+        : Promise.resolve([] as AppointmentListRow[]),
+    ])
+  );
 
   const orgSettings = parseOrganizationSettings(organization?.settings);
   const roomPresets = orgSettings.waitingRoomRooms ?? [];
   const whatsAppAutoEnabled = orgSettings.waitingRoomWhatsAppAutoEnabled === true;
   const boardSoundEnabled = orgSettings.waitingRoomBoardSoundEnabled === true;
   const currentUserId = session?.userId ?? null;
-  const listBranchId = resolveWaitingRoomListBranchId(
-    boardFilters.branchId,
-    session?.branchId
-  );
-
-  const [entries, weekAppointments] = await Promise.all([
-    listWaitingRoom({ date: selectedDate, branchId: listBranchId }),
-    isToday
-      ? listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[])
-      : Promise.resolve([] as AppointmentListRow[]),
-  ]);
 
   const visibleEntries =
     mineOnly && currentUserId
@@ -238,24 +250,26 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
         listBranchId={listBranchId}
       />
 
-      <WaitingRoomBoard
-        key={`${selectedDate}-${mineOnly}-${params.q ?? ''}-${params.wrStatus ?? ''}-${params.wrAssigned ?? ''}-${params.wrBranch ?? ''}`}
-        entries={visibleEntries}
-        checkInCandidates={checkInCandidates}
-        canWrite={canWrite}
-        canSendWhatsApp={canWhatsApp}
-        canStartConsultation={canStartConsultation}
-        whatsAppAutoEnabled={whatsAppAutoEnabled}
-        boardSoundEnabled={boardSoundEnabled}
-        todayLabel={selectedDate}
-        isToday={isToday}
-        roomPresets={roomPresets}
-        initialFilters={boardFilters}
-        syncFiltersToUrl
-        branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
-        sessionBranchId={session?.branchId ?? null}
-        listBranchId={listBranchId}
-      />
+      <Suspense fallback={<RouteLoading label="Cargando cola de sala de espera" variant="board" />}>
+        <WaitingRoomBoard
+          key={`${selectedDate}-${mineOnly}-${params.q ?? ''}-${params.wrStatus ?? ''}-${params.wrAssigned ?? ''}-${params.wrBranch ?? ''}`}
+          entries={visibleEntries}
+          checkInCandidates={checkInCandidates}
+          canWrite={canWrite}
+          canSendWhatsApp={canWhatsApp}
+          canStartConsultation={canStartConsultation}
+          whatsAppAutoEnabled={whatsAppAutoEnabled}
+          boardSoundEnabled={boardSoundEnabled}
+          todayLabel={selectedDate}
+          isToday={isToday}
+          roomPresets={roomPresets}
+          initialFilters={boardFilters}
+          syncFiltersToUrl
+          branchOptions={branches.map((b) => ({ id: b.id, name: b.name }))}
+          sessionBranchId={session?.branchId ?? null}
+          listBranchId={listBranchId}
+        />
+      </Suspense>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import {
   getPermissionsForRole,
+  pickEffectiveBranchMembership,
   resolvePlatformAdminAccess,
   type Permission,
   type Role,
@@ -13,6 +14,7 @@ type BootstrapMembership = {
   branch_id: string;
   role: string;
   permissions: Permission[] | null;
+  created_at?: string | null;
 };
 
 type BootstrapProfile = {
@@ -58,14 +60,22 @@ function profileToSession(profile: BootstrapProfile): SessionContext['profile'] 
  * cookie validation / revocation semantics (not getClaims-only).
  */
 export const getSessionContext = cache(async (): Promise<SessionContext | null> => {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { navPerfTime } = await import('@/lib/perf/nav-timing');
+  return navPerfTime('session.total', async () => {
+    const supabase = await createServerClient();
+    const user = await navPerfTime('session.getUser', async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+      return authUser;
+    });
 
-  if (!user) return null;
+    if (!user) return null;
 
-  const { data: bootstrapRaw, error: bootstrapError } = await supabase.rpc('get_session_bootstrap');
+    const { data: bootstrapRaw, error: bootstrapError } = await navPerfTime(
+      'session.bootstrap',
+      async () => supabase.rpc('get_session_bootstrap')
+    );
 
   if (!bootstrapError && bootstrapRaw) {
     const bootstrap = bootstrapRaw as unknown as SessionBootstrap;
@@ -79,8 +89,10 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
     if (!profile?.id) return null;
 
     const memberships = Array.isArray(bootstrap.memberships) ? bootstrap.memberships : [];
-    const activeMembership =
-      memberships.find((m) => m.branch_id === profile.active_branch_id) ?? memberships[0] ?? null;
+    const activeMembership = pickEffectiveBranchMembership(
+      memberships,
+      profile.active_branch_id
+    );
 
     if (activeMembership) {
       const role = activeMembership.role as Role;
@@ -132,7 +144,7 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
       .single(),
     supabase
       .from('branch_members')
-      .select('branch_id, role, permissions')
+      .select('branch_id, role, permissions, created_at')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .is('deleted_at', null)
@@ -148,11 +160,11 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
   const profile = profileRes.data;
   if (!profile) return null;
 
-  const memberships = membershipsRes.data;
-  const activeMembership =
-    memberships?.find((m) => m.branch_id === profile.active_branch_id) ??
-    memberships?.[0] ??
-    null;
+  const memberships = membershipsRes.data ?? [];
+  const activeMembership = pickEffectiveBranchMembership(
+    memberships,
+    profile.active_branch_id
+  );
 
   if (activeMembership) {
     const role = activeMembership.role as Role;
@@ -185,4 +197,5 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
     ownerId: portalOwnerId,
     isPlatformAdmin,
   };
+  });
 });

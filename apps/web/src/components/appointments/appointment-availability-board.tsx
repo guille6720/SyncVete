@@ -46,6 +46,8 @@ interface AppointmentAvailabilityBoardProps {
   branches: Array<{ id: string; name: string }>;
   defaultBranchId?: string | null;
   canWrite: boolean;
+  /** When set, locks forms to this staff user (professional profile embed). */
+  lockedUserId?: string | null;
 }
 
 function formatTime(value: string): string {
@@ -59,6 +61,7 @@ export function AppointmentAvailabilityBoard({
   branches,
   defaultBranchId,
   canWrite,
+  lockedUserId = null,
 }: AppointmentAvailabilityBoardProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -76,7 +79,7 @@ export function AppointmentAvailabilityBoard({
 
   const handleSchedule = (formData: FormData) => {
     const branchId = String(formData.get('branchId') ?? defaultBranchId ?? '');
-    const userId = String(formData.get('userId') ?? '');
+    const userId = String(formData.get('userId') ?? lockedUserId ?? '');
     if (!branchId || !userId) {
       setError('Seleccioná sucursal y profesional');
       return;
@@ -116,7 +119,7 @@ export function AppointmentAvailabilityBoard({
         startsAt: fromLocalDateTimeInput(startsAtRaw),
         endsAt: fromLocalDateTimeInput(endsAtRaw),
         kind: String(formData.get('kind') || 'blocked'),
-        userId: String(formData.get('userId') || '') || undefined,
+        userId: String(formData.get('userId') || lockedUserId || '') || undefined,
         reason: String(formData.get('reason') || '') || undefined,
       });
       if (!result.success) {
@@ -295,14 +298,21 @@ export function AppointmentAvailabilityBoard({
           )}
           <div className="space-y-2">
             <Label htmlFor="sched-user">Profesional *</Label>
-            <Select id="sched-user" name="userId" required defaultValue="">
-              <option value="">—</option>
-              {staff.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {member.fullName}
-                </option>
-              ))}
-            </Select>
+            {lockedUserId ? (
+              <>
+                <input type="hidden" name="userId" value={lockedUserId} />
+                <p className="text-sm text-muted-foreground">{staffName(lockedUserId)}</p>
+              </>
+            ) : (
+              <Select id="sched-user" name="userId" required defaultValue="">
+                <option value="">—</option>
+                {staff.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.fullName}
+                  </option>
+                ))}
+              </Select>
+            )}
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">
@@ -370,14 +380,21 @@ export function AppointmentAvailabilityBoard({
           )}
           <div className="space-y-2">
             <Label htmlFor="block-user">Profesional</Label>
-            <Select id="block-user" name="userId" defaultValue="">
-              <option value="">Toda la sucursal</option>
-              {staff.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {member.fullName}
-                </option>
-              ))}
-            </Select>
+            {lockedUserId ? (
+              <>
+                <input type="hidden" name="userId" value={lockedUserId} />
+                <p className="text-sm text-muted-foreground">{staffName(lockedUserId)}</p>
+              </>
+            ) : (
+              <Select id="block-user" name="userId" defaultValue="">
+                <option value="">Toda la sucursal</option>
+                {staff.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.fullName}
+                  </option>
+                ))}
+              </Select>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="block-kind">Tipo</Label>
