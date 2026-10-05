@@ -13,7 +13,10 @@ export default async function PortalPage() {
 
   const session = await getSessionContext();
   const brand = session ? await getOwnerAppBrand(session.organizationId) : null;
-  if (brand?.enabled) return <OwnerAppDashboard home={home} />;
+  if (brand?.enabled)
+    return (
+      <OwnerAppDashboard home={home} clinicName={brand.appName.replace(/^app-/i, '').trim()} />
+    );
   const today = formatDateParam(new Date());
   const waitingRoom = await getOwnerPortalWaitingRoom(today);
 

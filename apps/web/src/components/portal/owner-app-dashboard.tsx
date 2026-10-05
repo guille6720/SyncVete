@@ -7,12 +7,20 @@ import {
   type OwnerPortalHome,
 } from '@sincvete/shared';
 
-export function OwnerAppDashboard({ home }: { home: OwnerPortalHome }) {
+export function OwnerAppDashboard({
+  home,
+  clinicName,
+}: {
+  home: OwnerPortalHome;
+  clinicName?: string;
+}) {
   const next = home.upcomingAppointments[0];
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm text-muted-foreground">Solo para clientes de {home.clinic.name}</p>
+        <p className="text-sm text-muted-foreground">
+          Solo para pacientes de {clinicName || home.clinic.name}
+        </p>
         <h1 className="mt-1 text-2xl font-bold">Hola, {home.owner.fullName.split(' ')[0]}</h1>
         <p className="text-sm text-muted-foreground">Así están tus mascotas hoy.</p>
       </div>
