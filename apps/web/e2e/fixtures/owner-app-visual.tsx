@@ -5,6 +5,7 @@ import { OwnerAppInstall } from '@/components/portal/owner-app-install';
 import { LoginForm } from '@/components/auth/login-form';
 import { PortalActivateForm } from '@/components/portal/portal-activate-form';
 import { ownerAppMetadata } from '@/lib/owner-app-metadata';
+import { OwnerProfessionalBooking } from '@/components/portal/owner-professional-booking';
 import { OwnerAppAgenda } from '@/components/portal/owner-app-agenda';
 import { OwnerVaccineCalendar } from '@/components/portal/owner-vaccine-calendar';
 import type { OwnerPortalHome } from '@sincvete/shared';
@@ -110,7 +111,30 @@ export default async function OwnerAppVisual({
         'use server';
       }}
     >
-      {view === 'home' ? (
+      {view === 'professionals' ? (
+        <OwnerProfessionalBooking
+          patients={[patient]}
+          availability={{
+            date: '2026-10-06',
+            minDate: '2026-10-05',
+            maxDate: '2026-11-04',
+            timezone: 'America/Argentina/Buenos_Aires',
+            professionals: [
+              { id: 'professional-one', name: 'Dra. Ana', specialty: 'Clínica' },
+              { id: 'professional-two', name: 'Dr. Pedro', specialty: null },
+            ],
+            slots: ['one', 'two'].map((id) => ({
+              schedule_id: `schedule-${id}`,
+              professional_id: `professional-${id}`,
+              professional_name: id === 'one' ? 'Dra. Ana' : 'Dr. Pedro',
+              branch_name: 'IMILVET',
+              branch_id: 'branch',
+              starts_at: '2026-10-06T18:00:00Z',
+              ends_at: '2026-10-06T18:30:00Z',
+            })),
+          }}
+        />
+      ) : view === 'home' ? (
         <OwnerAppDashboard home={home} />
       ) : (
         <>

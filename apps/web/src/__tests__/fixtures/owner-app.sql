@@ -16,7 +16,7 @@ CREATE TABLE appointments(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organiz
 CREATE TABLE vaccinations(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), organization_id uuid, owner_id uuid, patient_id uuid, vaccine_name text, administered_at date, next_due_at date, created_at timestamptz DEFAULT now(), deleted_at timestamptz);
 CREATE TABLE owner_portal_invites(organization_id uuid, token_hash text, expires_at timestamptz, accepted_at timestamptz, revoked_at timestamptz);
 CREATE TABLE professional_time_blocks(organization_id uuid, branch_id uuid, user_id uuid, starts_at timestamptz, ends_at timestamptz, deleted_at timestamptz);
-CREATE TABLE professional_schedules(organization_id uuid, branch_id uuid, user_id uuid, weekday smallint, start_time time, end_time time, allowed_appointment_types text[], is_active boolean DEFAULT true, deleted_at timestamptz);
+CREATE TABLE professional_schedules(id uuid PRIMARY KEY DEFAULT gen_random_uuid(), slot_duration_minutes integer DEFAULT 30, organization_id uuid, branch_id uuid, user_id uuid, weekday smallint, start_time time, end_time time, allowed_appointment_types text[], is_active boolean DEFAULT true, deleted_at timestamptz);
 CREATE FUNCTION get_user_organization_id() RETURNS uuid LANGUAGE sql AS $$ SELECT nullif(current_setting('test.org',true),'')::uuid $$;
 CREATE FUNCTION is_clinic_staff() RETURNS boolean LANGUAGE sql AS $$ SELECT current_setting('test.staff',true) = 'true' $$;
 CREATE FUNCTION has_permission(text) RETURNS boolean LANGUAGE sql AS $$ SELECT current_setting('test.staff',true) = 'true' $$;
@@ -27,3 +27,7 @@ INSERT INTO branches(id,organization_id,name) VALUES('eeeeeeee-0000-4000-8000-00
 INSERT INTO branch_members(user_id,branch_id) VALUES('aaaaaaaa-0000-4000-8000-000000000001','eeeeeeee-0000-4000-8000-000000000001');
 INSERT INTO owners(id,organization_id,portal_user_id,email) VALUES('cccccccc-0000-4000-8000-000000000001','11111111-0000-4000-8000-000000000001','bbbbbbbb-0000-4000-8000-000000000001','owner@example.test'),('cccccccc-0000-4000-8000-000000000002','22222222-0000-4000-8000-000000000002','bbbbbbbb-0000-4000-8000-000000000002','other@example.test');
 INSERT INTO patients(id,organization_id,owner_id,name) VALUES('dddddddd-0000-4000-8000-000000000001','11111111-0000-4000-8000-000000000001','cccccccc-0000-4000-8000-000000000001','Luna'),('dddddddd-0000-4000-8000-000000000002','22222222-0000-4000-8000-000000000002','cccccccc-0000-4000-8000-000000000002','Toby');
+
+CREATE TABLE profiles(id uuid PRIMARY KEY,organization_id uuid,full_name text,is_active boolean DEFAULT true,deleted_at timestamptz);
+CREATE TABLE professionals(id uuid DEFAULT gen_random_uuid(),organization_id uuid,user_id uuid,first_name text,last_name text,specialty text,is_active boolean DEFAULT true,deleted_at timestamptz,created_at timestamptz DEFAULT now());
+INSERT INTO profiles(id,organization_id,full_name) VALUES('aaaaaaaa-0000-4000-8000-000000000001','11111111-0000-4000-8000-000000000001','Dra. Test');

@@ -51,7 +51,7 @@ describe('owner PWA SQL contracts (isolated Postgres)', () => {
       await db.exec(existing.slice(start, end));
     }
     await db.exec(
-      'CREATE TRIGGER availability BEFORE INSERT OR UPDATE ON appointments FOR EACH ROW EXECUTE FUNCTION trg_fn_appointments_availability()'
+      'CREATE TRIGGER trg_availability BEFORE INSERT OR UPDATE ON appointments FOR EACH ROW EXECUTE FUNCTION trg_fn_appointments_availability()'
     );
     const migration = readFileSync(
       resolve('../../supabase/migrations/20261005014349_owner_pwa_staging.sql'),
@@ -60,6 +60,20 @@ describe('owner PWA SQL contracts (isolated Postgres)', () => {
     await expect(db.exec(migration)).rejects.toThrow('STAGING ONLY');
     await db.exec("SET app.owner_pwa_staging='on'");
     await db.exec(migration);
+    await db.exec(
+      readFileSync(
+        resolve('../../supabase/migrations/20261005175954_owner_professional_booking_staging.sql'),
+        'utf8'
+      )
+    );
+    await db.exec(
+      readFileSync(
+        resolve(
+          '../../supabase/migrations/20261005180733_owner_professional_rpc_permissions_staging.sql'
+        ),
+        'utf8'
+      )
+    );
     await session('staff');
     await db.query('SELECT save_owner_app_brand($1::jsonb)', [
       {
@@ -202,6 +216,106 @@ describe('owner PWA SQL contracts (isolated Postgres)', () => {
     await db.exec("RESET ROLE; UPDATE appointments SET status='cancelada'");
     await session('service');
     expect(await scalar('SELECT claim_owner_app_emails() AS value')).toEqual([]);
+  });
+
+  it('generates agenda slots, excludes occupied and blocked times, and saves owner bookings in the clinical agenda', async () => {
+    await db.exec('RESET ROLE; BEGIN');
+    try {
+      const schedule = await scalar<string>(
+        `INSERT INTO professional_schedules(organization_id,branch_id,user_id,weekday,start_time,end_time)
+        VALUES($1,$2,'aaaaaaaa-0000-4000-8000-000000000001',extract(isodow FROM (now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date+1),'09:00','11:00') RETURNING id AS value`,
+        [org, branch]
+      );
+      const date = await scalar<string>(
+        "SELECT ((now() AT TIME ZONE 'America/Argentina/Buenos_Aires')::date+1)::text AS value"
+      );
+      const foreignSchedule = await scalar<string>(
+        `INSERT INTO professional_schedules(organization_id,branch_id,user_id,weekday,start_time,end_time)
+        VALUES($1,'eeeeeeee-0000-4000-8000-000000000002','aaaaaaaa-0000-4000-8000-000000000001',1,'09:00','11:00') RETURNING id AS value`,
+        [otherOrg]
+      );
+      await session('owner');
+      type Availability = {
+        professionals: { id: string; name: string }[];
+        slots: { schedule_id: string; starts_at: string; ends_at: string }[];
+      };
+      const read = () =>
+        scalar<Availability>('SELECT get_owner_professional_availability($1::date) AS value', [
+          date,
+        ]);
+      const availability = (await read())!;
+      expect(availability.professionals.map((p) => p.name)).toEqual(['Dra. Test']);
+      expect(availability.slots).toHaveLength(4);
+      const slot = availability.slots[0];
+      await db.exec('SAVEPOINT forged_slot');
+      await expect(
+        db.query('SELECT book_owner_professional_slot($1,$2,$3)', [
+          schedule,
+          new Date(new Date(slot.starts_at).getTime() + 300000).toISOString(),
+          patient,
+        ])
+      ).rejects.toThrow('Unavailable');
+      await db.exec('ROLLBACK TO forged_slot');
+      await expect(
+        db.query('SELECT book_owner_professional_slot($1,$2,$3)', [
+          foreignSchedule,
+          slot.starts_at,
+          patient,
+        ])
+      ).rejects.toThrow('Unavailable');
+      await db.exec('ROLLBACK TO forged_slot');
+      await db.exec('SAVEPOINT foreign_pet');
+      await expect(
+        db.query('SELECT book_owner_professional_slot($1,$2,$3)', [
+          schedule,
+          slot.starts_at,
+          otherPatient,
+        ])
+      ).rejects.toThrow('Unavailable');
+      await db.exec('ROLLBACK TO foreign_pet');
+      const appointment = await scalar<string>(
+        'SELECT book_owner_professional_slot($1,$2,$3) AS value',
+        [schedule, slot.starts_at, patient]
+      );
+      expect((await read())!.slots).toHaveLength(3);
+      await db.exec('SAVEPOINT duplicate');
+      await expect(
+        db.query('SELECT book_owner_professional_slot($1,$2,$3)', [
+          schedule,
+          slot.starts_at,
+          patient,
+        ])
+      ).rejects.toThrow('Unavailable');
+      await db.exec('ROLLBACK TO duplicate');
+      await db.exec('RESET ROLE');
+      const saved = (
+        await db.query(
+          'SELECT assigned_user_id,patient_id,branch_id,status FROM appointments WHERE id=$1',
+          [appointment]
+        )
+      ).rows[0];
+      expect(saved).toEqual({
+        assigned_user_id: 'aaaaaaaa-0000-4000-8000-000000000001',
+        patient_id: patient,
+        branch_id: branch,
+        status: 'programada',
+      });
+      const next = availability.slots[1];
+      await db.query(
+        'INSERT INTO professional_time_blocks(organization_id,branch_id,starts_at,ends_at) VALUES($1,$2,$3,$4)',
+        [org, branch, next.starts_at, next.ends_at]
+      );
+      await session('owner');
+      expect((await read())!.slots).toHaveLength(2);
+      await db.query('SELECT cancel_owner_app_booking($1)', [appointment]);
+      expect((await read())!.slots).toHaveLength(3);
+      await session('anon');
+      await db.exec('SAVEPOINT anonymous');
+      await expect(read()).rejects.toThrow('permission denied');
+      await db.exec('ROLLBACK TO anonymous');
+    } finally {
+      await db.exec('RESET ROLE; ROLLBACK');
+    }
   });
 
   it('revokes an existing owner session immediately at the data boundary', async () => {

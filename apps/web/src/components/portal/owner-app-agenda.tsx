@@ -20,8 +20,10 @@ export function OwnerAppAgenda({
   patients,
   bookings,
   showReminders = true,
+  showReservation = true,
 }: {
   showReminders?: boolean;
+  showReservation?: boolean;
   slots: OwnerAppSlot[];
   reminders: OwnerAppReminder[];
   patients: PortalPatientSummary[];
@@ -33,41 +35,44 @@ export function OwnerAppAgenda({
   return (
     <div className="space-y-6 border-b pb-6">
       <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <CalendarPlus size={18} /> Reservar turno
-        </h2>
-        {slots.length > 0 && alive.length > 0 ? (
-          <form action={action} className="grid gap-3 sm:grid-cols-2">
-            <div className="space-y-1">
-              <Label htmlFor="patientId">Mascota</Label>
-              <Select name="patientId" id="patientId" required>
-                {alive.map((patient) => (
-                  <option value={patient.id} key={patient.id}>
-                    {patient.name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="slotId">Horario</Label>
-              <Select name="slotId" id="slotId" required>
-                {slots.map((slot) => (
-                  <option value={slot.id} key={slot.id}>
-                    {new Date(slot.starts_at).toLocaleString('es-AR')} - {slot.branch_name}
-                  </option>
-                ))}
-              </Select>
-            </div>
-            <Button type="submit" disabled={pending}>
-              <CalendarPlus size={16} />
-              {pending ? 'Reservando...' : 'Confirmar turno'}
-            </Button>
-          </form>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            No hay horarios disponibles. Contacta a la veterinaria.
-          </p>
+        {showReservation && (
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <CalendarPlus size={18} /> Reservar turno
+          </h2>
         )}
+        {showReservation &&
+          (slots.length > 0 && alive.length > 0 ? (
+            <form action={action} className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="patientId">Mascota</Label>
+                <Select name="patientId" id="patientId" required>
+                  {alive.map((patient) => (
+                    <option value={patient.id} key={patient.id}>
+                      {patient.name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="slotId">Horario</Label>
+                <Select name="slotId" id="slotId" required>
+                  {slots.map((slot) => (
+                    <option value={slot.id} key={slot.id}>
+                      {new Date(slot.starts_at).toLocaleString('es-AR')} - {slot.branch_name}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <Button type="submit" disabled={pending}>
+                <CalendarPlus size={16} />
+                {pending ? 'Reservando...' : 'Confirmar turno'}
+              </Button>
+            </form>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No hay horarios disponibles. Contacta a la veterinaria.
+            </p>
+          ))}
         {state && (
           <p
             role="status"

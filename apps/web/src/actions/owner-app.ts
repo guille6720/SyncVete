@@ -86,6 +86,75 @@ export type OwnerAppSlot = { id: string; starts_at: string; ends_at: string; bra
 export type OwnerAppReminder = { id: string; message: string; created_at: string };
 export type OwnerAppBooking = { id: string; starts_at: string; patient_name: string };
 
+export type OwnerProfessionalAvailability = {
+  date: string;
+  minDate: string;
+  maxDate: string;
+  timezone: string;
+  professionals: { id: string; name: string; specialty: string | null }[];
+  slots: {
+    schedule_id: string;
+    professional_id: string;
+    professional_name: string;
+    branch_name: string;
+    branch_id: string;
+    starts_at: string;
+    ends_at: string;
+  }[];
+};
+
+export async function getOwnerProfessionalAvailability(
+  date?: string
+): Promise<OwnerProfessionalAvailability> {
+  requireStaging();
+  const session = await requirePortalSession();
+  await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+  const db = await createServerClient();
+  const parsed = z.string().date().safeParse(date);
+  const { data, error } = await db.rpc('get_owner_professional_availability', {
+    p_date: parsed.success ? parsed.data : null,
+  });
+  if (error?.message === 'Invalid date') return getOwnerProfessionalAvailability();
+  if (error) throw new Error('No se pudo cargar la disponibilidad de los profesionales');
+  return data as unknown as OwnerProfessionalAvailability;
+}
+
+export async function bookOwnerProfessionalSlot(
+  _previous: ActionResult | null,
+  form: FormData
+): Promise<ActionResult> {
+  requireStaging();
+  const session = await requirePortalSession();
+  await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+  const input = z
+    .object({
+      scheduleId: z.string().uuid(),
+      startsAt: z.string().datetime({ offset: true }),
+      patientId: z.string().uuid(),
+    })
+    .safeParse({
+      scheduleId: form.get('scheduleId'),
+      startsAt: form.get('startsAt'),
+      patientId: form.get('patientId'),
+    });
+  if (!input.success)
+    return { success: false, error: 'Elegí una mascota, un profesional y un horario.' };
+  const db = await createServerClient();
+  const { error } = await db.rpc('book_owner_professional_slot', {
+    p_schedule_id: input.data.scheduleId,
+    p_starts_at: input.data.startsAt,
+    p_patient_id: input.data.patientId,
+  });
+  if (error)
+    return {
+      success: false,
+      error: 'Ese horario ya no está disponible. Actualizá los horarios y elegí otro.',
+    };
+  revalidatePath('/portal', 'layout');
+  revalidatePath('/agenda');
+  return { success: true };
+}
+
 export async function getOwnerAppData(): Promise<{
   slots: OwnerAppSlot[];
   reminders: OwnerAppReminder[];
