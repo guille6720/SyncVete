@@ -162,7 +162,6 @@ export function OwnerDetail({
       {canSendOwnerApp && (
         <OwnerAppInviteCard
           ownerId={owner.id}
-          ownerEmail={owner.email}
           hasWhatsAppPhone={pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone) !== null}
         />
       )}

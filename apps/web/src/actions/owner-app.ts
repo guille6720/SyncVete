@@ -11,33 +11,20 @@ import { consumeMeteredFeature, FEATURES, planRestrictionResult } from '@/lib/en
 /**
  * "Enviar app" — issues a private invitation to the owner app (app-<clinic>)
  * through its server-to-server endpoint and prepares the WhatsApp message.
- * The owner app also emails the same link when its email provider is set.
  *
  * Env (server-only): OWNER_APP_URL, OWNER_APP_BRIDGE_SECRET.
  */
 
-export type OwnerAppEmailStatus = 'sent' | 'skipped' | 'failed' | 'no_email';
-
 export interface OwnerAppInviteResult {
-  inviteUrl: string;
   expiresAt: string;
-  appName: string;
-  whatsappUrl: string | null;
+  whatsappUrl: string;
   whatsappText: string;
-  email: {
-    status: OwnerAppEmailStatus;
-    to: string | null;
-    /** Fallback to compose it from the receptionist's mail client. */
-    mailtoUrl: string | null;
-  };
 }
 
 interface BridgeResponse {
   url: string;
   expiresAt: string;
-  appName: string;
   whatsappText: string;
-  email: { status: OwnerAppEmailStatus; subject: string; text: string };
 }
 
 const BRIDGE_ERRORS: Record<string, string> = {
@@ -66,6 +53,11 @@ export async function sendOwnerAppInvite(ownerId: string): Promise<ActionResult<
 
     const owner = await getOwner(ownerId);
     if (!owner) return { success: false, error: 'Propietario no encontrado' };
+
+    const phoneE164 = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
+    if (!phoneE164) {
+      return { success: false, error: 'Cargá un teléfono o WhatsApp válido en la ficha del propietario.' };
+    }
 
     const supabase = await createServerClient();
     const { data: patients, error: patientsError } = await supabase
@@ -96,13 +88,13 @@ export async function sendOwnerAppInvite(ownerId: string): Promise<ActionResult<
           sex: p.sex,
           birthDate: p.birth_date,
         })),
-        sendEmail: true,
+        sendEmail: false,
       }),
       cache: 'no-store',
       signal: AbortSignal.timeout(20_000),
     });
     const payload = (await res.json().catch(() => ({}))) as Partial<BridgeResponse> & { error?: string };
-    if (!res.ok || !payload.url || !payload.whatsappText || !payload.email) {
+    if (!res.ok || !payload.url || !payload.whatsappText) {
       console.error('[owner-app] invite failed', res.status, payload.error);
       return {
         success: false,
@@ -110,50 +102,36 @@ export async function sendOwnerAppInvite(ownerId: string): Promise<ActionResult<
       };
     }
 
-    const phoneE164 = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
-    let whatsappUrl: string | null = null;
-    if (phoneE164) {
-      whatsappUrl = buildWhatsAppUrl(phoneE164, payload.whatsappText);
-      if (await canSendWhatsApp()) {
-        // The invitation already exists at this point: logging must never block sending it.
-        try {
-          await consumeMeteredFeature({
-            organizationId: session.organizationId,
-            featureKey: FEATURES.WHATSAPP_MONTHLY_MESSAGES,
-          });
-          const { error: logError } = await supabase.rpc('log_whatsapp_message', {
-            p_owner_id: owner.id,
-            p_body: payload.whatsappText,
-            p_phone_e164: phoneE164,
-            p_template_key: 'portal_invite',
-            p_patient_id: null,
-            p_related_type: 'portal',
-            p_related_id: null,
-            p_branch_id: session.branchId,
-          });
-          if (logError) console.error('[owner-app] whatsapp log failed', logError.message);
-          revalidatePath('/whatsapp');
-        } catch (logFailure) {
-          console.error('[owner-app] whatsapp log skipped', logFailure);
-        }
+    if (await canSendWhatsApp()) {
+      // The invitation already exists at this point: logging must never block sending it.
+      try {
+        await consumeMeteredFeature({
+          organizationId: session.organizationId,
+          featureKey: FEATURES.WHATSAPP_MONTHLY_MESSAGES,
+        });
+        const { error: logError } = await supabase.rpc('log_whatsapp_message', {
+          p_owner_id: owner.id,
+          p_body: payload.whatsappText,
+          p_phone_e164: phoneE164,
+          p_template_key: 'portal_invite',
+          p_patient_id: null,
+          p_related_type: 'portal',
+          p_related_id: null,
+          p_branch_id: session.branchId,
+        });
+        if (logError) console.error('[owner-app] whatsapp log failed', logError.message);
+        revalidatePath('/whatsapp');
+      } catch (logFailure) {
+        console.error('[owner-app] whatsapp log skipped', logFailure);
       }
     }
-
-    const emailTo = owner.email?.trim() || null;
-    const mailtoUrl =
-      emailTo && payload.email.status !== 'sent'
-        ? `mailto:${encodeURIComponent(emailTo)}?subject=${encodeURIComponent(payload.email.subject)}&body=${encodeURIComponent(payload.email.text)}`
-        : null;
 
     return {
       success: true,
       data: {
-        inviteUrl: payload.url,
         expiresAt: payload.expiresAt ?? '',
-        appName: payload.appName ?? 'la app',
-        whatsappUrl,
+        whatsappUrl: buildWhatsAppUrl(phoneE164, payload.whatsappText),
         whatsappText: payload.whatsappText,
-        email: { status: payload.email.status, to: emailTo, mailtoUrl },
       },
     };
   } catch (error) {

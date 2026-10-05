@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Mail, MessageCircle, Smartphone } from 'lucide-react';
+import { MessageCircle, Smartphone } from 'lucide-react';
 import { sendOwnerAppInvite, type OwnerAppInviteResult } from '@/actions/owner-app';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,11 +9,10 @@ import { formatDashboardDateTime } from '@sincvete/shared';
 
 interface OwnerAppInviteCardProps {
   ownerId: string;
-  ownerEmail: string | null;
   hasWhatsAppPhone: boolean;
 }
 
-export function OwnerAppInviteCard({ ownerId, ownerEmail, hasWhatsAppPhone }: OwnerAppInviteCardProps) {
+export function OwnerAppInviteCard({ ownerId, hasWhatsAppPhone }: OwnerAppInviteCardProps) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OwnerAppInviteResult | null>(null);
@@ -24,7 +23,7 @@ export function OwnerAppInviteCard({ ownerId, ownerEmail, hasWhatsAppPhone }: Ow
     setError(null);
     setCopied(false);
     // Opened synchronously so the browser does not block it as a popup.
-    const popup = hasWhatsAppPhone ? window.open('about:blank', '_blank') : null;
+    const popup = window.open('about:blank', '_blank');
     const response = await sendOwnerAppInvite(ownerId);
     setPending(false);
     if (!response.success || !response.data) {
@@ -33,11 +32,7 @@ export function OwnerAppInviteCard({ ownerId, ownerEmail, hasWhatsAppPhone }: Ow
       return;
     }
     setResult(response.data);
-    if (popup && response.data.whatsappUrl) {
-      popup.location.href = response.data.whatsappUrl;
-    } else {
-      popup?.close();
-    }
+    if (popup) popup.location.href = response.data.whatsappUrl;
   };
 
   const handleCopy = async () => {
@@ -50,20 +45,6 @@ export function OwnerAppInviteCard({ ownerId, ownerEmail, hasWhatsAppPhone }: Ow
     }
   };
 
-  const emailLine = (() => {
-    if (!result) return null;
-    switch (result.email.status) {
-      case 'sent':
-        return `Email enviado a ${result.email.to}.`;
-      case 'no_email':
-        return 'El propietario no tiene email cargado: solo se envía por WhatsApp.';
-      case 'failed':
-        return 'No se pudo enviar el email automático. Podés enviarlo desde tu correo.';
-      default:
-        return 'El envío automático de emails no está configurado. Podés enviarlo desde tu correo.';
-    }
-  })();
-
   return (
     <Card>
       <CardHeader>
@@ -72,48 +53,32 @@ export function OwnerAppInviteCard({ ownerId, ownerEmail, hasWhatsAppPhone }: Ow
           App del propietario
         </CardTitle>
         <CardDescription>
-          Enviale el enlace privado para descargar la app: vacunas, tratamientos y turnos desde su celular.
-          Se envía por WhatsApp y, como refuerzo, por email.
+          Enviale por WhatsApp el enlace privado para descargar la app: vacunas, tratamientos y turnos desde su
+          celular.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {!hasWhatsAppPhone && (
           <p className="text-sm text-muted-foreground">
-            Cargá un teléfono o WhatsApp en la ficha para enviarlo por WhatsApp.
+            Cargá un teléfono o WhatsApp en la ficha para poder enviarle la app.
           </p>
         )}
-        {!ownerEmail && (
-          <p className="text-sm text-muted-foreground">Sin email cargado: no se enviará el refuerzo por email.</p>
-        )}
 
-        <Button type="button" size="sm" onClick={() => void handleSend()} disabled={pending || (!hasWhatsAppPhone && !ownerEmail)}>
+        <Button type="button" size="sm" onClick={() => void handleSend()} disabled={pending || !hasWhatsAppPhone}>
           <MessageCircle className="mr-2 h-4 w-4" />
-          {pending ? 'Generando enlace…' : result ? 'Reenviar app' : 'Enviar app por WhatsApp y email'}
+          {pending ? 'Generando enlace…' : result ? 'Reenviar app por WhatsApp' : 'Enviar app por WhatsApp'}
         </Button>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {result && (
           <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm">
-            {result.whatsappUrl ? (
-              <p>
-                WhatsApp listo para enviar.{' '}
-                <a href={result.whatsappUrl} target="_blank" rel="noreferrer" className="font-medium underline">
-                  Abrir WhatsApp
-                </a>
-              </p>
-            ) : (
-              <p>Sin teléfono válido para WhatsApp.</p>
-            )}
-            {emailLine && <p className="text-muted-foreground">{emailLine}</p>}
-            {result.email.mailtoUrl && (
-              <Button type="button" variant="outline" size="sm" asChild>
-                <a href={result.email.mailtoUrl}>
-                  <Mail className="mr-2 h-4 w-4" />
-                  Enviar email desde mi correo
-                </a>
-              </Button>
-            )}
+            <p>
+              WhatsApp listo para enviar.{' '}
+              <a href={result.whatsappUrl} target="_blank" rel="noreferrer" className="font-medium underline">
+                Abrir WhatsApp
+              </a>
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               <Button type="button" variant="ghost" size="sm" onClick={() => void handleCopy()}>
                 Copiar mensaje
@@ -122,7 +87,8 @@ export function OwnerAppInviteCard({ ownerId, ownerEmail, hasWhatsAppPhone }: Ow
             </div>
             {result.expiresAt && (
               <p className="text-xs text-muted-foreground">
-                El enlace es personal y vence el {formatDashboardDateTime(result.expiresAt)}. Al reenviar, el anterior deja de funcionar.
+                El enlace es personal y vence el {formatDashboardDateTime(result.expiresAt)}. Al reenviar, el
+                anterior deja de funcionar.
               </p>
             )}
           </div>
