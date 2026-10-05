@@ -189,6 +189,8 @@ export async function sendOwnerAppInvite(
       return { success: false, error: 'Habilita la app en la configuracion de la clinica.' };
     const owner = await getOwner(ownerId);
     if (!owner) return { success: false, error: 'Propietario no encontrado' };
+    if (!owner.is_active)
+      return { success: false, error: 'Activa al propietario en su ficha antes de enviar la app.' };
     const phone = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
     if (!phone) return { success: false, error: 'Carga un telefono de WhatsApp valido.' };
     const origin = ownerAppOrigin();

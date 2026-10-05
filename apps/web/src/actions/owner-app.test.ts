@@ -38,12 +38,20 @@ vi.mock('@/lib/owner-app-email', () => ({ ownerAppOrigin: mocks.origin }));
 import { sendOwnerAppInvite } from './owner-app';
 
 describe('integrated WhatsApp invitations', () => {
+  it('does not issue invitations for inactive owners', async () => {
+    mocks.owner.mockResolvedValue({ is_active: false });
+    const result = await sendOwnerAppInvite('11111111-1111-4111-8111-111111111111');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Activa al propietario');
+    expect(mocks.rpc.mock.calls.some(([name]) => name === 'create_owner_portal_invite')).toBe(false);
+  });
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.enabled.mockReturnValue(true);
     mocks.status.mockResolvedValue({ status: 'inactive' });
     mocks.permission.mockResolvedValue({ organizationId: '11111111-1111-4111-8111-111111111111' });
     mocks.owner.mockResolvedValue({
+      is_active: true,
       full_name: 'Tutor',
       phone_whatsapp: '+5491112345678',
       phone: null,

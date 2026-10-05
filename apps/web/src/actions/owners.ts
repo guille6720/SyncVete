@@ -50,7 +50,7 @@ function parseOwnerForm(formData: FormData) {
     notes: formData.get('notes'),
     branchId: formData.get('branchId'),
     isActive: formData.has('isActive')
-      ? formData.get('isActive') === 'true'
+      ? formData.getAll('isActive').includes('true')
       : true,
   });
 }
