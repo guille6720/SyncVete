@@ -10,6 +10,8 @@ import { PlanBillingPanel } from '@/components/settings/plan-billing-panel';
 import { SettingsLegalPanel } from '@/components/settings/settings-legal-panel';
 import { SettingsSuperadminManualPanel } from '@/components/settings/settings-superadmin-manual-panel';
 import { DataMigrationPanel } from '@/components/settings/data-migration-panel';
+import { OwnerAppSettings } from '@/components/settings/owner-app-settings';
+import type { OwnerAppBrand } from '@/lib/owner-app';
 import type { PlanBillingState } from '@/actions/plan-billing';
 import type {
   Branch,
@@ -21,6 +23,7 @@ import type {
 } from '@sincvete/shared';
 
 interface SettingsPageClientProps {
+  ownerApp?: { brand: OwnerAppBrand; branchId: string | null };
   availableTabs: SettingsTab[];
   defaultTab: SettingsTab;
   canImportData?: boolean;
@@ -42,6 +45,7 @@ interface SettingsPageClientProps {
 }
 
 export function SettingsPageClient({
+  ownerApp,
   availableTabs,
   defaultTab,
   canImportData = false,
@@ -69,14 +73,15 @@ export function SettingsPageClient({
       <SettingsTabs active={activeTab} onChange={setActiveTab} availableTabs={availableTabs} />
 
       {activeTab === 'clinica' && clinic && (
-        <ClinicSettingsForm
-          organizationName={clinic.organizationName}
-          settings={clinic.settings}
-        />
+        <ClinicSettingsForm organizationName={clinic.organizationName} settings={clinic.settings} />
       )}
+      {activeTab === 'clinica' && ownerApp && <OwnerAppSettings {...ownerApp} />}
 
       {activeTab === 'sucursales' && branches && (
-        <BranchesPanel initialData={branches} seatMeter={seats.find((meter) => meter.featureKey === 'branches.max')} />
+        <BranchesPanel
+          initialData={branches}
+          seatMeter={seats.find((meter) => meter.featureKey === 'branches.max')}
+        />
       )}
 
       {activeTab === 'equipo' && team && (

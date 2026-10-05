@@ -2,6 +2,22 @@ import { redirect } from 'next/navigation';
 import { getSessionContext, signOut } from '@/actions/auth';
 import { PortalShell } from '@/components/portal/portal-shell';
 import { FEATURES, canUseFeature } from '@/lib/entitlements';
+import { getOwnerAppBrand } from '@/actions/owner-app';
+import type { Metadata } from 'next';
+
+export async function generateMetadata(): Promise<Metadata> {
+  const session = await getSessionContext();
+  if (!session || session.kind !== 'portal') return {};
+  const brand = await getOwnerAppBrand(session.organizationId);
+  if (!brand?.enabled) return {};
+  return {
+    title: brand.appName,
+    applicationName: brand.appName,
+    manifest: `/portal/manifest/${session.organizationId}`,
+    appleWebApp: { capable: true, title: brand.appName },
+    icons: { apple: [{ url: brand.logoUrl || `/portal/icon/${session.organizationId}?size=180` }] },
+  };
+}
 
 export default async function PortalSessionLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionContext();
@@ -33,8 +49,10 @@ export default async function PortalSessionLayout({ children }: { children: Reac
     );
   }
 
+  const brand = await getOwnerAppBrand(session.organizationId);
+
   return (
-    <PortalShell userName={session.profile.full_name} signOutAction={signOut}>
+    <PortalShell userName={session.profile.full_name} signOutAction={signOut} brand={brand}>
       {children}
     </PortalShell>
   );

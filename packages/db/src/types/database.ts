@@ -6619,6 +6619,16 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Json;
       };
+      get_owner_app_brand: { Args: { p_organization_id: string }; Returns: Json };
+      get_owner_app_invite_brand: { Args: { p_token: string }; Returns: Json };
+      save_owner_app_brand: { Args: { p_brand: Json }; Returns: undefined };
+      publish_owner_app_slot: { Args: { p_branch_id: string; p_starts_at: string }; Returns: string };
+      book_owner_app_slot: { Args: { p_slot_id: string; p_patient_id: string }; Returns: string };
+      cancel_owner_app_booking: { Args: { p_appointment_id: string }; Returns: undefined };
+      get_owner_app_data: { Args: Record<string, never>; Returns: Json };
+      queue_owner_app_reminders: { Args: { p_now?: string }; Returns: number };
+      claim_owner_app_emails: { Args: Record<string, never>; Returns: Json };
+      complete_owner_app_email: { Args: { p_id: string }; Returns: undefined };
       get_owner_portal_patient: {
         Args: {
           p_patient_id: string;

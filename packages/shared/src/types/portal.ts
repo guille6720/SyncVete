@@ -14,6 +14,7 @@ export interface PortalInvitePreview {
 }
 
 export interface PortalInviteCreated {
+  deliveryStatus?: 'sent' | 'not_sent';
   token: string;
   email: string;
   expiresAt: string;

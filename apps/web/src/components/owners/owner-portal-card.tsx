@@ -36,6 +36,7 @@ export function OwnerPortalCard({
   const [pending, setPending] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [deliveryMessage, setDeliveryMessage] = useState<string | null>(null);
   const access = status?.status ?? 'inactive';
 
   const handleInvite = async () => {
@@ -50,6 +51,13 @@ export function OwnerPortalCard({
     }
     const path = buildPortalActivatePath(result.data.token);
     setInviteUrl(`${window.location.origin}${path}`);
+    setDeliveryMessage(
+      result.data.deliveryStatus === 'sent'
+        ? 'Invitacion enviada por email.'
+        : result.data.deliveryStatus === 'not_sent'
+          ? 'El email no se envio. Podes compartir el enlace privado.'
+          : null
+    );
     router.refresh();
   };
 
@@ -130,6 +138,11 @@ export function OwnerPortalCard({
               </p>
             )}
           </div>
+        )}
+        {deliveryMessage && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {deliveryMessage}
+          </p>
         )}
         {!portalEnabled && (
           <p className="text-sm text-muted-foreground">
