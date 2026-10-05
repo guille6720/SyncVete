@@ -3,6 +3,8 @@ import { PortalShell } from '@/components/portal/portal-shell';
 import { OwnerAppDashboard } from '@/components/portal/owner-app-dashboard';
 import { OwnerAppInstall } from '@/components/portal/owner-app-install';
 import { LoginForm } from '@/components/auth/login-form';
+import { PortalActivateForm } from '@/components/portal/portal-activate-form';
+import { ownerAppMetadata } from '@/lib/owner-app-metadata';
 import { OwnerAppAgenda } from '@/components/portal/owner-app-agenda';
 import { OwnerVaccineCalendar } from '@/components/portal/owner-vaccine-calendar';
 import type { OwnerPortalHome } from '@sincvete/shared';
@@ -64,6 +66,10 @@ const brand = {
   enabled: true,
 };
 
+export function generateMetadata() {
+  return ownerAppMetadata('11111111-1111-4111-8111-111111111111', brand);
+}
+
 export default async function OwnerAppVisual({
   searchParams,
 }: {
@@ -71,6 +77,24 @@ export default async function OwnerAppVisual({
 }) {
   if (process.env.NODE_ENV !== 'development') notFound();
   const { view } = await searchParams;
+  if (view === 'activate')
+    return (
+      <OwnerAppInstall brand={brand} clinicName="Veterinaria IMILVET" activationRequired>
+        <PortalActivateForm
+          brand={brand}
+          token={'a'.repeat(64)}
+          preview={{
+            valid: true,
+            email: 'owner@example.test',
+            ownerName: 'Maria',
+            clinicName: 'IMILVET',
+            expiresAt: '2099-01-01T00:00:00Z',
+          }}
+          isLoggedIn={false}
+          isStaff={false}
+        />
+      </OwnerAppInstall>
+    );
   if (view === 'install')
     return (
       <OwnerAppInstall brand={brand} clinicName="Veterinaria IMILVET">

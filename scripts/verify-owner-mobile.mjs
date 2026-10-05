@@ -47,7 +47,7 @@ try {
   });
   await mkdir('docs/owner-app/screenshots', { recursive: true });
   for (const width of [390, 1440]) {
-    for (const view of ['home', 'install', 'all']) {
+    for (const view of ['home', 'install', 'all', 'activate']) {
       const page = await browser.newPage({ viewport: { width, height: 844 } });
       const errors = [];
       page.on('pageerror', (e) => errors.push(e.message));
@@ -62,7 +62,22 @@ try {
       );
       if (overflow || errors.length)
         throw new Error(JSON.stringify({ width, view, overflow, errors }));
-      if (view === 'install') {
+      const manifests = await page.locator('link[rel="manifest"]').evaluateAll(
+        (links) => links.map((link) => link.getAttribute('href'))
+      );
+      if (manifests.length !== 1 || !manifests[0].startsWith('/portal/manifest/'))
+        throw new Error(`Administrative manifest leaked: ${JSON.stringify(manifests)}`);
+      if (view === 'activate') {
+        const inviteUrl = page.url();
+        await page.getByRole('button', { name: 'Ingresar', exact: true }).click();
+        await page.getByText('Ingresá con tu acceso de propietario').waitFor();
+        if (page.url() !== inviteUrl || await page.getByText('Registrá tu clínica').count())
+          throw new Error('Owner invitation escaped to administrative login');
+        if (await page.getByText('Instalá SyncVete en tu celular').count())
+          throw new Error('Administrative installation leaked');
+        await page.getByRole('button', { name: 'Volver a activar mi acceso' }).click();
+        await page.getByRole('button', { name: 'Crear acceso', exact: true }).waitFor();
+      } else if (view === 'install') {
         await page.getByRole('button', { name: 'Instalar app-IMILVET' }).click();
         await page.getByText('En iPhone, abrí el enlace en Safari').waitFor();
         if (await page.getByText('Registrá tu clínica').count())

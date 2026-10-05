@@ -14,12 +14,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 interface LoginFormProps {
+  ownerAccess?: boolean;
   brand?: OwnerAppBrand;
   redirectTo?: string;
   errorCode?: string;
 }
 
-export function LoginForm({ redirectTo, errorCode, brand }: LoginFormProps) {
+export function LoginForm({ redirectTo, errorCode, brand, ownerAccess = false }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(signIn, null);
 
   return (
@@ -29,7 +30,7 @@ export function LoginForm({ redirectTo, errorCode, brand }: LoginFormProps) {
           {brand ? <OwnerAppBrandMark brand={brand} /> : <BrandLogo href="/" size="lg" priority />}
         </div>
         <CardDescription>
-          {brand
+          {brand || ownerAccess
             ? 'Ingresá con tu acceso de propietario'
             : 'Ingresá a tu clínica o al portal del tutor'}
         </CardDescription>
@@ -98,7 +99,7 @@ export function LoginForm({ redirectTo, errorCode, brand }: LoginFormProps) {
 
         </form>
 
-        {!brand && (
+        {!brand && !ownerAccess && (
           <p className="mt-6 text-center text-sm text-muted-foreground">
             ¿No tenés cuenta?{' '}
             <Link href="/register" className="font-medium text-primary hover:underline">
