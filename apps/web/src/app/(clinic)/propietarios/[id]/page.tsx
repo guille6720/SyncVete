@@ -3,6 +3,7 @@ import { getOwner, canReadOwners, canManageOwners } from '@/actions/owners';
 import { canManagePatients, canReadPatients, listPatients } from '@/actions/patients';
 import { getOwnerPortalStatus } from '@/actions/portal';
 import { canSendWhatsApp } from '@/actions/whatsapp';
+import { isOwnerAppConfigured } from '@/actions/owner-app';
 import { listOwnerWaitingRoomHistory, canReadWaitingRoom } from '@/actions/waiting-room';
 import { OwnerDetail } from '@/components/owners/owner-detail';
 import { FEATURES, canUseFeature, getClinicCommercialShell } from '@/lib/entitlements';
@@ -29,6 +30,7 @@ export default async function PropietarioDetailPage({ params }: OwnerPageProps) 
     canReadWr,
     canReadPats,
     canWritePats,
+    ownerAppConfigured,
   ] = await Promise.all([
     getOwner(id),
     canManageOwners(),
@@ -41,6 +43,7 @@ export default async function PropietarioDetailPage({ params }: OwnerPageProps) 
     canReadWaitingRoom(),
     canReadPatients(),
     canManagePatients(),
+    isOwnerAppConfigured(),
   ]);
 
   if (!owner) notFound();
@@ -61,6 +64,7 @@ export default async function PropietarioDetailPage({ params }: OwnerPageProps) 
       canWrite={canWrite}
       canManagePatients={canWritePats}
       canSendWhatsApp={canWhatsApp}
+      canSendOwnerApp={ownerAppConfigured && canWrite}
       portalEnabled={portalEnabled}
       portalStatus={portalStatus}
       entitledHrefs={commercial.entitledHrefs}

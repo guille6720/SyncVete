@@ -11,12 +11,14 @@ import {
   DOCUMENT_TYPE_LABELS,
   buildWhatsAppComposePath,
   isClinicPathEntitled,
+  pickOwnerWhatsAppPhone,
   type Owner,
   type OwnerPortalStatus,
   type OwnerWaitingRoomHistoryRow,
   type PatientListRow,
 } from '@sincvete/shared';
 import { OwnerPortalCard } from '@/components/owners/owner-portal-card';
+import { OwnerAppInviteCard } from '@/components/owners/owner-app-invite-card';
 import { OwnerPatientsPanel } from '@/components/owners/owner-patients-panel';
 import { OwnerWaitingRoomHistory } from '@/components/owners/owner-waiting-room-history';
 
@@ -25,6 +27,7 @@ interface OwnerDetailProps {
   canWrite: boolean;
   canManagePatients?: boolean;
   canSendWhatsApp?: boolean;
+  canSendOwnerApp?: boolean;
   portalEnabled?: boolean;
   portalStatus: OwnerPortalStatus | null;
   entitledHrefs?: string[] | null;
@@ -38,6 +41,7 @@ export function OwnerDetail({
   canWrite,
   canManagePatients = false,
   canSendWhatsApp = false,
+  canSendOwnerApp = false,
   portalEnabled = true,
   portalStatus,
   entitledHrefs = null,
@@ -153,6 +157,14 @@ export function OwnerDetail({
 
       {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
         <OwnerWaitingRoomHistory history={waitingRoomHistory} ownerName={owner.full_name} />
+      )}
+
+      {canSendOwnerApp && (
+        <OwnerAppInviteCard
+          ownerId={owner.id}
+          ownerEmail={owner.email}
+          hasWhatsAppPhone={pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone) !== null}
+        />
       )}
 
       <OwnerPortalCard
