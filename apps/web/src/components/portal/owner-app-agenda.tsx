@@ -19,7 +19,9 @@ export function OwnerAppAgenda({
   reminders,
   patients,
   bookings,
+  showReminders = true,
 }: {
+  showReminders?: boolean;
   slots: OwnerAppSlot[];
   reminders: OwnerAppReminder[];
   patients: PortalPatientSummary[];
@@ -95,22 +97,24 @@ export function OwnerAppAgenda({
           </form>
         )}
       </section>
-      <section className="space-y-3">
-        <h2 className="flex items-center gap-2 text-lg font-semibold">
-          <Bell size={18} /> Recordatorios
-        </h2>
-        {reminders.length ? (
-          <ul className="divide-y">
-            {reminders.map((reminder) => (
-              <li className="py-2 text-sm" key={reminder.id}>
-                {reminder.message}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">No tenes recordatorios pendientes.</p>
-        )}
-      </section>
+      {showReminders && (
+        <section className="space-y-3">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Bell size={18} /> Recordatorios
+          </h2>
+          {reminders.length ? (
+            <ul className="divide-y">
+              {reminders.map((reminder) => (
+                <li className="py-2 text-sm" key={reminder.id}>
+                  {reminder.message}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">No tenes recordatorios pendientes.</p>
+          )}
+        </section>
+      )}
     </div>
   );
 }

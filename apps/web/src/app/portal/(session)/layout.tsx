@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { getSessionContext, signOut } from '@/actions/auth';
 import { PortalShell } from '@/components/portal/portal-shell';
 import { FEATURES, canUseFeature } from '@/lib/entitlements';
-import { getOwnerAppBrand } from '@/actions/owner-app';
+import { getOwnerAppBrand, signOutOwnerApp } from '@/actions/owner-app';
+import { ownerAppMetadata } from '@/lib/owner-app-metadata';
 import type { Metadata } from 'next';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -10,13 +11,7 @@ export async function generateMetadata(): Promise<Metadata> {
   if (!session || session.kind !== 'portal') return {};
   const brand = await getOwnerAppBrand(session.organizationId);
   if (!brand?.enabled) return {};
-  return {
-    title: brand.appName,
-    applicationName: brand.appName,
-    manifest: `/portal/manifest/${session.organizationId}`,
-    appleWebApp: { capable: true, title: brand.appName },
-    icons: { apple: [{ url: brand.logoUrl || `/portal/icon/${session.organizationId}?size=180` }] },
-  };
+  return ownerAppMetadata(session.organizationId, brand);
 }
 
 export default async function PortalSessionLayout({ children }: { children: React.ReactNode }) {
@@ -52,7 +47,11 @@ export default async function PortalSessionLayout({ children }: { children: Reac
   const brand = await getOwnerAppBrand(session.organizationId);
 
   return (
-    <PortalShell userName={session.profile.full_name} signOutAction={signOut} brand={brand}>
+    <PortalShell
+      userName={session.profile.full_name}
+      signOutAction={brand?.enabled ? signOutOwnerApp : signOut}
+      brand={brand}
+    >
       {children}
     </PortalShell>
   );

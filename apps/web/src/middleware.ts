@@ -10,6 +10,7 @@ const PUBLIC_ROUTES = [
   '/register',
   '/auth/callback',
   '/portal/activar',
+  '/portal/instalar',
   '/portal/offline.html',
   '/check-in',
   '/interconsulta/responder',

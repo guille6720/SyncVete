@@ -1,6 +1,8 @@
 'use client';
 
 import { useActionState } from 'react';
+import type { OwnerAppBrand } from '@/lib/owner-app';
+import { OwnerAppBrandMark } from './owner-app-brand';
 import Link from 'next/link';
 import { acceptPortalInviteForm, activatePortalAccount } from '@/actions/portal';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
@@ -11,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import type { PortalInvitePreview } from '@sincvete/shared';
 
 interface PortalActivateFormProps {
+  brand?: OwnerAppBrand;
   token: string;
   preview: PortalInvitePreview | null;
   isLoggedIn: boolean;
@@ -19,6 +22,7 @@ interface PortalActivateFormProps {
 
 export function PortalActivateForm({
   token,
+  brand,
   preview,
   isLoggedIn,
   isStaff,
@@ -31,7 +35,7 @@ export function PortalActivateForm({
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center">
-            <BrandLogo href="/" size="md" />
+            {brand ? <OwnerAppBrandMark brand={brand} /> : <BrandLogo href="/" size="md" />}
           </div>
           <CardDescription>Invitación inválida o vencida</CardDescription>
         </CardHeader>
@@ -50,7 +54,7 @@ export function PortalActivateForm({
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center">
-            <BrandLogo href="/" size="md" />
+            {brand ? <OwnerAppBrandMark brand={brand} /> : <BrandLogo href="/" size="md" />}
           </div>
           <CardDescription>Esta cuenta es del equipo de la clínica</CardDescription>
         </CardHeader>

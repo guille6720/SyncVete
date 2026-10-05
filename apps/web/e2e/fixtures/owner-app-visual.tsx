@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { PortalShell } from '@/components/portal/portal-shell';
-import { PortalHome } from '@/components/portal/portal-home';
+import { OwnerAppDashboard } from '@/components/portal/owner-app-dashboard';
+import { OwnerAppInstall } from '@/components/portal/owner-app-install';
+import { LoginForm } from '@/components/auth/login-form';
 import { OwnerAppAgenda } from '@/components/portal/owner-app-agenda';
 import { OwnerVaccineCalendar } from '@/components/portal/owner-vaccine-calendar';
 import type { OwnerPortalHome } from '@sincvete/shared';
@@ -54,48 +56,67 @@ const home: OwnerPortalHome = {
   ],
 };
 
-export default function OwnerAppVisual() {
+const brand = {
+  appName: 'app-IMILVET',
+  logoUrl: '',
+  primaryColor: '#7c3aed',
+  welcomeText: 'Bienvenida a IMILVET',
+  enabled: true,
+};
+
+export default async function OwnerAppVisual({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   if (process.env.NODE_ENV !== 'development') notFound();
+  const { view } = await searchParams;
+  if (view === 'install')
+    return (
+      <OwnerAppInstall brand={brand} clinicName="Veterinaria IMILVET">
+        <LoginForm brand={brand} />
+      </OwnerAppInstall>
+    );
   return (
     <PortalShell
       userName="Maria"
       showAlerts={false}
-      brand={{
-        appName: 'app-IMILVET',
-        logoUrl: '/icons/apple-touch-icon.png',
-        primaryColor: '#16745c',
-        welcomeText: 'Bienvenida a IMILVET',
-        enabled: true,
-      }}
+      brand={brand}
       signOutAction={async () => {
         'use server';
       }}
     >
-      <OwnerAppAgenda
-        slots={[
-          {
-            id: 'aaaaaaaa-0000-4000-8000-000000000001',
-            starts_at: date.toISOString(),
-            ends_at: date.toISOString(),
-            branch_name: 'IMILVET',
-          },
-        ]}
-        patients={[patient]}
-        reminders={[
-          {
-            id: 'notice',
-            message: 'Vacuna antirrabica de Luna manana',
-            created_at: date.toISOString(),
-          },
-        ]}
-        bookings={[]}
-      />
-      <div className="mt-6">
-        <OwnerVaccineCalendar vaccines={home.vaccinesDue} />
-      </div>
-      <div className="mt-6">
-        <PortalHome home={home} />
-      </div>
+      {view === 'home' ? (
+        <OwnerAppDashboard home={home} />
+      ) : (
+        <>
+          <OwnerAppAgenda
+            slots={[
+              {
+                id: 'aaaaaaaa-0000-4000-8000-000000000001',
+                starts_at: date.toISOString(),
+                ends_at: date.toISOString(),
+                branch_name: 'IMILVET',
+              },
+            ]}
+            patients={[patient]}
+            reminders={[
+              {
+                id: 'notice',
+                message: 'Vacuna antirrabica de Luna manana',
+                created_at: date.toISOString(),
+              },
+            ]}
+            bookings={[]}
+          />
+          <div className="mt-6">
+            <OwnerVaccineCalendar vaccines={home.vaccinesDue} />
+          </div>
+          <div className="mt-6">
+            <OwnerAppDashboard home={home} />
+          </div>
+        </>
+      )}
     </PortalShell>
   );
 }

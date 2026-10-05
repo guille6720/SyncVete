@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { OwnerAppMobileNav } from './owner-app-mobile-nav';
 import { usePathname } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
@@ -31,7 +32,11 @@ export function PortalShell({
 
   return (
     <div
-      className="flex min-h-screen flex-col bg-background"
+      className={
+        brand?.enabled
+          ? 'flex min-h-dvh flex-col bg-muted/20 pb-20'
+          : 'flex min-h-screen flex-col bg-background'
+      }
       style={
         brand?.enabled
           ? ({
@@ -54,28 +59,32 @@ export function PortalShell({
             <BrandLogo href="/portal" size="sm" />
           )}
           <nav className="flex flex-wrap items-center gap-2">
-            <Link
-              href="/portal"
-              className={cn(
-                'rounded-md px-3 py-1.5 text-sm',
-                pathname === '/portal'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent'
-              )}
-            >
-              Inicio
-            </Link>
-            <Link
-              href="/portal/sala-espera"
-              className={cn(
-                'rounded-md px-3 py-1.5 text-sm',
-                pathname.startsWith('/portal/sala-espera')
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent'
-              )}
-            >
-              Sala de espera
-            </Link>
+            {!brand?.enabled && (
+              <>
+                <Link
+                  href="/portal"
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-sm',
+                    pathname === '/portal'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  Inicio
+                </Link>
+                <Link
+                  href="/portal/sala-espera"
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-sm',
+                    pathname.startsWith('/portal/sala-espera')
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-accent'
+                  )}
+                >
+                  Sala de espera
+                </Link>
+              </>
+            )}
             <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
             <form action={signOutAction}>
               <Button variant="ghost" size="sm" type="submit">
@@ -96,6 +105,7 @@ export function PortalShell({
         {showAlerts && <PortalWaitingRoomAlerts />}
         {children}
       </main>
+      {brand?.enabled && <OwnerAppMobileNav />}
       {brand?.enabled && (
         <footer className="border-t px-4 py-4 text-center text-xs text-muted-foreground">
           Hecho por OpusOrg

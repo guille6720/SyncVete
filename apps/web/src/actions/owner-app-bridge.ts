@@ -16,7 +16,7 @@ import { consumeMeteredFeature, FEATURES, planRestrictionResult } from '@/lib/en
  */
 
 export interface OwnerAppInviteResult {
-  expiresAt: string;
+  expiresAt?: string;
   whatsappUrl: string;
   whatsappText: string;
 }

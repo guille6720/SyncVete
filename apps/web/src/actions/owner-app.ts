@@ -1,6 +1,8 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { ownerAppInstallUrl } from '@/lib/owner-app-navigation';
 import { createServerClient } from '@/lib/supabase/server';
 import { requirePermission, requirePortalSession } from '@/lib/permissions';
 import { FEATURES, requireFeature } from '@/lib/entitlements';
@@ -11,12 +13,23 @@ import {
   ownerAppSlotSchema,
   parseOwnerAppBrand,
 } from '@/lib/owner-app';
-import { buildWhatsAppUrl, buildPortalActivatePath, pickOwnerWhatsAppPhone, parsePortalInviteCreated, type ActionResult } from '@sincvete/shared';
+import {
+  buildWhatsAppUrl,
+  buildPortalActivatePath,
+  pickOwnerWhatsAppPhone,
+  parsePortalInviteCreated,
+  type ActionResult,
+} from '@sincvete/shared';
 import { PermissionError } from '@/lib/permissions';
 import { planRestrictionResult } from '@/lib/entitlements';
 import { getOwner } from '@/actions/owners';
+import { getOwnerPortalStatus } from '@/actions/portal';
 import { ownerAppOrigin } from '@/lib/owner-app-email';
-import { isOwnerAppConfigured as isBridgeConfigured, sendOwnerAppInvite as sendBridgeInvite, type OwnerAppInviteResult } from '@/actions/owner-app-bridge';
+import {
+  isOwnerAppConfigured as isBridgeConfigured,
+  sendOwnerAppInvite as sendBridgeInvite,
+  type OwnerAppInviteResult,
+} from '@/actions/owner-app-bridge';
 export type { OwnerAppInviteResult } from '@/actions/owner-app-bridge';
 import { z } from 'zod';
 
@@ -164,30 +177,59 @@ export async function isOwnerAppConfigured(): Promise<boolean> {
   return ownerAppEnabled() || isBridgeConfigured();
 }
 
-export async function sendOwnerAppInvite(ownerId: string): Promise<ActionResult<OwnerAppInviteResult>> {
+export async function sendOwnerAppInvite(
+  ownerId: string
+): Promise<ActionResult<OwnerAppInviteResult>> {
   if (!ownerAppEnabled()) return sendBridgeInvite(ownerId);
   try {
     const session = await requirePermission('patients:write');
     await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
     const brand = await getOwnerAppBrand(session.organizationId);
-    if (!brand?.enabled) return { success: false, error: 'Habilita la app en la configuracion de la clinica.' };
+    if (!brand?.enabled)
+      return { success: false, error: 'Habilita la app en la configuracion de la clinica.' };
     const owner = await getOwner(ownerId);
     if (!owner) return { success: false, error: 'Propietario no encontrado' };
     const phone = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
     if (!phone) return { success: false, error: 'Carga un telefono de WhatsApp valido.' };
     const origin = ownerAppOrigin();
+    const status = await getOwnerPortalStatus(ownerId);
+    if (status?.status === 'active') {
+      const text = `Hola ${owner.full_name}, instalá ${brand.appName} desde ${origin}${ownerAppInstallUrl(session.organizationId)}\n\nIngresá con tu cuenta para ver tus mascotas, vacunas, tratamientos y turnos.\n\nHecho por OpusOrg`;
+      return {
+        success: true,
+        data: { whatsappUrl: buildWhatsAppUrl(phone, text), whatsappText: text },
+      };
+    }
     const db = await createServerClient();
     const { data, error } = await db.rpc('create_owner_portal_invite', { p_owner_id: ownerId });
-    if (error) return { success: false, error: 'No se pudo crear la invitacion. Revisa el email del propietario.' };
+    if (error)
+      return {
+        success: false,
+        error: 'No se pudo crear la invitacion. Revisa el email del propietario.',
+      };
     const invite = parsePortalInviteCreated(data);
     if (!invite) return { success: false, error: 'No se pudo crear la invitacion' };
     const text = `Hola ${owner.full_name}, activa tu acceso a ${brand.appName} e instala la app desde este enlace privado: ${origin}${buildPortalActivatePath(invite.token)}\n\nHecho por OpusOrg`;
     revalidatePath(`/propietarios/${ownerId}`);
-    return { success: true, data: { expiresAt: invite.expiresAt, whatsappUrl: buildWhatsAppUrl(phone, text), whatsappText: text } };
+    return {
+      success: true,
+      data: {
+        expiresAt: invite.expiresAt,
+        whatsappUrl: buildWhatsAppUrl(phone, text),
+        whatsappText: text,
+      },
+    };
   } catch (error) {
     const planError = planRestrictionResult<OwnerAppInviteResult>(error);
     if (planError) return planError;
     if (error instanceof PermissionError) return { success: false, error: error.message };
     return { success: false, error: 'No se pudo generar el enlace de la app.' };
   }
+}
+
+export async function signOutOwnerApp(): Promise<void> {
+  const session = await requirePortalSession();
+  const db = await createServerClient();
+  await db.auth.signOut();
+  redirect(ownerAppInstallUrl(session.organizationId));
 }

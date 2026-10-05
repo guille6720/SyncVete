@@ -1,6 +1,9 @@
 'use client';
 
 import { useActionState } from 'react';
+import type { OwnerAppBrand } from '@/lib/owner-app';
+import { safeOwnerPortalRedirect } from '@/lib/owner-app-navigation';
+import { OwnerAppBrandMark } from '@/components/portal/owner-app-brand';
 import Link from 'next/link';
 import { signIn } from '@/actions/auth';
 import { APP_NAME } from '@sincvete/shared';
@@ -11,24 +14,29 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
 interface LoginFormProps {
+  brand?: OwnerAppBrand;
   redirectTo?: string;
   errorCode?: string;
 }
 
-export function LoginForm({ redirectTo, errorCode }: LoginFormProps) {
+export function LoginForm({ redirectTo, errorCode, brand }: LoginFormProps) {
   const [state, formAction, pending] = useActionState(signIn, null);
 
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="space-y-4 text-center">
         <div className="flex justify-center">
-          <BrandLogo href="/" size="lg" priority />
+          {brand ? <OwnerAppBrandMark brand={brand} /> : <BrandLogo href="/" size="lg" priority />}
         </div>
-        <CardDescription>Ingresá a tu clínica o al portal del tutor</CardDescription>
+        <CardDescription>
+          {brand
+            ? 'Ingresá con tu acceso de propietario'
+            : 'Ingresá a tu clínica o al portal del tutor'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="space-y-4">
-          {redirectTo?.startsWith('/portal/activar') && (
+          {safeOwnerPortalRedirect(redirectTo) && (
             <input type="hidden" name="redirectTo" value={redirectTo} />
           )}
           <div className="space-y-2">
@@ -88,22 +96,16 @@ export function LoginForm({ redirectTo, errorCode }: LoginFormProps) {
             {pending ? 'Ingresando…' : 'Ingresar'}
           </Button>
 
-          <p className="text-center text-sm">
-            <Link
-              href="/recuperar-contrasena"
-              className="font-medium text-teal-700 underline underline-offset-2 hover:text-teal-900"
-            >
-              ¿Olvidaste tu contraseña? Recuperarla
-            </Link>
-          </p>
         </form>
 
-        <p className="mt-6 text-center text-sm text-muted-foreground">
-          ¿No tenés cuenta?{' '}
-          <Link href="/register" className="font-medium text-primary hover:underline">
-            Registrá tu clínica
-          </Link>
-        </p>
+        {!brand && (
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            ¿No tenés cuenta?{' '}
+            <Link href="/register" className="font-medium text-primary hover:underline">
+              Registrá tu clínica
+            </Link>
+          </p>
+        )}
       </CardContent>
     </Card>
   );

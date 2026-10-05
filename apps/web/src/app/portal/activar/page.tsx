@@ -2,7 +2,8 @@ import { previewPortalInvite } from '@/actions/portal';
 import { getSessionContext } from '@/actions/auth';
 import { PortalActivateForm } from '@/components/portal/portal-activate-form';
 import { getOwnerAppInviteBrand } from '@/actions/owner-app';
-import { OwnerAppBrandMark } from '@/components/portal/owner-app-brand';
+import { OwnerAppInstall } from '@/components/portal/owner-app-install';
+import { ownerAppMetadata } from '@/lib/owner-app-metadata';
 import type { Metadata } from 'next';
 
 interface PortalActivatePageProps {
@@ -15,14 +16,7 @@ export async function generateMetadata({
   const { token } = await searchParams;
   const app = token ? await getOwnerAppInviteBrand(token) : null;
   if (!app) return { robots: { index: false, follow: false } };
-  return {
-    title: app.brand.appName,
-    applicationName: app.brand.appName,
-    manifest: `/portal/manifest/${app.organizationId}`,
-    appleWebApp: { capable: true, title: app.brand.appName },
-    icons: { apple: [{ url: app.brand.logoUrl || `/portal/icon/${app.organizationId}?size=180` }] },
-    robots: { index: false, follow: false },
-  };
+  return ownerAppMetadata(app.organizationId, app.brand);
 }
 
 export default async function PortalActivatePage({ searchParams }: PortalActivatePageProps) {
@@ -34,16 +28,22 @@ export default async function PortalActivatePage({ searchParams }: PortalActivat
   ]);
   const app = inviteToken ? await getOwnerAppInviteBrand(inviteToken) : null;
 
+  const form = (
+    <PortalActivateForm
+      token={inviteToken}
+      preview={preview}
+      isLoggedIn={Boolean(session)}
+      isStaff={session?.kind === 'staff'}
+      brand={app?.brand}
+    />
+  );
+  if (app)
+    return (
+      <OwnerAppInstall brand={app.brand} clinicName={preview?.clinicName} activationRequired>
+        {form}
+      </OwnerAppInstall>
+    );
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-muted/30 p-4">
-      {app && <OwnerAppBrandMark brand={app.brand} />}
-      <PortalActivateForm
-        token={inviteToken}
-        preview={preview}
-        isLoggedIn={Boolean(session)}
-        isStaff={session?.kind === 'staff'}
-      />
-      {app && <p className="text-xs text-muted-foreground">Hecho por OpusOrg</p>}
-    </div>
+    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">{form}</div>
   );
 }

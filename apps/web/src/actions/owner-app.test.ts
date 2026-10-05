@@ -8,8 +8,10 @@ const mocks = vi.hoisted(() => ({
   owner: vi.fn(),
   bridge: vi.fn(),
   origin: vi.fn(),
+  status: vi.fn(),
 }));
 
+vi.mock('@/actions/portal', () => ({ getOwnerPortalStatus: mocks.status }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
 vi.mock('@/lib/owner-app', async (original) => ({
   ...(await original<typeof import('@/lib/owner-app')>()),
@@ -39,12 +41,35 @@ describe('integrated WhatsApp invitations', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.enabled.mockReturnValue(true);
+    mocks.status.mockResolvedValue({ status: 'inactive' });
     mocks.permission.mockResolvedValue({ organizationId: '11111111-1111-4111-8111-111111111111' });
-    mocks.owner.mockResolvedValue({ full_name: 'Tutor', phone_whatsapp: '+5491112345678', phone: null });
+    mocks.owner.mockResolvedValue({
+      full_name: 'Tutor',
+      phone_whatsapp: '+5491112345678',
+      phone: null,
+    });
     mocks.origin.mockReturnValue('https://staging.example.com');
-    mocks.rpc.mockImplementation(async (name) => name === 'get_owner_app_brand'
-      ? { data: { appName: 'app-IMILVET', logoUrl: '', primaryColor: '#008060', welcomeText: '', enabled: true }, error: null }
-      : { data: { token: 'a'.repeat(64), email: 'tutor@example.com', expiresAt: '2026-11-01T00:00:00Z' }, error: null });
+    mocks.rpc.mockImplementation(async (name) =>
+      name === 'get_owner_app_brand'
+        ? {
+            data: {
+              appName: 'app-IMILVET',
+              logoUrl: '',
+              primaryColor: '#008060',
+              welcomeText: '',
+              enabled: true,
+            },
+            error: null,
+          }
+        : {
+            data: {
+              token: 'a'.repeat(64),
+              email: 'tutor@example.com',
+              expiresAt: '2026-11-01T00:00:00Z',
+            },
+            error: null,
+          }
+    );
   });
 
   it('preserves the external bridge outside enabled staging', async () => {
@@ -58,13 +83,29 @@ describe('integrated WhatsApp invitations', () => {
     const result = await sendOwnerAppInvite('owner');
     expect(result.success).toBe(true);
     expect(result.data?.whatsappText).toContain('app-IMILVET');
-    expect(result.data?.whatsappText).toContain('https://staging.example.com/portal/activar?token=');
+    expect(result.data?.whatsappText).toContain(
+      'https://staging.example.com/portal/activar?token='
+    );
     expect(mocks.feature).toHaveBeenCalled();
     expect(mocks.bridge).not.toHaveBeenCalled();
   });
 
+  it('shares installation without rotating access for an active owner', async () => {
+    mocks.status.mockResolvedValue({ status: 'active' });
+    const result = await sendOwnerAppInvite('owner');
+    expect(result.success).toBe(true);
+    expect(result.data?.whatsappText).toContain(
+      '/portal/instalar/11111111-1111-4111-8111-111111111111'
+    );
+    expect(result.data?.whatsappText).not.toContain('token=');
+    expect(mocks.rpc).not.toHaveBeenCalledWith('create_owner_portal_invite', expect.anything());
+  });
+
   it('does not generate an invitation for a disabled clinic', async () => {
-    mocks.rpc.mockResolvedValue({ data: { appName: 'App', primaryColor: '#008060', enabled: false }, error: null });
+    mocks.rpc.mockResolvedValue({
+      data: { appName: 'App', primaryColor: '#008060', enabled: false },
+      error: null,
+    });
     expect((await sendOwnerAppInvite('owner')).success).toBe(false);
     expect(mocks.rpc).not.toHaveBeenCalledWith('create_owner_portal_invite', expect.anything());
   });
@@ -76,7 +117,9 @@ describe('integrated WhatsApp invitations', () => {
   });
 
   it('validates the origin before creating a private token', async () => {
-    mocks.origin.mockImplementation(() => { throw new Error('Missing staging origin'); });
+    mocks.origin.mockImplementation(() => {
+      throw new Error('Missing staging origin');
+    });
     expect((await sendOwnerAppInvite('owner')).success).toBe(false);
     expect(mocks.rpc).not.toHaveBeenCalledWith('create_owner_portal_invite', expect.anything());
   });
