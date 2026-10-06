@@ -23,6 +23,11 @@ import {
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { PermissionError, requirePermission, requirePortalSession } from '@/lib/permissions';
 import { getSessionContext } from '@/actions/auth';
+import { createHash } from 'node:crypto';
+import { ownerAppEnabled } from '@/lib/owner-app';
+import { ownerAppOrigin, sendOwnerAppEmail } from '@/lib/owner-app-email';
+import { getOwnerAppBrand } from '@/actions/owner-app';
+import { buildPortalActivatePath } from '@sincvete/shared';
 import { FEATURES, planRestrictionResult, requireFeature, canUseFeature } from '@/lib/entitlements';
 
 function isNextRedirect(error: unknown): boolean {
@@ -78,7 +83,9 @@ export async function getOwnerPortalStatus(ownerId: string): Promise<OwnerPortal
   return parseOwnerPortalStatus(data);
 }
 
-export async function inviteOwnerToPortal(ownerId: string): Promise<ActionResult<PortalInviteCreated>> {
+export async function inviteOwnerToPortal(
+  ownerId: string
+): Promise<ActionResult<PortalInviteCreated>> {
   try {
     const session = await requirePermission('patients:write');
     await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
@@ -94,6 +101,19 @@ export async function inviteOwnerToPortal(ownerId: string): Promise<ActionResult
       return { success: false, error: 'No se pudo crear la invitación' };
     }
     revalidatePath(`/propietarios/${ownerId}`);
+    if (ownerAppEnabled() && (await getOwnerAppBrand(session.organizationId))?.enabled) {
+      try {
+        const sent = await sendOwnerAppEmail(
+          invite.email,
+          'Invitacion a la app de tu veterinaria',
+          `Activa tu acceso e instala la app desde este enlace privado:\n\n${ownerAppOrigin()}${buildPortalActivatePath(invite.token)}\n\nEl enlace vence el ${invite.expiresAt}.\n\nHecho por OpusOrg`,
+          `owner-app-invite-${createHash('sha256').update(invite.token).digest('hex')}`
+        );
+        return { success: true, data: { ...invite, deliveryStatus: sent ? 'sent' : 'not_sent' } };
+      } catch {
+        return { success: true, data: { ...invite, deliveryStatus: 'not_sent' } };
+      }
+    }
     return { success: true, data: invite };
   } catch (error) {
     return actionError(error);
@@ -170,9 +190,7 @@ export async function getOwnerPortalWaitingRoom(date?: string): Promise<PortalWa
   return parsePortalWaitingRoomRows(data);
 }
 
-export async function listOwnerPortalAlerts(
-  unreadOnly = true
-): Promise<OwnerPortalAlert[]> {
+export async function listOwnerPortalAlerts(unreadOnly = true): Promise<OwnerPortalAlert[]> {
   const session = await requirePortalSession();
   const portalAllowed = await canUseFeature({
     organizationId: session.organizationId,
@@ -291,6 +309,14 @@ export async function activatePortalAccount(
           error: authError?.message?.includes('already')
             ? 'Ese email ya tiene una cuenta. Ingresá y volvé a abrir el enlace.'
             : (authError?.message ?? 'No se pudo crear la cuenta'),
+        };
+      }
+
+      if (!authData.session) {
+        return {
+          success: false,
+          error:
+            'Revisa tu email para confirmar la cuenta. Luego ingresa y abre nuevamente esta invitacion.',
         };
       }
 

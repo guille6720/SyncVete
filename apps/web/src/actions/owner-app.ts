@@ -1,144 +1,306 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { buildWhatsAppUrl, pickOwnerWhatsAppPhone, type ActionResult } from '@sincvete/shared';
+import { redirect } from 'next/navigation';
+import { ownerAppInstallUrl } from '@/lib/owner-app-navigation';
 import { createServerClient } from '@/lib/supabase/server';
-import { PermissionError, requirePermission } from '@/lib/permissions';
+import { requirePermission, requirePortalSession } from '@/lib/permissions';
+import { FEATURES, requireFeature } from '@/lib/entitlements';
+import {
+  ownerAppEnabled,
+  ownerAppBrandSchema,
+  ownerAppBookingSchema,
+  ownerAppSlotSchema,
+  parseOwnerAppBrand,
+} from '@/lib/owner-app';
+import {
+  buildWhatsAppUrl,
+  buildPortalActivatePath,
+  pickOwnerWhatsAppPhone,
+  parsePortalInviteCreated,
+  type ActionResult,
+} from '@sincvete/shared';
+import { PermissionError } from '@/lib/permissions';
+import { planRestrictionResult } from '@/lib/entitlements';
 import { getOwner } from '@/actions/owners';
-import { canSendWhatsApp } from '@/actions/whatsapp';
-import { consumeMeteredFeature, FEATURES, planRestrictionResult } from '@/lib/entitlements';
+import { getOwnerPortalStatus } from '@/actions/portal';
+import { ownerAppOrigin } from '@/lib/owner-app-email';
+import {
+  isOwnerAppConfigured as isBridgeConfigured,
+  sendOwnerAppInvite as sendBridgeInvite,
+  type OwnerAppInviteResult,
+} from '@/actions/owner-app-bridge';
+export type { OwnerAppInviteResult } from '@/actions/owner-app-bridge';
+import { z } from 'zod';
 
-/**
- * "Enviar app" — issues a private invitation to the owner app (app-<clinic>)
- * through its server-to-server endpoint and prepares the WhatsApp message.
- *
- * Env (server-only): OWNER_APP_URL, OWNER_APP_BRIDGE_SECRET.
- */
-
-export interface OwnerAppInviteResult {
-  expiresAt: string;
-  whatsappUrl: string;
-  whatsappText: string;
+function requireStaging() {
+  if (!ownerAppEnabled())
+    throw new Error('La app de propietarios no esta habilitada en este entorno');
 }
 
-interface BridgeResponse {
-  url: string;
-  expiresAt: string;
-  whatsappText: string;
+export async function getOwnerAppBrand(organizationId: string) {
+  if (!ownerAppEnabled()) return null;
+  const db = await createServerClient();
+  const { data, error } = await db.rpc('get_owner_app_brand', {
+    p_organization_id: organizationId,
+  });
+  if (error || !data) return null;
+  return parseOwnerAppBrand(data);
 }
 
-const BRIDGE_ERRORS: Record<string, string> = {
-  CLINIC_NOT_LINKED: 'La clínica todavía no está vinculada con la app de propietarios.',
-  CLINIC_INACTIVE: 'La app de propietarios de esta clínica está desactivada.',
-  unauthorized: 'La conexión con la app de propietarios no está bien configurada.',
+export async function getOwnerAppInviteBrand(token: string) {
+  if (!ownerAppEnabled() || !/^[a-f0-9]{64}$/i.test(token)) return null;
+  const db = await createServerClient();
+  const { data, error } = await db.rpc('get_owner_app_invite_brand', { p_token: token });
+  if (error || !data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const parsed = z
+    .object({ organizationId: z.string().uuid(), brand: ownerAppBrandSchema })
+    .safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
+export async function saveOwnerAppBrand(
+  _previous: ActionResult | null,
+  form: FormData
+): Promise<ActionResult> {
+  requireStaging();
+  await requirePermission('org:manage');
+  const brand = ownerAppBrandSchema.safeParse({
+    appName: form.get('appName'),
+    logoUrl: form.get('logoUrl') || '',
+    primaryColor: form.get('primaryColor'),
+    welcomeText: form.get('welcomeText') || '',
+    enabled: form.get('enabled') === 'on',
+  });
+  if (!brand.success)
+    return { success: false, error: 'Revisa el nombre, el color y la URL del logo' };
+  const db = await createServerClient();
+  const { error } = await db.rpc('save_owner_app_brand', { p_brand: brand.data });
+  if (error) return { success: false, error: 'No se pudo guardar la configuracion' };
+  revalidatePath('/portal', 'layout');
+  revalidatePath('/configuracion');
+  return { success: true };
+}
+
+export type OwnerAppSlot = { id: string; starts_at: string; ends_at: string; branch_name: string };
+export type OwnerAppReminder = { id: string; message: string; created_at: string };
+export type OwnerAppBooking = { id: string; starts_at: string; patient_name: string };
+
+export type OwnerProfessionalAvailability = {
+  date: string;
+  minDate: string;
+  maxDate: string;
+  timezone: string;
+  professionals: { id: string; name: string; specialty: string | null }[];
+  slots: {
+    schedule_id: string;
+    professional_id: string;
+    professional_name: string;
+    branch_name: string;
+    branch_id: string;
+    starts_at: string;
+    ends_at: string;
+  }[];
 };
 
-function bridgeConfig(): { url: string; secret: string } | null {
-  const url = process.env.OWNER_APP_URL?.replace(/\/$/, '');
-  const secret = process.env.OWNER_APP_BRIDGE_SECRET;
-  return url && secret ? { url, secret } : null;
+export async function getOwnerProfessionalAvailability(
+  date?: string
+): Promise<OwnerProfessionalAvailability> {
+  requireStaging();
+  const session = await requirePortalSession();
+  await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+  const db = await createServerClient();
+  const parsed = z.string().date().safeParse(date);
+  const { data, error } = await db.rpc('get_owner_professional_availability', {
+    p_date: parsed.success ? parsed.data : null,
+  });
+  if (error?.message === 'Invalid date') return getOwnerProfessionalAvailability();
+  if (error) throw new Error('No se pudo cargar la disponibilidad de los profesionales');
+  return data as unknown as OwnerProfessionalAvailability;
+}
+
+export async function bookOwnerProfessionalSlot(
+  _previous: ActionResult | null,
+  form: FormData
+): Promise<ActionResult> {
+  requireStaging();
+  const session = await requirePortalSession();
+  await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+  const input = z
+    .object({
+      scheduleId: z.string().uuid(),
+      startsAt: z.string().datetime({ offset: true }),
+      patientId: z.string().uuid(),
+    })
+    .safeParse({
+      scheduleId: form.get('scheduleId'),
+      startsAt: form.get('startsAt'),
+      patientId: form.get('patientId'),
+    });
+  if (!input.success)
+    return { success: false, error: 'Elegí una mascota, un profesional y un horario.' };
+  const db = await createServerClient();
+  const { error } = await db.rpc('book_owner_professional_slot', {
+    p_schedule_id: input.data.scheduleId,
+    p_starts_at: input.data.startsAt,
+    p_patient_id: input.data.patientId,
+  });
+  if (error)
+    return {
+      success: false,
+      error: 'Ese horario ya no está disponible. Actualizá los horarios y elegí otro.',
+    };
+  revalidatePath('/portal', 'layout');
+  revalidatePath('/agenda');
+  return { success: true };
+}
+
+export async function getOwnerAppData(): Promise<{
+  slots: OwnerAppSlot[];
+  reminders: OwnerAppReminder[];
+  bookings: OwnerAppBooking[];
+}> {
+  requireStaging();
+  const session = await requirePortalSession();
+  await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+  const db = await createServerClient();
+  const { data, error } = await db.rpc('get_owner_app_data');
+  if (error) throw new Error('No se pudo cargar la agenda y los avisos');
+  return data as unknown as {
+    slots: OwnerAppSlot[];
+    reminders: OwnerAppReminder[];
+    bookings: OwnerAppBooking[];
+  };
+}
+
+export async function cancelOwnerAppBooking(
+  _previous: ActionResult | null,
+  form: FormData
+): Promise<ActionResult> {
+  requireStaging();
+  const session = await requirePortalSession();
+  await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+  const id = z.string().uuid().safeParse(form.get('appointmentId'));
+  if (!id.success) return { success: false, error: 'Turno invalido' };
+  const db = await createServerClient();
+  const { error } = await db.rpc('cancel_owner_app_booking', { p_appointment_id: id.data });
+  if (error) return { success: false, error: 'No se pudo cancelar el turno' };
+  revalidatePath('/portal', 'layout');
+  revalidatePath('/agenda');
+  return { success: true };
+}
+
+export async function bookOwnerAppSlot(
+  _previous: ActionResult | null,
+  form: FormData
+): Promise<ActionResult> {
+  requireStaging();
+  const session = await requirePortalSession();
+  await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+  const input = ownerAppBookingSchema.safeParse({
+    slotId: form.get('slotId'),
+    patientId: form.get('patientId'),
+  });
+  if (!input.success) return { success: false, error: 'Selecciona una mascota y un horario' };
+  const db = await createServerClient();
+  const { error } = await db.rpc('book_owner_app_slot', {
+    p_slot_id: input.data.slotId,
+    p_patient_id: input.data.patientId,
+  });
+  if (error)
+    return {
+      success: false,
+      error: 'El horario ya no esta disponible. Actualiza la agenda e intenta nuevamente.',
+    };
+  revalidatePath('/portal', 'layout');
+  revalidatePath('/agenda');
+  return { success: true };
+}
+
+export async function publishOwnerAppSlot(
+  _previous: ActionResult | null,
+  form: FormData
+): Promise<ActionResult> {
+  requireStaging();
+  await requirePermission('appointments:write');
+  const input = ownerAppSlotSchema.safeParse({
+    branchId: form.get('branchId'),
+    startsAt: form.get('startsAt'),
+  });
+  if (!input.success) return { success: false, error: 'Revisa la sucursal y el horario' };
+  const db = await createServerClient();
+  const { error } = await db.rpc('publish_owner_app_slot', {
+    p_branch_id: input.data.branchId,
+    p_starts_at: input.data.startsAt,
+  });
+  if (error)
+    return {
+      success: false,
+      error: 'No se pudo publicar el horario; revisa si hay otro turno en ese intervalo',
+    };
+  revalidatePath('/portal', 'layout');
+  return { success: true };
 }
 
 export async function isOwnerAppConfigured(): Promise<boolean> {
-  return bridgeConfig() !== null;
+  return ownerAppEnabled() || isBridgeConfigured();
 }
 
-export async function sendOwnerAppInvite(ownerId: string): Promise<ActionResult<OwnerAppInviteResult>> {
+export async function sendOwnerAppInvite(
+  ownerId: string
+): Promise<ActionResult<OwnerAppInviteResult>> {
+  if (!ownerAppEnabled()) return sendBridgeInvite(ownerId);
   try {
     const session = await requirePermission('patients:write');
-    const config = bridgeConfig();
-    if (!config) {
-      return { success: false, error: 'La app de propietarios no está configurada en este entorno.' };
-    }
-
+    await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
+    const brand = await getOwnerAppBrand(session.organizationId);
+    if (!brand?.enabled)
+      return { success: false, error: 'Habilita la app en la configuracion de la clinica.' };
     const owner = await getOwner(ownerId);
     if (!owner) return { success: false, error: 'Propietario no encontrado' };
-
-    const phoneE164 = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
-    if (!phoneE164) {
-      return { success: false, error: 'Cargá un teléfono o WhatsApp válido en la ficha del propietario.' };
-    }
-
-    const supabase = await createServerClient();
-    const { data: patients, error: patientsError } = await supabase
-      .from('patients')
-      .select('id, name, species, breed, sex, birth_date')
-      .eq('owner_id', owner.id)
-      .eq('is_deceased', false)
-      .is('deleted_at', null)
-      .order('name');
-    if (patientsError) throw patientsError;
-
-    const res = await fetch(`${config.url}/api/integrations/syncvete/invitations`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${config.secret}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        organizationId: session.organizationId,
-        owner: {
-          id: owner.id,
-          fullName: owner.full_name,
-          email: owner.email,
-          phone: owner.phone_whatsapp || owner.phone,
-        },
-        patients: (patients ?? []).map((p) => ({
-          id: p.id,
-          name: p.name,
-          species: p.species,
-          breed: p.breed,
-          sex: p.sex,
-          birthDate: p.birth_date,
-        })),
-        sendEmail: false,
-      }),
-      cache: 'no-store',
-      signal: AbortSignal.timeout(20_000),
-    });
-    const payload = (await res.json().catch(() => ({}))) as Partial<BridgeResponse> & { error?: string };
-    if (!res.ok || !payload.url || !payload.whatsappText) {
-      console.error('[owner-app] invite failed', res.status, payload.error);
+    if (!owner.is_active)
+      return { success: false, error: 'Activa al propietario en su ficha antes de enviar la app.' };
+    const phone = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
+    if (!phone) return { success: false, error: 'Carga un telefono de WhatsApp valido.' };
+    const origin = ownerAppOrigin();
+    const status = await getOwnerPortalStatus(ownerId);
+    if (status?.status === 'active') {
+      const text = `Hola ${owner.full_name}, instalá ${brand.appName} desde ${origin}${ownerAppInstallUrl(session.organizationId)}\n\nIngresá con tu cuenta para ver tus mascotas, vacunas, tratamientos y turnos.\n\nHecho por OpusOrg`;
       return {
-        success: false,
-        error: BRIDGE_ERRORS[payload.error ?? ''] ?? 'No se pudo generar el enlace de la app. Probá de nuevo.',
+        success: true,
+        data: { whatsappUrl: buildWhatsAppUrl(phone, text), whatsappText: text },
       };
     }
-
-    if (await canSendWhatsApp()) {
-      // The invitation already exists at this point: logging must never block sending it.
-      try {
-        await consumeMeteredFeature({
-          organizationId: session.organizationId,
-          featureKey: FEATURES.WHATSAPP_MONTHLY_MESSAGES,
-        });
-        const { error: logError } = await supabase.rpc('log_whatsapp_message', {
-          p_owner_id: owner.id,
-          p_body: payload.whatsappText,
-          p_phone_e164: phoneE164,
-          p_template_key: 'portal_invite',
-          p_patient_id: null,
-          p_related_type: 'portal',
-          p_related_id: null,
-          p_branch_id: session.branchId,
-        });
-        if (logError) console.error('[owner-app] whatsapp log failed', logError.message);
-        revalidatePath('/whatsapp');
-      } catch (logFailure) {
-        console.error('[owner-app] whatsapp log skipped', logFailure);
-      }
-    }
-
+    const db = await createServerClient();
+    const { data, error } = await db.rpc('create_owner_portal_invite', { p_owner_id: ownerId });
+    if (error)
+      return {
+        success: false,
+        error: 'No se pudo crear la invitacion. Revisa el email del propietario.',
+      };
+    const invite = parsePortalInviteCreated(data);
+    if (!invite) return { success: false, error: 'No se pudo crear la invitacion' };
+    const text = `Hola ${owner.full_name}, activa tu acceso a ${brand.appName} e instala la app desde este enlace privado: ${origin}${buildPortalActivatePath(invite.token)}\n\nHecho por OpusOrg`;
+    revalidatePath(`/propietarios/${ownerId}`);
     return {
       success: true,
       data: {
-        expiresAt: payload.expiresAt ?? '',
-        whatsappUrl: buildWhatsAppUrl(phoneE164, payload.whatsappText),
-        whatsappText: payload.whatsappText,
+        expiresAt: invite.expiresAt,
+        whatsappUrl: buildWhatsAppUrl(phone, text),
+        whatsappText: text,
       },
     };
   } catch (error) {
     const planError = planRestrictionResult<OwnerAppInviteResult>(error);
     if (planError) return planError;
     if (error instanceof PermissionError) return { success: false, error: error.message };
-    console.error(error);
-    return { success: false, error: 'Ocurrió un error inesperado' };
+    return { success: false, error: 'No se pudo generar el enlace de la app.' };
   }
+}
+
+export async function signOutOwnerApp(): Promise<void> {
+  const session = await requirePortalSession();
+  const db = await createServerClient();
+  await db.auth.signOut();
+  redirect(ownerAppInstallUrl(session.organizationId));
 }

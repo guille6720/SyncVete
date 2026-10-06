@@ -31,6 +31,11 @@ export function PortalHome({ home }: PortalHomeProps) {
           Portal de {home.clinic.name}
           {home.clinic.phone ? ` · ${home.clinic.phone}` : ''}
         </p>
+        {home.clinic.email && (
+          <a className="text-sm text-primary underline" href={`mailto:${home.clinic.email}`}>
+            {home.clinic.email}
+          </a>
+        )}
       </div>
 
       <section className="space-y-3">
@@ -173,6 +178,7 @@ export function PortalHome({ home }: PortalHomeProps) {
                   </span>
                 </div>
                 {row.diagnosis && <p className="text-sm">{row.diagnosis}</p>}
+                {row.treatment && <p className="text-sm">Tratamiento: {row.treatment}</p>}
                 {row.plan && <p className="text-sm text-muted-foreground">{row.plan}</p>}
               </div>
             ))

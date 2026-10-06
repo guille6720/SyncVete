@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { OwnerVaccineCalendar } from '@/components/portal/owner-vaccine-calendar';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,6 +53,8 @@ export function PortalPatientView({ detail }: PortalPatientViewProps) {
         </CardContent>
       </Card>
 
+      <OwnerVaccineCalendar vaccines={detail.vaccines} />
+
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Vacunas</CardTitle>
@@ -103,7 +106,7 @@ export function PortalPatientView({ detail }: PortalPatientViewProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Historia resumida</CardTitle>
+          <CardTitle className="text-lg">Seguimiento de tratamientos</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           {detail.clinical.length === 0 ? (

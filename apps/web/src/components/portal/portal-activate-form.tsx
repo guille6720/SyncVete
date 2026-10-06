@@ -1,7 +1,9 @@
 'use client';
 
-import { useActionState } from 'react';
-import Link from 'next/link';
+import { useActionState, useState } from 'react';
+import { LoginForm } from '@/components/auth/login-form';
+import type { OwnerAppBrand } from '@/lib/owner-app';
+import { OwnerAppBrandMark } from './owner-app-brand';
 import { acceptPortalInviteForm, activatePortalAccount } from '@/actions/portal';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
 import { Button } from '@/components/ui/button';
@@ -11,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import type { PortalInvitePreview } from '@sincvete/shared';
 
 interface PortalActivateFormProps {
+  brand?: OwnerAppBrand;
   token: string;
   preview: PortalInvitePreview | null;
   isLoggedIn: boolean;
@@ -19,27 +22,26 @@ interface PortalActivateFormProps {
 
 export function PortalActivateForm({
   token,
+  brand,
   preview,
   isLoggedIn,
   isStaff,
 }: PortalActivateFormProps) {
   const [state, formAction, pending] = useActionState(activatePortalAccount, null);
   const [acceptState, acceptAction, acceptPending] = useActionState(acceptPortalInviteForm, null);
+  const [showLogin, setShowLogin] = useState(false);
 
   if (!token || !preview) {
     return (
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center">
-            <BrandLogo href="/" size="md" />
+            {brand ? <OwnerAppBrandMark brand={brand} /> : <BrandLogo href="/" size="md" />}
           </div>
           <CardDescription>Invitación inválida o vencida</CardDescription>
         </CardHeader>
         <CardContent className="text-center text-sm text-muted-foreground">
-          Pedile a tu clínica un enlace nuevo.{' '}
-          <Link href="/login" className="font-medium text-primary hover:underline">
-            Ir al ingreso
-          </Link>
+          Pedile a tu veterinaria un enlace nuevo para acceder a la app de tus mascotas.
         </CardContent>
       </Card>
     );
@@ -50,7 +52,7 @@ export function PortalActivateForm({
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-3 text-center">
           <div className="flex justify-center">
-            <BrandLogo href="/" size="md" />
+            {brand ? <OwnerAppBrandMark brand={brand} /> : <BrandLogo href="/" size="md" />}
           </div>
           <CardDescription>Esta cuenta es del equipo de la clínica</CardDescription>
         </CardHeader>
@@ -83,6 +85,21 @@ export function PortalActivateForm({
           </form>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (showLogin) {
+    return (
+      <div className="space-y-3">
+        <LoginForm
+          brand={brand}
+          ownerAccess
+          redirectTo={`/portal/activar?token=${token}`}
+        />
+        <Button variant="ghost" className="w-full" onClick={() => setShowLogin(false)}>
+          Volver a activar mi acceso
+        </Button>
+      </div>
     );
   }
 
@@ -135,12 +152,13 @@ export function PortalActivateForm({
         </form>
         <p className="mt-4 text-center text-sm text-muted-foreground">
           ¿Ya tenés cuenta?{' '}
-          <Link
-            href={`/login?redirectTo=${encodeURIComponent(`/portal/activar?token=${token}`)}`}
+          <button
+            type="button"
+            onClick={() => setShowLogin(true)}
             className="font-medium text-primary hover:underline"
           >
             Ingresar
-          </Link>
+          </button>
         </p>
       </CardContent>
     </Card>

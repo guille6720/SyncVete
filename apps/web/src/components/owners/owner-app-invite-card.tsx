@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { MessageCircle, Smartphone } from 'lucide-react';
 import { sendOwnerAppInvite, type OwnerAppInviteResult } from '@/actions/owner-app';
 import { Button } from '@/components/ui/button';
@@ -13,6 +14,7 @@ interface OwnerAppInviteCardProps {
 }
 
 export function OwnerAppInviteCard({ ownerId, hasWhatsAppPhone }: OwnerAppInviteCardProps) {
+  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<OwnerAppInviteResult | null>(null);
@@ -32,6 +34,7 @@ export function OwnerAppInviteCard({ ownerId, hasWhatsAppPhone }: OwnerAppInvite
       return;
     }
     setResult(response.data);
+    router.refresh();
     if (popup) popup.location.href = response.data.whatsappUrl;
   };
 
@@ -53,8 +56,8 @@ export function OwnerAppInviteCard({ ownerId, hasWhatsAppPhone }: OwnerAppInvite
           App del propietario
         </CardTitle>
         <CardDescription>
-          Enviale por WhatsApp el enlace privado para descargar la app: vacunas, tratamientos y turnos desde su
-          celular.
+          Enviale por WhatsApp el enlace privado para descargar la app: vacunas, tratamientos y
+          turnos desde su celular.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -64,9 +67,18 @@ export function OwnerAppInviteCard({ ownerId, hasWhatsAppPhone }: OwnerAppInvite
           </p>
         )}
 
-        <Button type="button" size="sm" onClick={() => void handleSend()} disabled={pending || !hasWhatsAppPhone}>
+        <Button
+          type="button"
+          size="sm"
+          onClick={() => void handleSend()}
+          disabled={pending || !hasWhatsAppPhone}
+        >
           <MessageCircle className="mr-2 h-4 w-4" />
-          {pending ? 'Generando enlace…' : result ? 'Reenviar app por WhatsApp' : 'Enviar app por WhatsApp'}
+          {pending
+            ? 'Generando enlace…'
+            : result
+              ? 'Reenviar app por WhatsApp'
+              : 'Enviar app por WhatsApp'}
         </Button>
 
         {error && <p className="text-sm text-destructive">{error}</p>}
@@ -75,7 +87,12 @@ export function OwnerAppInviteCard({ ownerId, hasWhatsAppPhone }: OwnerAppInvite
           <div className="space-y-2 rounded-md border bg-muted/40 p-3 text-sm">
             <p>
               WhatsApp listo para enviar.{' '}
-              <a href={result.whatsappUrl} target="_blank" rel="noreferrer" className="font-medium underline">
+              <a
+                href={result.whatsappUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="font-medium underline"
+              >
                 Abrir WhatsApp
               </a>
             </p>
@@ -87,8 +104,8 @@ export function OwnerAppInviteCard({ ownerId, hasWhatsAppPhone }: OwnerAppInvite
             </div>
             {result.expiresAt && (
               <p className="text-xs text-muted-foreground">
-                El enlace es personal y vence el {formatDashboardDateTime(result.expiresAt)}. Al reenviar, el
-                anterior deja de funcionar.
+                El enlace es personal y vence el {formatDashboardDateTime(result.expiresAt)}. Al
+                reenviar, el anterior deja de funcionar.
               </p>
             )}
           </div>
