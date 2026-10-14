@@ -323,7 +323,7 @@ export async function updatePatient(
 
 export async function deletePatient(patientId: string): Promise<ActionResult> {
   try {
-    await requirePermissionAndFeature('patients:write', FEATURES.PATIENTS);
+    await requirePermissionAndFeature(['patients:write', 'patients:delete'], FEATURES.PATIENTS);
     const supabase = await createServerClient();
 
     const { data, error } = await supabase

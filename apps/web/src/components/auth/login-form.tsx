@@ -77,6 +77,16 @@ export function LoginForm({ redirectTo, errorCode }: LoginFormProps) {
           {errorCode === 'portal_denied' && (
             <p className="text-sm text-destructive">Esta cuenta no tiene acceso a {APP_NAME}.</p>
           )}
+          {errorCode === 'account_suspended' && (
+            <p className="text-sm text-destructive">
+              Tu acceso fue suspendido por el administrador de la clínica.
+            </p>
+          )}
+          {errorCode === 'account_disabled' && (
+            <p className="text-sm text-destructive">
+              Tu acceso fue revocado por el administrador de la clínica.
+            </p>
+          )}
           {errorCode === 'incomplete_account' && (
             <p className="text-sm text-destructive">
               Tu usuario existe pero la clínica no quedó configurada. Volvé a registrarte con un

@@ -51,6 +51,26 @@ describe('clinic-sidebar-nav', () => {
     ).toBe('professionals');
   });
 
+  it('shows "Usuarios y permisos" only to users:manage holders', () => {
+    const base = {
+      entitledHrefs: null,
+      showMySettlementsNav: false,
+      isEntitled: () => true,
+    };
+    const staff = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, {
+      ...base,
+      permissions: ['patients:read', 'appointments:write'],
+    });
+    const noPerms = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, base);
+    const admin = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, {
+      ...base,
+      permissions: ['users:manage'],
+    });
+    expect(staff.some((item) => item.href === '/configuracion/usuarios')).toBe(false);
+    expect(noPerms.some((item) => item.href === '/configuracion/usuarios')).toBe(false);
+    expect(admin.some((item) => item.href === '/configuracion/usuarios')).toBe(true);
+  });
+
   it('includes Interconsultas under professionals group', () => {
     const item = CLINIC_SIDEBAR_NAV_ITEMS.find((entry) => entry.href === '/interconsultas');
     expect(item?.groupId).toBe('professionals');

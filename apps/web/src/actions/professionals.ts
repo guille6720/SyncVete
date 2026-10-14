@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import {
+  managedUserErrorMessage,
   professionalCreateSchema,
   professionalUpdateSchema,
   type ActionResult,
@@ -127,8 +128,6 @@ async function ensureProfessionalAgendaAccess(params: {
         email_confirm: true,
         user_metadata: {
           full_name: params.fullName,
-          organization_id: params.organizationId,
-          role: 'veterinarian',
         },
       });
       if (created.error || !created.data.user) {
@@ -142,23 +141,57 @@ async function ensureProfessionalAgendaAccess(params: {
     return { error: 'Indicá un email o vinculá un usuario para agenda' };
   }
 
-  await assertAgendaSeatAvailable(params.organizationId, userId);
+  const { data: existingProfile } = await service
+    .from('profiles')
+    .select('organization_id, account_status, deleted_at')
+    .eq('id', userId)
+    .maybeSingle();
 
-  const { error: profileError } = await service.from('profiles').upsert(
-    {
-      id: userId,
-      organization_id: params.organizationId,
-      full_name: params.fullName,
-      is_active: true,
-      deleted_at: null,
-    },
-    { onConflict: 'id' }
-  );
-  if (profileError) {
-    return { error: rpcErrorMessage(profileError) };
+  const liveProfile = existingProfile && existingProfile.deleted_at == null;
+  if (liveProfile && existingProfile.organization_id !== params.organizationId) {
+    return { error: 'Ese usuario pertenece a otra organización y no se puede vincular.' };
+  }
+  if (liveProfile && existingProfile.account_status !== 'active') {
+    return {
+      error:
+        'El usuario está suspendido o deshabilitado. Reactivalo desde Configuración → Usuarios y permisos.',
+    };
   }
 
+  await assertAgendaSeatAvailable(params.organizationId, userId);
+
+  if (!liveProfile) {
+    const { error: profileError } = await service.from('profiles').upsert(
+      {
+        id: userId,
+        organization_id: params.organizationId,
+        full_name: params.fullName,
+        is_active: true,
+        deleted_at: null,
+      },
+      { onConflict: 'id' }
+    );
+    if (profileError) {
+      return {
+        error: managedUserErrorMessage(profileError.message) ?? rpcErrorMessage(profileError),
+      };
+    }
+  }
+
+  const { data: currentMemberships } = await service
+    .from('branch_members')
+    .select('branch_id, role, is_active, deleted_at')
+    .eq('user_id', userId)
+    .in('branch_id', branchIds);
+  const privilegedBranches = new Set(
+    (currentMemberships ?? [])
+      .filter((m) => m.is_active && m.deleted_at == null && (m.role === 'owner' || m.role === 'admin'))
+      .map((m) => m.branch_id)
+  );
+
   for (const branchId of branchIds) {
+    // Never demote a Central Admin / admin to veterinarian just to give them an agenda.
+    if (privilegedBranches.has(branchId)) continue;
     const { error: memberError } = await service.from('branch_members').upsert(
       {
         organization_id: params.organizationId,
@@ -178,7 +211,12 @@ async function ensureProfessionalAgendaAccess(params: {
         p_role: 'veterinarian',
       });
       if (rpcError) {
-        return { error: rpcErrorMessage(memberError) || rpcError.message };
+        return {
+          error:
+            managedUserErrorMessage(memberError.message) ??
+            managedUserErrorMessage(rpcError.message) ??
+            (rpcErrorMessage(memberError) || rpcError.message),
+        };
       }
     }
   }

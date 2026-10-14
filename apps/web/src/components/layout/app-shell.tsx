@@ -33,6 +33,7 @@ interface AppShellProps {
   /** Streamed commercial banner (non-critical). Prefer over blocking layout awaits. */
   billingBannerSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
+  permissions?: string[];
 }
 
 export function AppShell({
@@ -47,6 +48,7 @@ export function AppShell({
   entitledHrefs = null,
   billingBannerSlot = null,
   showMySettlementsNav = false,
+  permissions = [],
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -176,6 +178,7 @@ export function AppShell({
         <ClinicSidebarNav
           entitledHrefs={entitledHrefs}
           showMySettlementsNav={showMySettlementsNav}
+          permissions={permissions}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           onNavigate={(href, isActive) => {

@@ -434,7 +434,7 @@ export async function registerPaymentAction(
 
 export async function voidInvoiceAction(invoiceId: string): Promise<ActionResult> {
   try {
-    await requirePermissionAndFeature('billing:write', FEATURES.BILLING);
+    await requirePermissionAndFeature(['billing:write', 'billing:cancel'], FEATURES.BILLING);
     const supabase = await createServerClient();
     const { error } = await supabase.rpc('void_invoice', { p_invoice_id: invoiceId });
 

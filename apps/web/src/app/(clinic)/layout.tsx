@@ -46,6 +46,7 @@ export default async function ClinicLayout({ children }: { children: React.React
       isPlatformAdmin={session.isPlatformAdmin}
       entitledHrefs={entitledHrefs}
       showMySettlementsNav={showMySettlementsNav}
+      permissions={session.permissions}
       billingBannerSlot={
         <Suspense fallback={null}>
           <ClinicBillingBannerSlot organizationId={session.organizationId} />

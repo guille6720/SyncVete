@@ -6,11 +6,11 @@ import {
   signInSchema,
   signUpSchema,
   updatePasswordSchema,
-  APP_CANONICAL_HOST,
   type ActionResult,
   type SessionContext,
 } from '@sincvete/shared';
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
+import { getAppOrigin } from '@/lib/app-origin';
 import { getSessionContext as loadSessionContext } from '@/lib/session';
 import { headers } from 'next/headers';
 
@@ -193,22 +193,6 @@ export async function signOut(): Promise<void> {
   const supabase = await createServerClient();
   await supabase.auth.signOut();
   redirect('/login');
-}
-
-function getAppOrigin(headerStore: Headers): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-  if (configured) return configured;
-
-  const forwardedHost = headerStore.get('x-forwarded-host');
-  const host = forwardedHost ?? headerStore.get('host');
-  const proto = headerStore.get('x-forwarded-proto') ?? 'https';
-  if (host && !host.includes('localhost')) return `${proto}://${host}`;
-
-  if (process.env.NODE_ENV === 'production') {
-    return `https://${APP_CANONICAL_HOST}`;
-  }
-
-  return 'http://localhost:3000';
 }
 
 export async function requestPasswordReset(

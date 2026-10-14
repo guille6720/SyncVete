@@ -200,7 +200,7 @@ export async function updateOwner(
 
 export async function deleteOwner(ownerId: string): Promise<ActionResult> {
   try {
-    await requirePermissionAndFeature('patients:write', FEATURES.OWNERS);
+    await requirePermissionAndFeature(['patients:write', 'patients:delete'], FEATURES.OWNERS);
     const supabase = await createServerClient();
 
     const { error } = await supabase

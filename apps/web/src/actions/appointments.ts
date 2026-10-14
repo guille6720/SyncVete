@@ -457,7 +457,10 @@ export async function updateAppointmentStatus(
   cancellationReason?: string
 ): Promise<ActionResult> {
   try {
-    await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
+    await requirePermissionAndFeature(
+      status === 'cancelada' ? ['appointments:write', 'appointments:cancel'] : 'appointments:write',
+      FEATURES.APPOINTMENTS
+    );
     const supabase = await createServerClient();
 
     const { error } = await supabase
@@ -486,7 +489,10 @@ export async function updateAppointmentStatus(
 
 export async function deleteAppointment(appointmentId: string): Promise<ActionResult> {
   try {
-    await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
+    await requirePermissionAndFeature(
+      ['appointments:write', 'appointments:cancel'],
+      FEATURES.APPOINTMENTS
+    );
     const supabase = await createServerClient();
 
     const { data, error } = await supabase

@@ -363,6 +363,10 @@ export interface Database {
           phone: string | null;
           active_branch_id: string | null;
           is_active: boolean;
+          account_status: 'active' | 'suspended' | 'disabled';
+          status_changed_at: string | null;
+          status_changed_by: string | null;
+          status_reason: string | null;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -4249,6 +4253,33 @@ export interface Database {
           },
         ];
       };
+      user_permission_overrides: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          permission_key: string;
+          enabled: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          permission_key: string;
+          enabled?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          enabled?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       organization_invitations: {
         Row: {
           id: string;
@@ -4260,6 +4291,11 @@ export interface Database {
           status: string;
           expires_at: string;
           accepted_at: string | null;
+          full_name: string | null;
+          phone: string | null;
+          denied_permissions: string[];
+          last_sent_at: string;
+          send_count: number;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -5347,6 +5383,129 @@ export interface Database {
       };
       get_session_bootstrap: {
         Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      get_my_account_state: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      accept_pending_invitation: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      list_managed_users: {
+        Args: { p_user_id?: string | null };
+        Returns: {
+          user_id: string;
+          full_name: string;
+          email: string | null;
+          phone: string | null;
+          role: UserRole;
+          branch_id: string | null;
+          branch_name: string | null;
+          branch_count: number;
+          account_status: string;
+          is_central_admin: boolean;
+          last_sign_in_at: string | null;
+          last_activity_at: string | null;
+          denied_permissions: string[];
+          status_reason: string | null;
+          status_changed_at: string | null;
+          created_at: string;
+        }[];
+      };
+      list_managed_invitations: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          phone: string | null;
+          role: UserRole;
+          branch_id: string | null;
+          branch_name: string | null;
+          status: string;
+          expires_at: string;
+          last_sent_at: string;
+          send_count: number;
+          denied_permissions: string[];
+          created_at: string;
+        }[];
+      };
+      get_managed_users_overview: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      search_user_activity: {
+        Args: {
+          p_user_id?: string | null;
+          p_from?: string | null;
+          p_to?: string | null;
+          p_action?: string | null;
+          p_entity_types?: string[] | null;
+          p_branch_id?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: {
+          id: string;
+          created_at: string;
+          user_id: string;
+          user_name: string | null;
+          action: string;
+          entity_type: string;
+          entity_id: string | null;
+          branch_id: string | null;
+          branch_name: string | null;
+          status_from: string | null;
+          status_to: string | null;
+          details: Json | null;
+          total_count: number;
+        }[];
+      };
+      get_managed_user_access: {
+        Args: { p_user_id: string };
+        Returns: Json;
+      };
+      create_managed_invitation: {
+        Args: {
+          p_email: string;
+          p_full_name: string | null;
+          p_phone: string | null;
+          p_branch_id: string;
+          p_role: UserRole;
+          p_denied_permissions?: string[];
+        };
+        Returns: string;
+      };
+      resend_managed_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: Json;
+      };
+      revoke_managed_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: undefined;
+      };
+      update_managed_user: {
+        Args: {
+          p_user_id: string;
+          p_full_name: string | null;
+          p_phone: string | null;
+          p_role: UserRole;
+          p_branch_id: string | null;
+        };
+        Returns: undefined;
+      };
+      set_managed_user_status: {
+        Args: { p_user_id: string; p_status: string; p_reason?: string | null };
+        Returns: undefined;
+      };
+      revoke_managed_user_sessions: {
+        Args: { p_user_id: string };
+        Returns: number;
+      };
+      set_user_permission_restrictions: {
+        Args: { p_user_id: string; p_denied_permissions: string[] };
         Returns: Json;
       };
       expire_due_subscriptions_job: {

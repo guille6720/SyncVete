@@ -24,7 +24,11 @@ export function RecoverySessionBootstrap() {
         const accessToken = hashParams.get('access_token');
         const refreshToken = hashParams.get('refresh_token');
         const type = hashParams.get('type');
-        if (accessToken && refreshToken && (!type || type === 'recovery')) {
+        if (
+          accessToken &&
+          refreshToken &&
+          (!type || type === 'recovery' || type === 'invite' || type === 'magiclink')
+        ) {
           const { error } = await supabase.auth.setSession({
             access_token: accessToken,
             refresh_token: refreshToken,

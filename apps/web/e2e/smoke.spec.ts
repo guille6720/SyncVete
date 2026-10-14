@@ -26,6 +26,26 @@ test.describe('@smoke Auth flow', () => {
   });
 });
 
+test.describe('@smoke Usuarios y permisos', () => {
+  for (const path of [
+    '/configuracion/usuarios',
+    '/configuracion/usuarios/actividad',
+    '/configuracion/usuarios/00000000-0000-0000-0000-000000000000',
+  ]) {
+    test(`${path} redirects unauthenticated users`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page).toHaveURL(/\/login/);
+    });
+  }
+
+  test('login explains suspended and revoked accounts', async ({ page }) => {
+    await page.goto('/login?error=account_suspended');
+    await expect(page.getByText(/acceso fue suspendido/i)).toBeVisible();
+    await page.goto('/login?error=account_disabled');
+    await expect(page.getByText(/acceso fue revocado/i)).toBeVisible();
+  });
+});
+
 test.describe('@smoke Settings import/export', () => {
   test('configuracion redirects unauthenticated users', async ({ page }) => {
     await page.goto('/configuracion?tab=import-export');

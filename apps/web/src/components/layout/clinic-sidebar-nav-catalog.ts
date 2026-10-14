@@ -24,9 +24,11 @@ import {
   Sparkles,
   Stethoscope,
   Syringe,
+  UserCog,
   Users,
   Wallet,
 } from 'lucide-react';
+import type { Permission } from '@sincvete/shared';
 import {
   DASHBOARD_NAV_GROUPS,
   type DashboardNavGroup,
@@ -41,6 +43,8 @@ export interface ClinicSidebarNavItem {
   groupId: DashboardNavGroupId | null;
   /** Only show when AppShell enables my-settlements nav. */
   requiresMySettlements?: boolean;
+  /** Hide unless the session holds this permission (pages still enforce it server-side). */
+  requiresPermission?: Permission;
 }
 
 /** Browse destinations for the clinic sidebar — same module groups as dashboard. */
@@ -87,6 +91,13 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, groupId: 'communication' },
 
   { label: 'Configuración', href: '/configuracion', icon: Settings, groupId: 'settings' },
+  {
+    label: 'Usuarios y permisos',
+    href: '/configuracion/usuarios',
+    icon: UserCog,
+    groupId: 'settings',
+    requiresPermission: 'users:manage',
+  },
 ];
 
 export function filterClinicSidebarNavItems(
@@ -95,10 +106,14 @@ export function filterClinicSidebarNavItems(
     entitledHrefs: string[] | null;
     showMySettlementsNav: boolean;
     isEntitled: (href: string) => boolean;
+    permissions?: readonly string[];
   }
 ): ClinicSidebarNavItem[] {
   return items.filter((item) => {
     if (item.requiresMySettlements && !opts.showMySettlementsNav) return false;
+    if (item.requiresPermission && !opts.permissions?.includes(item.requiresPermission)) {
+      return false;
+    }
     return opts.isEntitled(item.href);
   });
 }
