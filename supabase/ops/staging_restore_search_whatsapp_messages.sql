@@ -85,6 +85,7 @@ BEGIN
   OFFSET v_offset;
 END;
 $$;
-GRANT EXECUTE ON FUNCTION public.search_whatsapp_messages TO authenticated;
+REVOKE ALL ON FUNCTION public.search_whatsapp_messages(TEXT, UUID, INT, INT) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.search_whatsapp_messages(TEXT, UUID, INT, INT) TO authenticated;
 
 NOTIFY pgrst, 'reload schema';
