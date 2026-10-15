@@ -55,6 +55,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
         <a href="#cobros">9. Facturación y caja</a>
         <a href="#ops">10. Reportes, avisos e IA</a>
         <a href="#config">11. Configuración y plan</a>
+        <a href="#usuarios">11a. Usuarios y permisos</a>
         <a href="#import-export">11b. Importar / Exportar</a>
         <a href="#roles">12. Roles y portal del tutor</a>
       </nav>
@@ -75,7 +76,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
             <strong>Manual</strong>: descarga esta guía. Está al lado de la rueda de Configuración.
           </li>
           <li>
-            <strong>Config</strong>: clínica, plan, sucursales, equipo y roles.
+            <strong>Config</strong>: clínica, plan, sucursales, usuarios, permisos y roles.
           </li>
           <li>
             <strong>Color / Oscuro</strong>: cambian el acento y el tema. Se guardan en este navegador.
@@ -312,7 +313,8 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
                 <strong>Sucursales:</strong> altas y sucursal principal.
               </li>
               <li>
-                <strong>Equipo:</strong> invitaciones y asientos del plan.
+                <strong>Usuarios y permisos:</strong> invitaciones, estado de cada cuenta, permisos por módulo y
+                cupos del plan (ver sección 11a).
               </li>
               <li>
                 <strong>Roles:</strong> qué puede hacer cada perfil.
@@ -326,6 +328,47 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
               clínica sigue operativa; el aviso indica qué hay que renovar o ampliar.
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="sv-section" id="usuarios">
+        <h2>11a. Usuarios y permisos</h2>
+        <p>
+          En <strong>Configuración → Usuarios y permisos</strong> el <strong>Administrador central</strong> de la
+          clínica gestiona todas las cuentas del personal. Arriba ves usuarios activos, total, invitaciones pendientes
+          y cupos disponibles del plan.
+        </p>
+        <ul className="sv-steps">
+          <li>
+            <strong>Agregar usuario:</strong> nombre, email, rol, sucursal y, si querés, permisos por módulo
+            restringidos. La persona recibe un email para activar su cuenta y elegir su contraseña. Desde la lista
+            podés reenviar o revocar una invitación pendiente.
+          </li>
+          <li>
+            <strong>Permisos por módulo:</strong> cada rol trae sus permisos. Podés quitar permisos puntuales (por
+            ejemplo, que un administrador vea facturación pero no la edite). Si quitás un permiso de lectura, se quita
+            también el de edición de ese módulo. Lo marcado como &quot;No incluido en el rol&quot; no se puede
+            agregar.
+          </li>
+          <li>
+            <strong>Estado de la cuenta:</strong> <em>Suspender</em> bloquea el acceso de forma temporal;{' '}
+            <em>Deshabilitar</em> lo da de baja y libera el cupo; <em>Reactivar</em> lo vuelve a habilitar si hay
+            cupos libres.
+          </li>
+          <li>
+            <strong>Accesos y sesiones:</strong> último acceso de la persona y opción <em>Cerrar sesiones</em> para
+            sacarla de todos sus dispositivos.
+          </li>
+          <li>
+            <strong>Ver actividad:</strong> historial de acciones del personal dentro de SyncVete (altas, cambios,
+            permisos, accesos). No registra nada fuera de la app.
+          </li>
+        </ul>
+        <div className="sv-callout">
+          Reglas de seguridad: nadie puede cambiar su propio rol, permisos ni estado; un administrador no puede
+          otorgar permisos que él no tiene ni modificar al Administrador central; y la clínica siempre conserva al
+          menos un Administrador central. Para sumar otro, usá <em>Promover a administrador central</em> en el
+          detalle del usuario.
         </div>
       </section>
 
@@ -520,8 +563,12 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           </thead>
           <tbody>
             <tr>
-              <td>Propietario / Administrador</td>
-              <td>Clínica, plan, sucursales, equipo y operación completa.</td>
+              <td>Administrador central</td>
+              <td>Dueño de la cuenta: clínica, plan, sucursales, usuarios, permisos y operación completa.</td>
+            </tr>
+            <tr>
+              <td>Administrador</td>
+              <td>Gestión diaria y del personal, dentro de los permisos que le dejó el Administrador central.</td>
             </tr>
             <tr>
               <td>Veterinario</td>
@@ -558,7 +605,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       </section>
 
       <footer className="sv-footer">
-        SyncVete · Manual de uso · Agosto 2026. Si un módulo no aparece en el menú, revisá el plan o pedile a un
+        SyncVete · Manual de uso · Octubre 2026. Si un módulo no aparece en el menú, revisá el plan o pedile a un
         administrador que te asigne el rol adecuado.
       </footer>
     </div>
