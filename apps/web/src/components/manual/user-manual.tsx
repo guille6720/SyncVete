@@ -341,8 +341,9 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
         <ul className="sv-steps">
           <li>
             <strong>Agregar usuario:</strong> nombre, email, rol, sucursal y, si querés, permisos por módulo
-            restringidos. La persona recibe un email para activar su cuenta y elegir su contraseña. Desde la lista
-            podés reenviar o revocar una invitación pendiente.
+            restringidos. La persona recibe un email para activar su cuenta y elegir su contraseña. Si el email no
+            llega (a veces cae en spam o el correo de prueba de staging no entrega), usá <em>Copiar enlace</em> y
+            mandáselo por WhatsApp. También podés reenviar o revocar una invitación pendiente.
           </li>
           <li>
             <strong>Permisos por módulo:</strong> cada rol trae sus permisos. Podés quitar permisos puntuales (por

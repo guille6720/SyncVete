@@ -13,6 +13,7 @@ import {
   type Role,
 } from '@sincvete/shared';
 import {
+  getManagedInvitationActivationLink,
   inviteManagedUser,
   resendManagedInvitation,
   revokeManagedInvitation,
@@ -82,10 +83,37 @@ export function ManagedUsersClient({
       setNotice({
         kind: 'ok',
         text: result.data?.emailSent
-          ? `Invitación reenviada a ${invitation.email}.`
-          : 'Invitación renovada, pero no se pudo enviar el email. Reintentá en unos minutos.',
+          ? `Invitación reenviada a ${invitation.email}. Si no llega, usá "Copiar enlace".`
+          : 'Invitación renovada, pero no se pudo enviar el email. Usá "Copiar enlace" y mandáselo por WhatsApp.',
       });
       router.refresh();
+    });
+  };
+
+  const copyLink = (invitation: ManagedInvitationRow) => {
+    setPendingInvite(invitation.id);
+    startTransition(async () => {
+      const result = await getManagedInvitationActivationLink(invitation.id);
+      setPendingInvite(null);
+      if (!result.success || !result.data?.link) {
+        setNotice({
+          kind: 'error',
+          text: result.error ?? 'No se pudo generar el enlace de activación',
+        });
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(result.data.link);
+        setNotice({
+          kind: 'ok',
+          text: `Enlace de activación copiado para ${result.data.email}. Pegalo en WhatsApp o email.`,
+        });
+      } catch {
+        setNotice({
+          kind: 'error',
+          text: 'Se generó el enlace, pero no se pudo copiar al portapapeles. Probá de nuevo.',
+        });
+      }
     });
   };
 
@@ -291,6 +319,14 @@ export function ManagedUsersClient({
                   </Button>
                   <Button
                     size="sm"
+                    variant="outline"
+                    disabled={pendingInvite === invitation.id || invitation.status === 'expired'}
+                    onClick={() => copyLink(invitation)}
+                  >
+                    Copiar enlace
+                  </Button>
+                  <Button
+                    size="sm"
                     variant="ghost"
                     disabled={pendingInvite === invitation.id}
                     onClick={() => setRevokeTarget(invitation)}
@@ -398,8 +434,8 @@ function AddUserDialog({
       reset();
       onDone(
         result.data?.emailSent
-          ? `Invitación enviada a ${sentTo}. Va a recibir un email para crear su contraseña.`
-          : `Invitación creada para ${sentTo}, pero no se pudo enviar el email. Usá "Reenviar".`
+          ? `Invitación enviada a ${sentTo}. Si no llega el email (revisá spam), usá "Copiar enlace".`
+          : `Invitación creada para ${sentTo}, pero no se pudo enviar el email. Usá "Copiar enlace".`
       );
     });
   };

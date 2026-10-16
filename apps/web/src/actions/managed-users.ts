@@ -429,6 +429,73 @@ export async function resendManagedInvitation(
   }
 }
 
+/**
+ * Builds an Auth activation link for a pending invitation so the admin can share it
+ * (WhatsApp/email) when the built-in Supabase mailer does not deliver.
+ */
+export async function getManagedInvitationActivationLink(
+  invitationId: string
+): Promise<ActionResult<{ link: string; email: string }>> {
+  try {
+    await requirePermission('users:manage');
+    if (!uuid.safeParse(invitationId).success) return { success: false, error: 'Invitación inválida' };
+
+    const supabase = await createServerClient();
+    const { data: inv, error } = await supabase
+      .from('organization_invitations')
+      .select('id, email, full_name, status')
+      .eq('id', invitationId)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) return fail(error, 'No se pudo leer la invitación');
+    if (!inv || inv.status !== 'pending') {
+      return { success: false, error: 'La invitación no está pendiente' };
+    }
+
+    const origin = getAppOrigin(await headers());
+    const redirectTo = `${origin}/actualizar-contrasena`;
+    const service = await createServiceClient();
+    const meta = inv.full_name ? { full_name: inv.full_name } : undefined;
+
+    const invite = await service.auth.admin.generateLink({
+      type: 'invite',
+      email: inv.email,
+      options: { redirectTo, data: meta },
+    });
+    let link = invite.data?.properties?.action_link ?? null;
+    let lastError = invite.error?.message ?? null;
+
+    if (!link) {
+      const magic = await service.auth.admin.generateLink({
+        type: 'magiclink',
+        email: inv.email,
+        options: { redirectTo, data: meta },
+      });
+      link = magic.data?.properties?.action_link ?? null;
+      lastError = magic.error?.message ?? lastError;
+    }
+
+    if (!link) {
+      const recovery = await service.auth.admin.generateLink({
+        type: 'recovery',
+        email: inv.email,
+        options: { redirectTo },
+      });
+      link = recovery.data?.properties?.action_link ?? null;
+      lastError = recovery.error?.message ?? lastError;
+    }
+
+    if (!link) {
+      console.error('[managed-users] activation link', lastError);
+      return { success: false, error: 'No se pudo generar el enlace de activación' };
+    }
+
+    return { success: true, data: { link, email: inv.email } };
+  } catch (error) {
+    return fail(error, 'No se pudo generar el enlace de activación');
+  }
+}
+
 export async function revokeManagedInvitation(invitationId: string): Promise<ActionResult> {
   try {
     await requirePermission('users:manage');
