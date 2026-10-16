@@ -62,10 +62,13 @@ export function RecoverySessionBootstrap() {
 
       const tokenHash = searchParams.get('token_hash');
       const type = searchParams.get('type');
-      if (tokenHash && type === 'recovery') {
+      if (
+        tokenHash &&
+        (type === 'recovery' || type === 'invite' || type === 'magiclink' || type === 'signup' || type === 'email')
+      ) {
         const { error } = await supabase.auth.verifyOtp({
           token_hash: tokenHash,
-          type: 'recovery',
+          type,
         });
         if (!error) {
           window.history.replaceState({}, '', window.location.pathname);

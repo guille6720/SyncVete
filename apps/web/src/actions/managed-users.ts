@@ -457,33 +457,58 @@ export async function getManagedInvitationActivationLink(
     const service = await createServiceClient();
     const meta = inv.full_name ? { full_name: inv.full_name } : undefined;
 
-    const invite = await service.auth.admin.generateLink({
-      type: 'invite',
-      email: inv.email,
-      options: { redirectTo, data: meta },
-    });
-    let link = invite.data?.properties?.action_link ?? null;
-    let lastError = invite.error?.message ?? null;
+    // Prefer an app-hosted link with token_hash so activation does not depend on
+    // Supabase Site URL (often still localhost on staging).
+    let link: string | null = null;
+    let lastError: string | null = null;
 
-    if (!link) {
-      const magic = await service.auth.admin.generateLink({
-        type: 'magiclink',
-        email: inv.email,
-        options: { redirectTo, data: meta },
-      });
-      link = magic.data?.properties?.action_link ?? null;
-      lastError = magic.error?.message ?? lastError;
-    }
+    const tryBuild = async (
+      generate: () => ReturnType<typeof service.auth.admin.generateLink>
+    ) => {
+      const attempt = await generate();
+      if (attempt.error) {
+        lastError = attempt.error.message;
+        return null;
+      }
+      const props = attempt.data?.properties;
+      const tokenHash = props?.hashed_token;
+      const verificationType = props?.verification_type;
+      if (tokenHash && verificationType) {
+        const params = new URLSearchParams({
+          token_hash: tokenHash,
+          type: verificationType,
+        });
+        return `${origin}/actualizar-contrasena?${params.toString()}`;
+      }
+      if (props?.action_link && !/[?&]redirect_to=https?%3A%2F%2Flocalhost/i.test(props.action_link) && !props.action_link.includes('://localhost')) {
+        return props.action_link;
+      }
+      lastError = 'Auth no devolvió un token de activación';
+      return null;
+    };
 
-    if (!link) {
-      const recovery = await service.auth.admin.generateLink({
-        type: 'recovery',
-        email: inv.email,
-        options: { redirectTo },
-      });
-      link = recovery.data?.properties?.action_link ?? null;
-      lastError = recovery.error?.message ?? lastError;
-    }
+    link =
+      (await tryBuild(() =>
+        service.auth.admin.generateLink({
+          type: 'invite',
+          email: inv.email,
+          options: { redirectTo, data: meta },
+        })
+      )) ??
+      (await tryBuild(() =>
+        service.auth.admin.generateLink({
+          type: 'magiclink',
+          email: inv.email,
+          options: { redirectTo, data: meta },
+        })
+      )) ??
+      (await tryBuild(() =>
+        service.auth.admin.generateLink({
+          type: 'recovery',
+          email: inv.email,
+          options: { redirectTo },
+        })
+      ));
 
     if (!link) {
       console.error('[managed-users] activation link', lastError);

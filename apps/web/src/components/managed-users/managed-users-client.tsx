@@ -90,7 +90,7 @@ export function ManagedUsersClient({
     });
   };
 
-  const copyLink = (invitation: ManagedInvitationRow) => {
+  const shareInvite = (invitation: ManagedInvitationRow, mode: 'copy' | 'whatsapp') => {
     setPendingInvite(invitation.id);
     startTransition(async () => {
       const result = await getManagedInvitationActivationLink(invitation.id);
@@ -102,16 +102,37 @@ export function ManagedUsersClient({
         });
         return;
       }
-      try {
-        await navigator.clipboard.writeText(result.data.link);
+
+      const link = result.data.link;
+      if (link.includes('localhost') || link.includes('127.0.0.1')) {
+        setNotice({
+          kind: 'error',
+          text: 'El enlace salió mal (apunta a localhost). Avisá para corregir la URL de Auth de staging.',
+        });
+        return;
+      }
+
+      const message = `Hola${invitation.fullName ? ` ${invitation.fullName}` : ''}, te invito a SyncVete. Abrí este enlace para crear tu contraseña y entrar:\n${link}`;
+
+      if (mode === 'whatsapp') {
+        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
         setNotice({
           kind: 'ok',
-          text: `Enlace de activación copiado para ${result.data.email}. Pegalo en WhatsApp o email.`,
+          text: `Se abrió WhatsApp con el enlace para ${result.data.email}.`,
+        });
+        return;
+      }
+
+      try {
+        await navigator.clipboard.writeText(link);
+        setNotice({
+          kind: 'ok',
+          text: `Enlace copiado para ${result.data.email}. Pegalo en WhatsApp o email.`,
         });
       } catch {
         setNotice({
           kind: 'error',
-          text: 'Se generó el enlace, pero no se pudo copiar al portapapeles. Probá de nuevo.',
+          text: 'Se generó el enlace, pero no se pudo copiar. Probá "WhatsApp".',
         });
       }
     });
@@ -321,9 +342,16 @@ export function ManagedUsersClient({
                     size="sm"
                     variant="outline"
                     disabled={pendingInvite === invitation.id || invitation.status === 'expired'}
-                    onClick={() => copyLink(invitation)}
+                    onClick={() => shareInvite(invitation, 'copy')}
                   >
                     Copiar enlace
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={pendingInvite === invitation.id || invitation.status === 'expired'}
+                    onClick={() => shareInvite(invitation, 'whatsapp')}
+                  >
+                    WhatsApp
                   </Button>
                   <Button
                     size="sm"
