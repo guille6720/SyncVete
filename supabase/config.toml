@@ -67,3 +67,41 @@ inspector_port = 8083
 
 [analytics]
 enabled = false
+
+[remotes.staging]
+project_id = "owmcrqvnfubyjxrlyhlc"
+
+[remotes.staging.auth]
+site_url = "https://sync-vete-staging-guillermo-c-bmw.vercel.app"
+additional_redirect_urls = [
+  "https://sync-vete-staging-guillermo-c-bmw.vercel.app/**",
+  "https://sync-vete-staging-*-guillermo-c-bmw.vercel.app/**",
+  "https://*-guillermo-c-bmw.vercel.app/**",
+  "http://localhost:3000/**",
+  "http://localhost:3000/auth/callback",
+  "http://localhost:3000/actualizar-contrasena"
+]
+minimum_password_length = 6
+
+[remotes.staging.db]
+major_version = 17
+
+[remotes.staging.auth.email]
+double_confirm_changes = false
+max_frequency = "1m0s"
+otp_length = 8
+
+[remotes.staging.db.pooler]
+default_pool_size = 15
+max_client_conn = 200
+
+[remotes.staging.storage.analytics]
+enabled = true
+max_namespaces = 10
+
+[remotes.staging.storage.image_transformation]
+enabled = true
+
+[remotes.staging.auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
