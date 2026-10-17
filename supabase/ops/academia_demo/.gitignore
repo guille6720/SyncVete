@@ -1,0 +1,7 @@
+# Local secrets from Auth Admin provisioning — never commit
+credentials.local.json
+*.local.json
+dry_run_work/
+schema_dump*.sql
+_bundle_*.sql
+credentials.example.json
