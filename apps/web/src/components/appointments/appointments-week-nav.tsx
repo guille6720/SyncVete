@@ -5,7 +5,14 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatDateParam, formatDayLabel, formatWeekdayLabel, getWeekDays, getWeekStartDate } from '@sincvete/shared';
+import {
+  TOUR_TARGETS,
+  formatDateParam,
+  formatDayLabel,
+  formatWeekdayLabel,
+  getWeekDays,
+  getWeekStartDate,
+} from '@sincvete/shared';
 
 interface AppointmentsWeekNavProps {
   weekStart: string;
@@ -46,22 +53,34 @@ export function AppointmentsWeekNav({
   const nextWeek = shiftWeek(weekStart, 1);
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" data-tour={TOUR_TARGETS.AGENDA_WEEK_NAV}>
       <div className="flex items-center justify-between">
         <Button variant="outline" size="sm" asChild>
-          <Link href={agendaHref(pathname, searchParams, selectedDate, prevWeek)} prefetch>
+          <Link
+            href={agendaHref(pathname, searchParams, selectedDate, prevWeek)}
+            prefetch
+            aria-label="Anterior"
+          >
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" asChild>
-            <Link href={agendaHref(pathname, searchParams, today, getWeekStartDate(today))} prefetch>
+            <Link
+              href={agendaHref(pathname, searchParams, today, getWeekStartDate(today))}
+              prefetch
+              data-tour={TOUR_TARGETS.AGENDA_WEEK_NAV_TODAY}
+            >
               Hoy
             </Link>
           </Button>
         </div>
         <Button variant="outline" size="sm" asChild>
-          <Link href={agendaHref(pathname, searchParams, selectedDate, nextWeek)} prefetch>
+          <Link
+            href={agendaHref(pathname, searchParams, selectedDate, nextWeek)}
+            prefetch
+            aria-label="Siguiente"
+          >
             <ChevronRight className="h-4 w-4" />
           </Link>
         </Button>

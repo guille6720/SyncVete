@@ -4,7 +4,9 @@ import { countUnreadNotifications } from '@/actions/notifications';
 import { getUserBranches } from '@/actions/settings';
 import { AppShell } from '@/components/layout/app-shell';
 import { EntitlementRouteGate } from '@/components/entitlements/entitlement-route-gate';
+import { ClinicTutorialShell } from '@/components/tutorials/clinic-tutorial-shell';
 import { getClinicCommercialShell } from '@/lib/entitlements';
+import { isAcademiaEnabled } from '@/lib/tutorials/feature-flag';
 
 export default async function ClinicLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionContext();
@@ -30,6 +32,8 @@ export default async function ClinicLayout({ children }: { children: React.React
     branches.find((b) => b.is_main)?.name ??
     branches[0]?.name;
 
+  const academiaEnabled = isAcademiaEnabled();
+
   return (
     <AppShell
       userName={session.profile.full_name}
@@ -41,8 +45,16 @@ export default async function ClinicLayout({ children }: { children: React.React
       isPlatformAdmin={session.isPlatformAdmin}
       entitledHrefs={commercial.entitledHrefs}
       billingBanner={commercial.banner}
+      academiaEnabled={academiaEnabled}
     >
-      <EntitlementRouteGate entitledHrefs={commercial.entitledHrefs}>{children}</EntitlementRouteGate>
+      <ClinicTutorialShell
+        enabled={academiaEnabled}
+        organizationId={session.organizationId}
+        userId={session.userId}
+        permissions={session.permissions}
+      >
+        <EntitlementRouteGate entitledHrefs={commercial.entitledHrefs}>{children}</EntitlementRouteGate>
+      </ClinicTutorialShell>
     </AppShell>
   );
 }

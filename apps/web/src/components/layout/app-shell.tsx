@@ -30,6 +30,7 @@ import {
   ScrollText,
   Shield,
   Hourglass,
+  GraduationCap,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { signOut } from '@/actions/auth';
@@ -68,6 +69,7 @@ const NAV_ITEMS = [
   { label: 'Recordatorios', href: '/recordatorios', icon: Bell },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox },
   { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles },
+  { label: 'Academia', href: '/academia', icon: GraduationCap },
   { label: 'Configuración', href: '/configuracion', icon: Settings },
 ] as const;
 
@@ -103,6 +105,8 @@ interface AppShellProps {
   isPlatformAdmin?: boolean;
   entitledHrefs?: string[] | null;
   billingBanner?: ClinicCommercialBanner | null;
+  /** When false, Academia nav entry is hidden (feature flag). */
+  academiaEnabled?: boolean;
 }
 
 export function AppShell({
@@ -116,6 +120,7 @@ export function AppShell({
   isPlatformAdmin = false,
   entitledHrefs = null,
   billingBanner = null,
+  academiaEnabled = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -146,7 +151,11 @@ export function AppShell({
   return (
     <div className="flex min-h-dvh" style={{ background: 'var(--shell-bg)' }}>
       <AppUpdateBanner />
-      <CommandPalette entitledHrefs={entitledHrefs} isPlatformAdmin={isPlatformAdmin} />
+      <CommandPalette
+        entitledHrefs={entitledHrefs}
+        isPlatformAdmin={isPlatformAdmin}
+        academiaEnabled={academiaEnabled}
+      />
 
       {pendingHref ? (
         <div
@@ -231,7 +240,11 @@ export function AppShell({
         )}
 
         <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-          {NAV_ITEMS.filter((item) => isClinicPathEntitled(item.href, entitledHrefs)).map((item) => {
+          {NAV_ITEMS.filter(
+            (item) =>
+              (item.href !== '/academia' || academiaEnabled) &&
+              isClinicPathEntitled(item.href, entitledHrefs)
+          ).map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             const isPending = pendingHref === item.href;
             return (

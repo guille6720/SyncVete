@@ -28,6 +28,7 @@ import {
   Inbox,
   ScrollText,
   Hourglass,
+  GraduationCap,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, useTransition } from 'react';
@@ -62,6 +63,12 @@ const NAV_ITEMS = [
   { label: 'Recordatorios', href: '/recordatorios', icon: Bell, keywords: 'avisos turnos vacunas saldos' },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, keywords: 'avisos campana inbox laboratorio stock' },
   { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles, keywords: 'inteligencia artificial resumen soap tutor' },
+  {
+    label: 'Academia',
+    href: '/academia',
+    icon: GraduationCap,
+    keywords: 'tutorial aprendizaje guia onboarding academia',
+  },
   { label: 'Configuración', href: '/configuracion', icon: Settings, keywords: 'ajustes settings' },
   { label: 'Manual de uso', href: '/manual', icon: BookOpen, keywords: 'ayuda guia descargar pdf instrucciones' },
 ] as const;
@@ -106,9 +113,11 @@ const PREFETCH_ON_OPEN = [
 export function CommandPalette({
   entitledHrefs = null,
   isPlatformAdmin = false,
+  academiaEnabled = false,
 }: {
   entitledHrefs?: string[] | null;
   isPlatformAdmin?: boolean;
+  academiaEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -173,7 +182,11 @@ export function CommandPalette({
             </Command.Empty>
 
             <Command.Group heading="Navegación" className="px-1 py-1.5 text-xs font-medium text-muted-foreground">
-              {NAV_ITEMS.filter((item) => isClinicPathEntitled(item.href, entitledHrefs)).map((item) => (
+              {NAV_ITEMS.filter(
+                (item) =>
+                  (item.href !== '/academia' || academiaEnabled) &&
+                  isClinicPathEntitled(item.href, entitledHrefs)
+              ).map((item) => (
                 <Command.Item
                   key={item.href}
                   value={`${item.label} ${item.keywords}`}

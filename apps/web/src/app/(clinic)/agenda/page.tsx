@@ -3,9 +3,12 @@ import { Suspense } from 'react';
 import { listAppointments, getAssignableStaff } from '@/actions/appointments';
 import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import { AppointmentsAgenda } from '@/components/appointments/appointments-agenda';
+import { AgendaTutorialHeader } from '@/components/tutorials/agenda-tutorial-header';
 import { getSessionContext } from '@/lib/session';
+import { isAcademiaEnabled } from '@/lib/tutorials/feature-flag';
 import {
   APPOINTMENT_STATUSES,
+  TOUR_TARGETS,
   getWeekStartDate,
   mapWaitingRoomByAppointmentId,
   parseDateParam,
@@ -48,10 +51,16 @@ export default async function AgendaPage({ searchParams }: AgendaPageProps) {
       : undefined;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Agenda</h1>
-        <p className="text-muted-foreground">Calendario semanal de citas</p>
+    <div className="space-y-6" data-tour={TOUR_TARGETS.AGENDA_ROOT}>
+      <div
+        className="flex flex-wrap items-start justify-between gap-3"
+        data-tour={TOUR_TARGETS.AGENDA_HEADER}
+      >
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Agenda</h1>
+          <p className="text-muted-foreground">Calendario semanal de citas</p>
+        </div>
+        {isAcademiaEnabled() ? <AgendaTutorialHeader /> : null}
       </div>
 
       <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>

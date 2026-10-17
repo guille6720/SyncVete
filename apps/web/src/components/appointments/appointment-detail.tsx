@@ -18,6 +18,7 @@ import {
   APPOINTMENT_TYPE_LABELS,
   WAITING_ROOM_STATUS_LABELS,
   WAITING_ROOM_STATUS_VARIANT,
+  TOUR_TARGETS,
   formatAppointmentDateTime,
   SPECIES_EMOJI,
   buildWhatsAppComposePath,
@@ -116,7 +117,7 @@ export function AppointmentDetail({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour={TOUR_TARGETS.AGENDA_DETAIL}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/agenda">
@@ -124,7 +125,7 @@ export function AppointmentDetail({
             Volver
           </Link>
         </Button>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2" data-tour={TOUR_TARGETS.AGENDA_DETAIL_ACTIONS}>
           {canSendWhatsApp && (
             <Button variant="outline" size="sm" asChild>
               <Link
@@ -222,7 +223,7 @@ export function AppointmentDetail({
 
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2" data-tour={TOUR_TARGETS.AGENDA_DETAIL_STATUS}>
             <CardTitle>{appointment.title || APPOINTMENT_TYPE_LABELS[appointment.appointment_type]}</CardTitle>
             <Badge variant={APPOINTMENT_STATUS_VARIANT[appointment.status]}>
               {APPOINTMENT_STATUS_LABELS[appointment.status]}

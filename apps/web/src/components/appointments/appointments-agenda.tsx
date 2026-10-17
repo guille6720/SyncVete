@@ -13,6 +13,7 @@ import {
   WAITING_ROOM_STATUS_LABELS,
   WAITING_ROOM_STATUS_VARIANT,
   APPOINTMENT_TYPE_LABELS,
+  TOUR_TARGETS,
   formatAppointmentTime,
   formatDayLabel,
   formatDateParam,
@@ -77,6 +78,8 @@ export function AppointmentsAgenda({
             value={initialStatus}
             onChange={(e) => updateFilter('status', e.target.value)}
             className="w-full sm:w-44"
+            aria-label="Filtrar por estado"
+            data-tour={TOUR_TARGETS.AGENDA_FILTER_STATUS}
           >
             <option value="">Todos los estados</option>
             {APPOINTMENT_STATUSES.map((status) => (
@@ -89,6 +92,8 @@ export function AppointmentsAgenda({
             value={initialAssignedUserId}
             onChange={(e) => updateFilter('assigned', e.target.value)}
             className="w-full sm:w-48"
+            aria-label="Filtrar por profesional"
+            data-tour={TOUR_TARGETS.AGENDA_FILTER_PROFESSIONAL}
           >
             <option value="">Todos los profesionales</option>
             {staff.map((member) => (
@@ -100,7 +105,10 @@ export function AppointmentsAgenda({
         </div>
         {canWrite && (
           <Button asChild>
-            <Link href={`/agenda/nueva?date=${selectedDate}`}>
+            <Link
+              href={`/agenda/nueva?date=${selectedDate}`}
+              data-tour={TOUR_TARGETS.AGENDA_NEW_BUTTON}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Nueva cita
             </Link>
@@ -114,7 +122,7 @@ export function AppointmentsAgenda({
         countsByDay={countsByDay}
       />
 
-      <div className="space-y-3">
+      <div className="space-y-3" data-tour={TOUR_TARGETS.AGENDA_DAY_LIST}>
         <h2 className="text-lg font-semibold">{formatDayLabel(selectedDate)}</h2>
 
         {dayAppointments.length === 0 ? (

@@ -1,0 +1,35 @@
+1
+00:00:00,000 --> 00:00:03,000
+SyncVete
+
+2
+00:00:03,000 --> 00:00:11,000
+Agenda SyncVete — primeros pasos
+
+3
+00:00:11,000 --> 00:00:23,000
+Lista de turnos del día
+
+4
+00:00:23,000 --> 00:00:35,000
+Navegá la semana y volvé a Hoy
+
+5
+00:00:35,000 --> 00:00:45,000
+Filtros por estado y profesional
+
+6
+00:00:45,000 --> 00:01:03,000
+Creá un turno paso a paso
+
+7
+00:01:03,000 --> 00:01:17,000
+Gestioná el estado del turno
+
+8
+00:01:17,000 --> 00:01:25,000
+Academia SyncVete
+
+9
+00:01:25,000 --> 00:01:28,000
+Gracias

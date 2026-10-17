@@ -17,6 +17,7 @@ import {
   APPOINTMENT_TYPES,
   APPOINTMENT_TYPE_LABELS,
   DEFAULT_APPOINTMENT_DURATION_MINUTES,
+  TOUR_TARGETS,
   getDurationMinutes,
   toLocalDateTimeInput,
   type AppointmentListRow,
@@ -61,21 +62,23 @@ export function AppointmentForm({
       : defaultStartsAt ?? toLocalDateTimeInput(new Date().toISOString());
 
   return (
-    <Card>
+    <Card data-tour={TOUR_TARGETS.AGENDA_FORM}>
       <CardHeader>
         <CardTitle>{appointment ? 'Editar cita' : 'Nueva cita'}</CardTitle>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid max-w-2xl gap-4">
-          <PatientPicker
-            defaultPatientId={appointment?.patient_id ?? defaultPatientId}
-            defaultPatientName={appointment?.patient_name ?? defaultPatientName}
-            defaultOwnerId={appointment?.owner_id ?? defaultOwnerId}
-            defaultOwnerName={appointment?.owner_full_name ?? defaultOwnerName}
-            error={state?.fieldErrors?.patientId?.[0] ?? state?.fieldErrors?.ownerId?.[0]}
-          />
+          <div data-tour={TOUR_TARGETS.AGENDA_FORM_PATIENT}>
+            <PatientPicker
+              defaultPatientId={appointment?.patient_id ?? defaultPatientId}
+              defaultPatientName={appointment?.patient_name ?? defaultPatientName}
+              defaultOwnerId={appointment?.owner_id ?? defaultOwnerId}
+              defaultOwnerName={appointment?.owner_full_name ?? defaultOwnerName}
+              error={state?.fieldErrors?.patientId?.[0] ?? state?.fieldErrors?.ownerId?.[0]}
+            />
+          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2" data-tour={TOUR_TARGETS.AGENDA_FORM_SCHEDULE}>
             <div className="space-y-2">
               <Label htmlFor="startsAt">Fecha y hora *</Label>
               <Input
