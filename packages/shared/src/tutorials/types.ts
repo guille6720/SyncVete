@@ -46,6 +46,16 @@ export interface TutorialStep {
   validation?: TutorialValidation;
   demoSceneId?: string;
   videoSceneId?: string;
+  /**
+   * When true, resolve `/agenda/:id` only from an authorized Academia Demo
+   * appointment in the current organization. Never uses arbitrary clinic IDs.
+   */
+  requiresDemoAppointment?: boolean;
+  /**
+   * If the demo appointment is unavailable, keep the tour on a safe route and
+   * show a labeled non-persistent demonstration panel instead of navigating.
+   */
+  allowDemoFallback?: boolean;
   /** Narration / caption overrides for this step when producing video. */
   narration?: string;
   caption?: string;

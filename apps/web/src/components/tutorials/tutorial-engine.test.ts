@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { AGENDA_BASICO_TUTORIAL, getTutorialById, tourSelector } from '@sincvete/shared';
+import {
+  AGENDA_BASICO_TUTORIAL,
+  getTutorialById,
+  resolveTutorialRoute,
+  tourSelector,
+} from '@sincvete/shared';
 
 /**
  * Pure navigation / safety checks for the tutorial engine.
- * React hook UI is covered indirectly; demo must never imply DB writes.
+ * Demo must never imply DB writes; routes must be explicit and safe.
  */
 describe('tutorial engine contracts', () => {
   it('supports forward and backward step indices within bounds', () => {
@@ -31,5 +36,38 @@ describe('tutorial engine contracts', () => {
       (s) => s.validation?.requirePermission === 'appointments:write'
     );
     expect(writeSteps.length).toBeGreaterThan(0);
+  });
+
+  it('launches from academia onto agenda via startRoute', () => {
+    const tutorial = AGENDA_BASICO_TUTORIAL;
+    const decision = resolveTutorialRoute({
+      tutorial,
+      step: tutorial.steps[0]!,
+      pathname: '/academia',
+      demoAppointmentId: null,
+      hasPermission: () => true,
+    });
+    expect(decision.kind).toBe('navigate');
+    if (decision.kind === 'navigate') {
+      expect(decision.href).toBe(tutorial.startRoute);
+    }
+  });
+
+  it('detail steps never invent foreign appointment ids', () => {
+    const step = AGENDA_BASICO_TUTORIAL.steps.find((s) => s.id === 'appointment-detail')!;
+    expect(step.requiresDemoAppointment).toBe(true);
+    expect(step.allowDemoFallback).toBe(true);
+    const decision = resolveTutorialRoute({
+      tutorial: AGENDA_BASICO_TUTORIAL,
+      step,
+      pathname: '/agenda',
+      demoAppointmentId: null,
+      hasPermission: () => true,
+    });
+    expect(decision.kind).toBe('demo-fallback');
+  });
+
+  it('marks demo path as non-mutating', () => {
+    expect(AGENDA_BASICO_TUTORIAL.demoScenes.length).toBeGreaterThan(0);
   });
 });

@@ -10,10 +10,10 @@ import {
 } from '../tutorials';
 
 describe('tutorial registry', () => {
-  it('registers agenda-basico v1', () => {
+  it('registers agenda-basico v2', () => {
     const tutorial = getTutorialById('agenda-basico');
     expect(tutorial).not.toBeNull();
-    expect(tutorial?.version).toBe(1);
+    expect(tutorial?.version).toBe(2);
     expect(tutorial?.moduleId).toBe('agenda');
     expect(tutorial?.steps.length).toBeGreaterThanOrEqual(8);
   });
@@ -28,7 +28,7 @@ describe('tutorial registry', () => {
     const cards = buildAcademyCards('admin', {
       'agenda-basico': {
         tutorialId: 'agenda-basico',
-        tutorialVersion: 1,
+        tutorialVersion: 2,
         currentStepIndex: 2,
         status: 'in_progress',
         startedAt: '2026-10-17T00:00:00.000Z',

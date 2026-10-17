@@ -1,6 +1,6 @@
 # Narración — Agenda SyncVete (es-AR)
 
-**Tutorial:** `agenda-basico` v1  
+**Tutorial:** `agenda-basico` v2  
 **Duración estimada del video:** ~82 segundos de escenas + intro/outro  
 **Nota:** Este documento es el guion de producción. **No se generó un archivo MP4** en este entregable.
 
