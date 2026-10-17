@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/server';
 import { getSessionContext } from '@/lib/session';
 
 const DEMO_ORG_NAME_PATTERN = 'Academia Demo%';
@@ -15,7 +15,7 @@ export async function getAcademiaDemoAppointmentId(): Promise<string | null> {
     return null;
   }
 
-  const supabase = await createClient();
+  const supabase = await createServerClient();
   const { data: org, error: orgError } = await supabase
     .from('organizations')
     .select('id, name')
