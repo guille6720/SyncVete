@@ -31,7 +31,8 @@ Endurecimiento recomendado post-apply:
 ```sql
 REVOKE ALL ON FUNCTION public.upsert_tutorial_progress(TEXT, INT, INT, TEXT) FROM PUBLIC, anon;
 REVOKE ALL ON FUNCTION public.get_my_tutorial_progress(TEXT) FROM PUBLIC, anon;
-REVOKE ALL ON FUNCTION public.tutorial_progress_org_id() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.tutorial_progress_authorized_org_id() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.tutorial_progress_authorized_org_id() TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.upsert_tutorial_progress(TEXT, INT, INT, TEXT) TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.get_my_tutorial_progress(TEXT) TO authenticated, service_role;
 ```
@@ -42,7 +43,7 @@ GRANT EXECUTE ON FUNCTION public.get_my_tutorial_progress(TEXT) TO authenticated
 BEGIN;
 DROP FUNCTION IF EXISTS public.get_my_tutorial_progress(TEXT);
 DROP FUNCTION IF EXISTS public.upsert_tutorial_progress(TEXT, INT, INT, TEXT);
-DROP FUNCTION IF EXISTS public.tutorial_progress_org_id();
+DROP FUNCTION IF EXISTS public.tutorial_progress_authorized_org_id();
 DROP TABLE IF EXISTS public.tutorial_progress;
 COMMIT;
 NOTIFY pgrst, 'reload schema';
