@@ -4,24 +4,14 @@
   Create Academia Demo QA users via Supabase Auth Admin API (staging only).
 
 .DESCRIPTION
-  - Never inserts into auth.users directly.
-  - Uses non-deliverable @academia-demo.invalid emails.
-  - email_confirm=true so password login works without invitation email.
-  - Passwords written only to credentials.local.json (gitignored); never logged.
-  - Existing accounts: REJECTED unless they are already Academia Demo QA accounts.
-  - Password reset of an existing account requires -AllowPasswordReset explicitly.
-  - Refuses accounts that already have a profile in another organization.
-  - DO NOT RUN until explicitly authorized for staging owmcrqvnfubyjxrlyhlc.
-
-.PARAMETER Execute
-  Call the Admin API. Without this flag, prints the plan only.
-
-.PARAMETER AllowPasswordReset
-  Required to rotate password on an EXISTING academia-demo QA account.
-  Never set casually; default is refuse password mutation on existing users.
-
-.PARAMETER ProjectUrl / ServiceRoleKey
-  From env SYNC_STAGING_*; never printed.
+  Phase 5C.2 — strict ownership:
+  - Reserved @academia-demo.invalid email alone does NOT authorize reuse.
+  - Existing accounts require app_metadata.academia_demo=true AND
+    app_metadata.academia_demo_managed_by='syncvete_ops' (admin-controlled).
+  - Paginates all Auth Admin users.
+  - Full preflight before any create.
+  - Credentials persisted atomically after each successful create.
+  - Password reset of existing QA requires -AllowPasswordReset.
 #>
 param(
   [switch]$Execute,
@@ -33,13 +23,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $credPath = Join-Path $here 'credentials.local.json'
+$credTmp = Join-Path $here ('credentials.local.{0}.tmp.json' -f [guid]::NewGuid().ToString('N'))
 
 $expectedRef = 'owmcrqvnfubyjxrlyhlc'
 $prodRef = 'lhdksiptpsubktikdses'
 $demoOrgId = 'a0a0a0a0-d0e0-4000-8000-000000000001'
+$managedBy = 'syncvete_ops'
 
 function Write-SafeHost([string]$Message) {
-  # Never echo service role key or passwords if accidentally interpolated
   $safe = $Message
   if ($ServiceRoleKey) { $safe = $safe.Replace($ServiceRoleKey, '[REDACTED_SERVICE_ROLE]') }
   Write-Host $safe
@@ -48,15 +39,19 @@ function Write-SafeHost([string]$Message) {
 function Set-PrivateFileAcl([string]$Path) {
   if (-not (Test-Path $Path)) { return }
   try {
-    if ($IsWindows -or $env:OS -like '*Windows*') {
-      icacls $Path /inheritance:r | Out-Null
-      icacls $Path /grant:r "${env:USERNAME}:(R,W)" | Out-Null
-    } else {
-      chmod 600 $Path 2>$null
-    }
+    icacls $Path /inheritance:r | Out-Null
+    icacls $Path /grant:r "${env:USERNAME}:(R,W)" | Out-Null
   } catch {
-    Write-SafeHost "WARN: could not tighten ACL on credentials file (continue)"
+    Write-SafeHost 'WARN: could not tighten ACL on credentials file'
   }
+}
+
+function Save-CredentialsAtomic([object]$Payload) {
+  $json = $Payload | ConvertTo-Json -Depth 6
+  Set-Content -Path $credTmp -Value $json -Encoding utf8
+  Set-PrivateFileAcl -Path $credTmp
+  Move-Item -LiteralPath $credTmp -Destination $credPath -Force
+  Set-PrivateFileAcl -Path $credPath
 }
 
 if (-not $ProjectUrl) { throw 'Abort: set SYNC_STAGING_SUPABASE_URL' }
@@ -78,16 +73,39 @@ function New-SecurePassword {
   return [Convert]::ToBase64String($bytes).TrimEnd('=')
 }
 
-function Test-IsAcademiaDemoAuthUser($userObj) {
+function Test-IsTrustedDemoAccount($userObj) {
   if (-not $userObj) { return $false }
   $email = [string]$userObj.email
   if ($email -notlike '*@academia-demo.invalid') { return $false }
-  $appMeta = $userObj.app_metadata
-  if ($appMeta -and ($appMeta.academia_demo -eq $true -or $appMeta.academia_demo -eq 'true')) {
-    return $true
+  $app = $userObj.app_metadata
+  if (-not $app) { return $false }
+  $demoFlag = ($app.academia_demo -eq $true -or $app.academia_demo -eq 'true')
+  $by = [string]$app.academia_demo_managed_by
+  return ($demoFlag -and $by -eq $managedBy)
+}
+
+function Get-AllAuthUsers {
+  $hdr = @{
+    apikey        = $ServiceRoleKey
+    Authorization = "Bearer $ServiceRoleKey"
+    Accept        = 'application/json'
   }
-  # Brand-new reserved email without metadata yet: treat as eligible only if no profile elsewhere
-  return $true
+  $all = @()
+  $page = 1
+  $perPage = 200
+  while ($true) {
+    $uri = "$ProjectUrl/auth/v1/admin/users?page=$page&per_page=$perPage"
+    $listed = Invoke-RestMethod -Method GET -Uri $uri -Headers $hdr
+    $batch = @()
+    if ($listed.users) { $batch = @($listed.users) }
+    elseif ($listed -is [System.Array]) { $batch = @($listed) }
+    if ($batch.Count -eq 0) { break }
+    $all += $batch
+    if ($batch.Count -lt $perPage) { break }
+    $page++
+    if ($page -gt 50) { throw 'Abort: Auth user pagination exceeded safety limit' }
+  }
+  return $all
 }
 
 function Get-ProfileOrgId([string]$UserId) {
@@ -98,21 +116,24 @@ function Get-ProfileOrgId([string]$UserId) {
     Accept        = 'application/json'
   }
   $rows = Invoke-RestMethod -Method GET -Uri $uri -Headers $hdr
-  if (-not $rows -or $rows.Count -eq 0) { return $null }
-  $active = $rows | Where-Object { -not $_.deleted_at } | Select-Object -First 1
+  if (-not $rows -or @($rows).Count -eq 0) { return $null }
+  $active = @($rows) | Where-Object { -not $_.deleted_at } | Select-Object -First 1
   if (-not $active) { return $null }
   return [string]$active.organization_id
+}
+
+function Find-UserByEmail($allUsers, [string]$Email) {
+  return @($allUsers) | Where-Object { $_.email -eq $Email } | Select-Object -First 1
 }
 
 Write-SafeHost "Academia Demo Auth plan — project $expectedRef"
 Write-SafeHost "Mode: $(if ($Execute) { 'EXECUTE' } else { 'PREPARE (no API writes)' })"
 Write-SafeHost "AllowPasswordReset: $AllowPasswordReset"
-Write-SafeHost 'Users to ensure:'
+Write-SafeHost "Trusted managed_by marker: $managedBy"
 foreach ($u in $users) { Write-SafeHost "  - $($u.email) ($($u.role))" }
 
 if (-not $Execute) {
   Write-SafeHost 'Re-run with -Execute after explicit authorization.'
-  Write-SafeHost "Credentials would be written to: $credPath (gitignored)"
   exit 0
 }
 
@@ -130,103 +151,119 @@ if (Test-Path $credPath) {
   } catch { }
 }
 
-$resultUsers = @()
+# -------- PREFLIGHT (no writes) --------
+Write-SafeHost 'Preflight: listing Auth users (all pages)...'
+$allUsers = Get-AllAuthUsers
+$plan = @()
 
 foreach ($u in $users) {
-  $listUri = "$ProjectUrl/auth/v1/admin/users?page=1&per_page=200"
-  $listed = Invoke-RestMethod -Method GET -Uri $listUri -Headers $headers
-  $found = $null
-  if ($listed.users) {
-    $found = $listed.users | Where-Object { $_.email -eq $u.email } | Select-Object -First 1
-  }
-
+  $found = Find-UserByEmail $allUsers $u.email
   if ($found) {
-    if (-not (Test-IsAcademiaDemoAuthUser $found)) {
-      throw "Abort: conflicting Auth account exists for $($u.email) and is not an Academia Demo QA account"
+    if (-not (Test-IsTrustedDemoAccount $found)) {
+      throw "Abort PREFLIGHT: existing account $($u.email) lacks trusted app_metadata (academia_demo + managed_by=$managedBy). Reserved email alone is insufficient."
     }
-
     $profileOrg = Get-ProfileOrgId -UserId ([string]$found.id)
     if ($profileOrg -and $profileOrg -ne $demoOrgId) {
-      throw "Abort: $($u.email) already has profile in organization $profileOrg (not demo org)"
+      throw "Abort PREFLIGHT: $($u.email) profile bound to foreign org $profileOrg"
     }
+    $plan += [pscustomobject]@{ email = $u.email; action = 'reuse'; id = [string]$found.id; role = $u.role; full_name = $u.full_name }
+  } else {
+    $plan += [pscustomobject]@{ email = $u.email; action = 'create'; id = $null; role = $u.role; full_name = $u.full_name }
+  }
+}
 
-    # Existing account: never reset password unless explicitly authorized
-    if ($AllowPasswordReset) {
-      $password = if ($existingCreds.ContainsKey($u.email) -and $existingCreds[$u.email].password) {
-        [string]$existingCreds[$u.email].password
+Write-SafeHost 'Preflight OK. Planned actions:'
+foreach ($p in $plan) { Write-SafeHost "  $($p.action) $($p.email)" }
+
+$resultUsers = @()
+if ($existingCreds.Count -gt 0) {
+  foreach ($k in $existingCreds.Keys) {
+    # Preserve prior entries for emails not in this run
+  }
+}
+
+foreach ($p in $plan) {
+  $password = $null
+  $userId = $null
+
+  try {
+    if ($p.action -eq 'reuse') {
+      $userId = $p.id
+      if ($AllowPasswordReset) {
+        $password = if ($existingCreds.ContainsKey($p.email) -and $existingCreds[$p.email].password) {
+          [string]$existingCreds[$p.email].password
+        } else { New-SecurePassword }
+        $body = @{
+          password      = $password
+          email_confirm = $true
+          app_metadata  = @{
+            academia_demo            = $true
+            academia_demo_managed_by = $managedBy
+            demo_role                = $p.role
+          }
+          user_metadata = @{
+            academia_demo = $true
+            full_name     = $p.full_name
+            demo_role     = $p.role
+          }
+        } | ConvertTo-Json -Depth 5
+        $upd = Invoke-RestMethod -Method PUT -Uri "$ProjectUrl/auth/v1/admin/users/$userId" -Headers $headers -Body $body
+        $userId = $upd.id
+        Write-SafeHost "Reused trusted QA user with password rotation: $($p.email)"
       } else {
-        New-SecurePassword
+        $password = if ($existingCreds.ContainsKey($p.email) -and $existingCreds[$p.email].password) {
+          [string]$existingCreds[$p.email].password
+        } else { $null }
+        Write-SafeHost "Reused trusted QA user (no password change): $($p.email)"
       }
+    } else {
+      $password = New-SecurePassword
       $body = @{
+        email         = $p.email
         password      = $password
         email_confirm = $true
-        app_metadata  = @{ academia_demo = $true; demo_role = $u.role }
         user_metadata = @{
           academia_demo = $true
-          full_name     = $u.full_name
-          demo_role     = $u.role
+          full_name     = $p.full_name
+          demo_role     = $p.role
+        }
+        app_metadata  = @{
+          academia_demo            = $true
+          academia_demo_managed_by = $managedBy
+          demo_role                = $p.role
         }
       } | ConvertTo-Json -Depth 5
-      $upd = Invoke-RestMethod -Method PUT -Uri "$ProjectUrl/auth/v1/admin/users/$($found.id)" -Headers $headers -Body $body
-      $userId = $upd.id
-      Write-SafeHost "Updated existing Academia Demo QA user (password rotated): $($u.email)"
-    } else {
-      # Metadata-only reinforce; no password field
-      $body = @{
-        email_confirm = $true
-        app_metadata  = @{ academia_demo = $true; demo_role = $u.role }
-        user_metadata = @{
-          academia_demo = $true
-          full_name     = $u.full_name
-          demo_role     = $u.role
-        }
-      } | ConvertTo-Json -Depth 5
-      $upd = Invoke-RestMethod -Method PUT -Uri "$ProjectUrl/auth/v1/admin/users/$($found.id)" -Headers $headers -Body $body
-      $userId = $upd.id
-      $password = if ($existingCreds.ContainsKey($u.email) -and $existingCreds[$u.email].password) {
-        [string]$existingCreds[$u.email].password
-      } else {
-        $null
-      }
-      Write-SafeHost "Existing Academia Demo QA user kept (no password reset): $($u.email)"
-      if (-not $password) {
-        Write-SafeHost "WARN: no local password on file for $($u.email); use -AllowPasswordReset if login credentials must be issued"
-      }
+      $created = Invoke-RestMethod -Method POST -Uri "$ProjectUrl/auth/v1/admin/users" -Headers $headers -Body $body
+      $userId = $created.id
+      Write-SafeHost "Created QA user: $($p.email)"
     }
-  } else {
-    $password = New-SecurePassword
-    $body = @{
-      email         = $u.email
-      password      = $password
-      email_confirm = $true
-      user_metadata = @{
-        academia_demo = $true
-        full_name     = $u.full_name
-        demo_role     = $u.role
-      }
-      app_metadata  = @{ academia_demo = $true; demo_role = $u.role }
-    } | ConvertTo-Json -Depth 5
-    $created = Invoke-RestMethod -Method POST -Uri "$ProjectUrl/auth/v1/admin/users" -Headers $headers -Body $body
-    $userId = $created.id
-    Write-SafeHost "Created QA user: $($u.email)"
-  }
 
-  $resultUsers += [pscustomobject]@{
-    email     = $u.email
-    role      = $u.role
-    full_name = $u.full_name
-    id        = $userId
-    password  = $password
+    $entry = [pscustomobject]@{
+      email     = $p.email
+      role      = $p.role
+      full_name = $p.full_name
+      id        = $userId
+      password  = $password
+      action    = $p.action
+    }
+    $resultUsers += $entry
+
+    # Merge into credential map and persist after EACH success (recoverable)
+    $existingCreds[$p.email] = $entry
+    $payload = [pscustomobject]@{
+      project_ref = $expectedRef
+      updated_at  = (Get-Date).ToUniversalTime().ToString('o')
+      warning     = 'LOCAL SECRET — do not commit, log, or paste into tickets'
+      managed_by  = $managedBy
+      users       = @($existingCreds.Values)
+    }
+    Save-CredentialsAtomic -Payload $payload
+  } catch {
+    Write-SafeHost "ERROR on $($p.email): $($_.Exception.Message)"
+    Write-SafeHost 'Partial progress preserved in credentials.local.json when prior creates succeeded.'
+    throw
   }
 }
 
-$payload = [pscustomobject]@{
-  project_ref = $expectedRef
-  created_at  = (Get-Date).ToUniversalTime().ToString('o')
-  warning     = 'LOCAL SECRET — do not commit, log, or paste into tickets'
-  users       = $resultUsers
-}
-$payload | ConvertTo-Json -Depth 6 | Set-Content -Path $credPath -Encoding utf8
-Set-PrivateFileAcl -Path $credPath
-Write-SafeHost 'Wrote credentials.local.json (gitignored, ACL tightened). Do not commit.'
-Write-SafeHost 'Next: apply 05_protect_demo_marker.sql then gated 01_seed_data.sql.'
+Write-SafeHost 'Auth provisioning complete. credentials.local.json updated (gitignored).'
+Write-SafeHost 'Next: gated seed via 07_run_staging_gated.ps1 (not auto-executed).'

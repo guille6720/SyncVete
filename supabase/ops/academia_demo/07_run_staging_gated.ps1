@@ -4,10 +4,14 @@
   Gated staging runner for Academia Demo seed. Defaults to prepare-only.
   This script never auto-executes SQL against staging.
 
+.DESCRIPTION
+  Phase 5C.2: Commit bundles include fail-closed 03_validation_assert.sql
+  BEFORE COMMIT so any failed assertion aborts the transaction.
+
 .PARAMETER Mode
-  Prepare  — Auth users plan only (no API writes)
-  DrySql   — Builds BEGIN…ROLLBACK bundle for operator
-  Commit   — Builds BEGIN…COMMIT bundle; requires -IAuthorizeStagingSeed
+  Prepare  - Auth users plan only (no API writes)
+  DrySql   - Builds BEGIN...ROLLBACK bundle for operator
+  Commit   - Builds BEGIN...COMMIT bundle; requires -IAuthorizeStagingSeed
 #>
 param(
   [ValidateSet('Prepare', 'DrySql', 'Commit')]
@@ -46,15 +50,16 @@ $txEnd = if ($Mode -eq 'Commit') { 'COMMIT;' } else { 'ROLLBACK;' }
 $bundle = Join-Path $here ("_bundle_{0}.sql" -f $Mode.ToLowerInvariant())
 
 $approval = @"
--- Operator approval gate (transaction-local; not a substitute for service_role/postgres)
+-- Operator approval gate (transaction-local; NOT authentication / NOT a substitute for service_role)
 SELECT set_config('app.academia_demo_seed_approved', 'yes', true);
 "@
 
+# Fail-closed: assert MUST run before COMMIT. Any RAISE aborts the TX.
 $parts = @(
-  "-- GATED Academia Demo apply — $Mode",
-  "-- project-ref MUST be $ref",
-  "-- Phase 5C.1: protect marker + approved seed + validation",
-  "-- MUST NOT be used for production. Does not auto-execute.",
+  ("-- GATED Academia Demo apply - {0}" -f $Mode),
+  ("-- project-ref MUST be {0}" -f $ref),
+  ("-- Phase 5C.2: protect marker + approved seed + FAIL-CLOSED assert before {0}" -f $txEnd),
+  '-- MUST NOT be used for production. Does not auto-execute.',
   'BEGIN;',
   '',
   $approval,
@@ -63,6 +68,10 @@ $parts = @(
   '',
   (Get-Content (Join-Path $here '01_seed_data.sql') -Raw),
   '',
+  '-- Fail-closed validation: blocks COMMIT on any failed assertion',
+  (Get-Content (Join-Path $here '03_validation_assert.sql') -Raw),
+  '',
+  '-- Advisory JSON evidence (non-mutating)',
   (Get-Content (Join-Path $here '03_validation_queries.sql') -Raw),
   '',
   $txEnd
@@ -71,8 +80,9 @@ $parts -join "`n" | Set-Content $bundle -Encoding utf8
 
 Write-Host "Bundle written: $bundle"
 Write-Host "Transaction end: $txEnd"
+Write-Host 'Assert file included: 03_validation_assert.sql (evaluated before COMMIT/ROLLBACK)'
 Write-Host 'Manual apply (operator) after Auth users exist:'
-Write-Host "  npx supabase db query --linked --project-ref $ref --workdir `"$isolated`" -f `"$bundle`""
+Write-Host ("  npx supabase db query --linked --project-ref {0} --workdir `"{1}`" -f `"{2}`"" -f $ref, $isolated, $bundle)
 Write-Host 'Security tests (disposable only): 08_security_tests.sql via 06_dry_run.ps1'
 Write-Host 'This script does NOT execute the bundle.'
 exit 0

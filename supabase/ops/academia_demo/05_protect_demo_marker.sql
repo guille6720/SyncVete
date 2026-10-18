@@ -1,12 +1,12 @@
 -- Protect academia_demo / academia_demo_key in organizations.settings
--- INSERT and UPDATE: only trusted server maintainers may set/change/remove markers.
+-- INSERT and UPDATE: only trusted DB roles may set/change/remove markers.
 --
--- Authorization (never user_metadata / forgeable GUCs):
---   - JWT claim role = service_role, OR
---   - session/current DB role in {postgres, supabase_admin}
+-- Authorization is CURRENT_USER-first (cannot escalate via set_config JWT claims):
+--   - authenticated / anon DB roles → never
+--   - service_role DB role → yes
+--   - postgres / supabase_admin → yes, unless JWT claim simulates clinic role
 --
--- SECURITY INVOKER: no elevated privileges; relies on request + DB role.
--- STAGING ops apply with seed authorization. Idempotent.
+-- SECURITY INVOKER; fixed search_path. Idempotent.
 
 CREATE OR REPLACE FUNCTION public.is_academia_demo_marker_maintainer()
 RETURNS boolean
@@ -17,28 +17,25 @@ SET search_path TO pg_catalog, public
 AS $$
   SELECT
     CASE
-      -- Clinic / anon JWT must never forge markers (even under a postgres DB session).
-      WHEN COALESCE(
-        NULLIF(auth.jwt() ->> 'role', ''),
-        NULLIF(current_setting('request.jwt.claim.role', true), ''),
-        ''
-      ) IN ('authenticated', 'anon') THEN false
-      WHEN COALESCE(
-        NULLIF(auth.jwt() ->> 'role', ''),
-        NULLIF(current_setting('request.jwt.claim.role', true), ''),
-        ''
-      ) = 'service_role' THEN true
-      -- No JWT (ops / migration / db query): only privileged DB roles.
-      WHEN CURRENT_USER IN ('postgres', 'supabase_admin') THEN true
+      WHEN CURRENT_USER IN ('authenticated', 'anon') THEN false
+      WHEN CURRENT_USER = 'service_role' THEN true
+      WHEN CURRENT_USER IN ('postgres', 'supabase_admin') THEN
+        -- Ops/maintenance allowed unless explicitly simulating a clinic JWT.
+        COALESCE(
+          NULLIF(auth.jwt() ->> 'role', ''),
+          NULLIF(current_setting('request.jwt.claim.role', true), ''),
+          ''
+        ) NOT IN ('authenticated', 'anon')
       ELSE false
     END;
 $$;
 
 COMMENT ON FUNCTION public.is_academia_demo_marker_maintainer() IS
-  'True only for service_role JWT or postgres/supabase_admin DB roles — not clinic users';
+  'Marker maintainer: service_role or postgres/supabase_admin; never authenticated/anon; JWT claims cannot escalate an unprivileged DB role';
 
 REVOKE ALL ON FUNCTION public.is_academia_demo_marker_maintainer() FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.is_academia_demo_marker_maintainer() TO authenticated, service_role, postgres;
+GRANT EXECUTE ON FUNCTION public.is_academia_demo_marker_maintainer()
+  TO authenticated, anon, service_role, postgres;
 
 CREATE OR REPLACE FUNCTION public.trg_protect_academia_demo_marker()
 RETURNS trigger
@@ -66,7 +63,6 @@ BEGIN
         'ACADEMIA_DEMO_MARKER_LOCKED: cannot INSERT organization with academia_demo marker'
         USING ERRCODE = '42501';
     END IF;
-
     RETURN NEW;
   END IF;
 
@@ -75,19 +71,16 @@ BEGIN
     v_new_demo := COALESCE(NEW.settings ->> 'academia_demo', '');
     v_old_key := COALESCE(OLD.settings ->> 'academia_demo_key', '');
     v_new_key := COALESCE(NEW.settings ->> 'academia_demo_key', '');
-
     v_changed :=
       (v_old_demo IS DISTINCT FROM v_new_demo)
       OR (v_old_key IS DISTINCT FROM v_new_key)
       OR (
         (COALESCE(OLD.settings, '{}'::jsonb) ? 'academia_demo')
-        IS DISTINCT FROM
-        (COALESCE(NEW.settings, '{}'::jsonb) ? 'academia_demo')
+        IS DISTINCT FROM (COALESCE(NEW.settings, '{}'::jsonb) ? 'academia_demo')
       )
       OR (
         (COALESCE(OLD.settings, '{}'::jsonb) ? 'academia_demo_key')
-        IS DISTINCT FROM
-        (COALESCE(NEW.settings, '{}'::jsonb) ? 'academia_demo_key')
+        IS DISTINCT FROM (COALESCE(NEW.settings, '{}'::jsonb) ? 'academia_demo_key')
       );
 
     IF v_changed AND NOT public.is_academia_demo_marker_maintainer() THEN
@@ -95,7 +88,6 @@ BEGIN
         'ACADEMIA_DEMO_MARKER_LOCKED: academia_demo settings are maintainer-only'
         USING ERRCODE = '42501';
     END IF;
-
     RETURN NEW;
   END IF;
 
