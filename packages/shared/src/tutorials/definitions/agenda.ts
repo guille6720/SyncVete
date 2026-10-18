@@ -2,8 +2,10 @@ import type { TutorialDefinition } from '../types';
 import { TOUR_TARGETS } from '../targets';
 
 /**
- * Agenda básico v1 — adapted to the Agenda UI on main:
+ * Agenda básico v2 — adapted to the Agenda UI on main:
  * day list, status/professional filters, week nav, nueva cita, form, detail/status.
+ *
+ * Narration scripts are Argentine Spanish for the Academia voice-over engine.
  *
  * Omitted vs product brief (UI not present on this branch):
  * - Day/week/month calendar toggle
@@ -40,6 +42,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
         profesional: 'Dra. Ana Demo',
       },
       durationMs: 3500,
+      narration:
+        'Esta es una demostración segura de Academia SyncVete. Todo lo que vas a ver es ficticio: no se crea ni se modifica ningún turno real de tu clínica.',
     },
     {
       id: 'demo-create',
@@ -51,6 +55,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
         horario: 'Martes 10:30',
       },
       durationMs: 4000,
+      narration:
+        'En un alta real elegirías paciente, tutor y horario. Acá lo simulamos con Luna, María Ejemplo y un turno el martes a las diez y media. No se guarda nada.',
     },
     {
       id: 'demo-status',
@@ -60,6 +66,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
         estado: 'confirmada',
       },
       durationMs: 4000,
+      narration:
+        'Los estados del turno te permiten seguir el ciclo de atención: programada, confirmada, en curso y completada. En la demo solo lo mostramos; no cambia ningún registro real.',
     },
   ],
   videoScenes: [
@@ -68,7 +76,7 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       order: 1,
       title: 'Introducción',
       narration:
-        'Bienvenida a la Agenda de SyncVete. En pocos minutos vas a ver cómo organizar los turnos del día.',
+        '¡Bienvenido a la Agenda de SyncVete! En este recorrido vas a aprender cómo organizar los turnos de tu veterinaria.',
       caption: 'Agenda SyncVete — primeros pasos',
       durationSec: 8,
       layoutNotes: 'Logo SyncVete centrado, fondo corporativo.',
@@ -140,7 +148,7 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       demoSceneId: 'demo-welcome',
       videoSceneId: 'v-intro',
       narration:
-        'Bienvenida a la Agenda de SyncVete. Vamos a recorrer juntos las herramientas del día a día.',
+        '¡Bienvenido a la Agenda de SyncVete! En este recorrido vas a aprender cómo organizar los turnos de tu veterinaria, consultar las citas y administrar la atención de tus pacientes.',
       caption: 'Bienvenida a la Agenda',
     },
     {
@@ -152,7 +160,7 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       route: '/agenda',
       videoSceneId: 'v-overview',
       narration:
-        'La lista del día concentra todos los turnos. Cada tarjeta te lleva al detalle.',
+        'Esta es la lista de turnos del día. Acá ves el horario, el paciente, el estado y el profesional de cada cita. Si tocás una tarjeta, abrís el detalle del turno.',
       caption: 'Lista de turnos del día',
     },
     {
@@ -163,7 +171,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       placement: 'bottom',
       route: '/agenda',
       videoSceneId: 'v-nav',
-      narration: 'Movete entre días y semanas sin perder los filtros activos.',
+      narration:
+        'Con la navegación de fechas te movés entre días y semanas. Usá las flechas para cambiar de semana, el botón Hoy para volver al día actual, o tocá un día de la tira semanal. Los filtros que tengas activos se mantienen.',
       caption: 'Navegación semanal',
     },
     {
@@ -174,7 +183,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       placement: 'bottom',
       route: '/agenda',
       videoSceneId: 'v-filters',
-      narration: 'Filtrá por profesional para enfocarte en una agenda.',
+      narration:
+        'Con el filtro por profesional podés ver solo la agenda de un veterinario o de un integrante del equipo. Es ideal cuando hay varias agendas en la misma clínica.',
       caption: 'Filtro por profesional',
     },
     {
@@ -184,7 +194,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       target: TOUR_TARGETS.AGENDA_FILTER_STATUS,
       placement: 'bottom',
       route: '/agenda',
-      narration: 'El filtro de estado te ayuda a priorizar lo pendiente.',
+      narration:
+        'El filtro por estado te ayuda a priorizar. Podés mostrar solo las citas programadas, confirmadas, en curso u otros estados según lo que necesites atender ahora.',
       caption: 'Filtro por estado',
     },
     {
@@ -197,7 +208,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       validation: { requirePermission: 'appointments:write' },
       demoSceneId: 'demo-create',
       videoSceneId: 'v-create',
-      narration: 'Con Nueva cita empezás el alta de un turno.',
+      narration:
+        'El botón Nueva cita abre el alta de un turno. Si estás en la demostración de Academia, no se guarda ningún dato real: solo practicamos el recorrido.',
       caption: 'Botón Nueva cita',
     },
     {
@@ -209,7 +221,7 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       route: '/agenda/nueva',
       validation: { requirePermission: 'appointments:write' },
       narration:
-        'El formulario reúne paciente, horario y profesional asignado.',
+        'En el formulario completás paciente, fecha y hora, duración, tipo de atención, profesional y sucursal. Revisá bien los datos antes de guardar.',
       caption: 'Formulario de nueva cita',
     },
     {
@@ -223,7 +235,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       allowDemoFallback: true,
       demoSceneId: 'demo-status',
       videoSceneId: 'v-detail',
-      narration: 'El detalle concentra la información y las acciones del turno.',
+      narration:
+        'El detalle del turno concentra la información del paciente, el tipo de atención, las notas y las acciones disponibles. Si todavía no hay un turno demo, vas a ver una demostración etiquetada sin datos reales.',
       caption: 'Detalle del turno',
     },
     {
@@ -236,7 +249,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       requiresDemoAppointment: true,
       allowDemoFallback: true,
       demoSceneId: 'demo-status',
-      narration: 'Gestioná el ciclo de vida del turno desde el detalle.',
+      narration:
+        'Desde acá gestionás el ciclo de vida del turno: confirmar, iniciar, completar, marcar ausente o cancelar, según el estado actual. El tutorial nunca cambia el estado solo: vos decidís cuándo hacerlo.',
       caption: 'Acciones de estado',
     },
     {
@@ -247,7 +261,8 @@ export const AGENDA_BASICO_TUTORIAL: TutorialDefinition = {
       placement: 'bottom',
       route: '/agenda',
       videoSceneId: 'v-outro',
-      narration: 'Fin del recorrido. Seguimos en Academia SyncVete.',
+      narration:
+        '¡Listo! Ya recorriste lo esencial de la Agenda. Podés volver a Academia SyncVete y reiniciar este tutorial cuando quieras practicar. ¡Éxitos con la atención de tus pacientes!',
       caption: 'Tutorial completado',
     },
   ],

@@ -12,6 +12,8 @@ interface TutorialTooltipProps {
   targetMissing: boolean;
   modeLabel?: string;
   demoExtra?: React.ReactNode;
+  /** Compact voice narration controls (shared by tutorial + demo). */
+  voiceControls?: React.ReactNode;
   onNext: () => void;
   onPrevious: () => void;
   onSkip: () => void;
@@ -62,6 +64,7 @@ export function TutorialTooltip({
   targetMissing,
   modeLabel,
   demoExtra,
+  voiceControls,
   onNext,
   onPrevious,
   onSkip,
@@ -91,6 +94,7 @@ export function TutorialTooltip({
           Este elemento no está visible ahora (permiso o pantalla distinta). Podés continuar igual.
         </p>
       ) : null}
+      {voiceControls}
       {demoExtra}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onSkip}>

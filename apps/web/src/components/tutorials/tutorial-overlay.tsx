@@ -1,21 +1,67 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import type { TutorialEngineApi } from '@/components/tutorials/use-tutorial-engine';
 import { TutorialTooltip } from '@/components/tutorials/tutorial-tooltip';
+import { TutorialVoiceControls } from '@/components/tutorials/tutorial-voice-controls';
+import { useTutorialNarration } from '@/components/tutorials/use-tutorial-narration';
 import { Button } from '@/components/ui/button';
+import { getSpeechNarrationEngine } from '@/lib/tutorials/speech-narration';
 
 interface TutorialOverlayProps {
   engine: TutorialEngineApi;
+}
+
+function resolveNarrationText(engine: TutorialEngineApi): string | null {
+  const { state } = engine;
+  if (!state.tutorial || !state.step) return null;
+
+  if (state.mode === 'demo') {
+    const scene =
+      state.tutorial.demoScenes[
+        Math.min(state.demoSceneIndex, state.tutorial.demoScenes.length - 1)
+      ];
+    if (scene?.narration?.trim()) return scene.narration.trim();
+  }
+
+  return state.step.narration?.trim() || state.step.body;
 }
 
 export function TutorialOverlay({ engine }: TutorialOverlayProps) {
   const { state, next, previous, skip, restart, pause, resume } = engine;
   const dialogRef = useRef<HTMLDivElement | null>(null);
 
+  const narrationText = useMemo(
+    () => resolveNarrationText(engine),
+    // Recompute when step/demo scene changes; engine.state fields are the source of truth.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional granular deps
+    [state.mode, state.stepIndex, state.demoSceneIndex, state.step?.id, state.step?.narration, state.tutorial?.id]
+  );
+
+  // ready must stay true while the demo is paused — pause uses speechSynthesis.pause(),
+  // not a ready=false cycle that would cancel and restart narration.
+  const narrationReady =
+    state.active && !state.navigating && Boolean(narrationText);
+
+  const narration = useTutorialNarration({
+    text: narrationText,
+    ready: narrationReady,
+    active: state.active,
+    paused: state.paused,
+  });
+
+  // Ensure skip / close / restart always halt speech immediately
+  useEffect(() => {
+    if (!state.active || state.navigating) {
+      getSpeechNarrationEngine().stop();
+    }
+  }, [state.active, state.navigating, state.stepIndex]);
+
   useEffect(() => {
     if (!state.active || state.navigating) return;
-    const node = dialogRef.current?.querySelector<HTMLElement>('button, [href], input, select, textarea');
+    const node = dialogRef.current?.querySelector<HTMLElement>(
+      'button, [href], input, select, textarea'
+    );
     node?.focus({ preventScroll: true });
   }, [state.active, state.stepIndex, state.navigating]);
 
@@ -40,6 +86,36 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
           Math.min(state.demoSceneIndex, state.tutorial.demoScenes.length - 1)
         ]
       : null;
+
+  const handleSkip = () => {
+    narration.stop();
+    skip();
+  };
+
+  const handleNext = () => {
+    narration.stop();
+    next();
+  };
+
+  const handlePrevious = () => {
+    narration.stop();
+    previous();
+  };
+
+  const handleRestart = () => {
+    narration.stop();
+    restart();
+  };
+
+  const handlePauseDemo = () => {
+    narration.pause();
+    pause();
+  };
+
+  const handleResumeDemo = () => {
+    resume();
+    narration.resume();
+  };
 
   const fallbackPanel =
     state.demoFallbackActive && state.step.allowDemoFallback ? (
@@ -111,6 +187,7 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
                 ? 'Demostración automática (sin guardar datos)'
                 : undefined
             }
+            voiceControls={<TutorialVoiceControls narration={narration} />}
             demoExtra={
               <>
                 {fallbackPanel}
@@ -129,11 +206,11 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
                     ) : null}
                     <div className="mt-2 flex gap-2">
                       {state.paused ? (
-                        <Button type="button" size="sm" variant="outline" onClick={resume}>
+                        <Button type="button" size="sm" variant="outline" onClick={handleResumeDemo}>
                           Reanudar
                         </Button>
                       ) : (
-                        <Button type="button" size="sm" variant="outline" onClick={pause}>
+                        <Button type="button" size="sm" variant="outline" onClick={handlePauseDemo}>
                           Pausar
                         </Button>
                       )}
@@ -142,10 +219,10 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
                 ) : null}
               </>
             }
-            onNext={next}
-            onPrevious={previous}
-            onSkip={skip}
-            onRestart={restart}
+            onNext={handleNext}
+            onPrevious={handlePrevious}
+            onSkip={handleSkip}
+            onRestart={handleRestart}
           />
         )}
       </div>

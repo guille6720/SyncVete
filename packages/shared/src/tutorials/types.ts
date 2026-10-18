@@ -23,6 +23,8 @@ export interface DemoScene {
   /** Mock labels shown in the demo panel (veterinarian, pet, owner…). */
   mockLabels?: Record<string, string>;
   durationMs?: number;
+  /** Optional spoken narration for the guided demo (Web Speech). */
+  narration?: string;
 }
 
 export interface VideoScene {

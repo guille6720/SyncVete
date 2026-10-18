@@ -52,6 +52,17 @@ describe('tutorial registry', () => {
     expect(AGENDA_BASICO_TUTORIAL.demoScenes[0]?.mockLabels?.profesional).toMatch(/Demo/i);
   });
 
+  it('provides Argentine Spanish narration for every agenda step and demo scene', () => {
+    expect(AGENDA_BASICO_TUTORIAL.steps).toHaveLength(10);
+    for (const step of AGENDA_BASICO_TUTORIAL.steps) {
+      expect(step.narration?.trim().length).toBeGreaterThan(40);
+    }
+    expect(AGENDA_BASICO_TUTORIAL.steps[0]?.narration).toMatch(/Bienvenido a la Agenda de SyncVete/i);
+    for (const scene of AGENDA_BASICO_TUTORIAL.demoScenes) {
+      expect(scene.narration?.trim().length).toBeGreaterThan(20);
+    }
+  });
+
   it('omits invented calendar-month steps (UI not on main)', () => {
     const ids = AGENDA_BASICO_TUTORIAL.steps.map((s) => s.id);
     expect(ids).not.toContain('month-view');

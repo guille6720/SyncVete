@@ -23,6 +23,8 @@ import {
   writeTutorialSession,
 } from '@/lib/tutorials/tutorial-session';
 import { isEditableKeyboardTarget, waitForTarget } from '@/lib/tutorials/wait-for-target';
+import { getSpeechNarrationEngine } from '@/lib/tutorials/speech-narration';
+import { waitForDemoSceneAdvance } from '@/lib/tutorials/demo-scene-advance';
 
 export interface TutorialEngineState {
   tutorial: TutorialDefinition | null;
@@ -262,6 +264,7 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
   const stop = useCallback(
     (status: TutorialProgressStatus = 'skipped') => {
       clearDemoTimer();
+      getSpeechNarrationEngine().stop();
       navSeqRef.current += 1;
       pendingHrefRef.current = null;
       if (tutorial) persist(stepIndex, status);
@@ -392,6 +395,7 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
       const nextIndex = Math.max(0, Math.min(index, tutorial.steps.length - 1));
       const nextStep = tutorial.steps[nextIndex];
       if (!nextStep) return;
+      getSpeechNarrationEngine().stop();
       setStepIndex(nextIndex);
       persist(nextIndex, 'in_progress');
       await syncRouteForStep(tutorial, nextStep, nextIndex);
@@ -424,27 +428,63 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
   const pause = useCallback(() => {
     setPaused(true);
     clearDemoTimer();
+    getSpeechNarrationEngine().pause();
   }, []);
-  const resume = useCallback(() => setPaused(false), []);
+  const resume = useCallback(() => {
+    setPaused(false);
+    getSpeechNarrationEngine().resume();
+  }, []);
 
-  // Demo auto-advance: fictional scenes only — never writes appointments.
+  // Demo auto-advance: wait for min scene time AND narration settlement (when voice on).
+  // Pause does NOT restart the scene timer — we only defer the final advance while paused.
+  // Manual Next still advances immediately via next()/goTo (stops narration).
+  const demoAdvanceSeqRef = useRef(0);
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+
   useEffect(() => {
     clearDemoTimer();
-    if (!active || paused || navigating || mode !== 'demo' || !tutorial) return;
+    if (!active || navigating || mode !== 'demo' || !tutorial) return;
     const scenes = tutorial.demoScenes;
     if (scenes.length === 0) return;
     const scene = scenes[Math.min(demoSceneIndex, scenes.length - 1)];
-    const ms = prefersReducedMotion() ? 800 : (scene?.durationMs ?? 3000);
-    demoTimerRef.current = setTimeout(() => {
+    const minMs = prefersReducedMotion() ? 800 : (scene?.durationMs ?? 3000);
+    const seq = ++demoAdvanceSeqRef.current;
+    const engine = getSpeechNarrationEngine();
+    let cancelled = false;
+
+    const sleep = (ms: number) =>
+      new Promise<void>((resolve) => {
+        demoTimerRef.current = setTimeout(() => resolve(), ms);
+      });
+
+    const run = async () => {
+      const shouldAdvance = await waitForDemoSceneAdvance({
+        engine,
+        minMs,
+        waitForNarration:
+          engine.isSupported() && !engine.isMuted() && Boolean(scene?.narration?.trim()),
+        isCancelled: () => cancelled || seq !== demoAdvanceSeqRef.current,
+        isPaused: () => pausedRef.current,
+        sleep,
+      });
+      if (!shouldAdvance) return;
       if (demoSceneIndex >= scenes.length - 1) {
         next();
         setDemoSceneIndex(0);
       } else {
         setDemoSceneIndex((i) => i + 1);
       }
-    }, ms);
-    return clearDemoTimer;
-  }, [active, paused, navigating, mode, tutorial, demoSceneIndex, next]);
+    };
+
+    void run();
+
+    return () => {
+      cancelled = true;
+      clearDemoTimer();
+      demoAdvanceSeqRef.current += 1;
+    };
+  }, [active, navigating, mode, tutorial, demoSceneIndex, next]);
 
   useEffect(() => {
     if (!active) return;
