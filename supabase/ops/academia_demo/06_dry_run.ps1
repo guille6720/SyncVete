@@ -176,17 +176,33 @@ $differences = @(
   'auth.jwt()/auth.uid() stubbed; RLS policies not fully exercised as authenticated clinic user'
 )
 
+$securityOk = $false
+$seedApply = Join-Path $Workdir 'seed_with_approval.sql'
+@"
+BEGIN;
+SELECT set_config('app.academia_demo_seed_approved', 'yes', true);
+$(Get-Content (Join-Path $here '01_seed_data.sql') -Raw)
+COMMIT;
+"@ | Set-Content $seedApply -Encoding utf8
+
 try {
-  # 5) Protect marker + seed
-  Write-Host 'Applying protect marker + seed...'
+  # 5) Protect marker + security tests + seed
+  Write-Host 'Applying protect marker...'
   $c1 = Invoke-PgFile (Join-Path $here '05_protect_demo_marker.sql') 'protect.log' 1
   if ($c1 -ne 0) { throw 'Protect marker failed — see protect.log' }
-  $c2 = Invoke-PgFile (Join-Path $here '01_seed_data.sql') 'seed1.log' 1
+
+  Write-Host 'Running security tests (unauthorized marker + collision detect)...'
+  $cSec = Invoke-PgFile (Join-Path $here '08_security_tests.sql') 'security_tests.log' 1
+  if ($cSec -ne 0) { throw 'Security tests failed — see security_tests.log' }
+  $securityOk = $true
+
+  Write-Host 'Applying seed (with approval gate)...'
+  $c2 = Invoke-PgFile $seedApply 'seed1.log' 1
   if ($c2 -ne 0) { throw 'Seed pass 1 failed — see seed1.log' }
   $seedOk = $true
 
   # Idempotency: second pass
-  $c3 = Invoke-PgFile (Join-Path $here '01_seed_data.sql') 'seed2.log' 1
+  $c3 = Invoke-PgFile $seedApply 'seed2.log' 1
   if ($c3 -ne 0) { throw 'Seed pass 2 (idempotency) failed — see seed2.log' }
   $idempotentOk = $true
 
@@ -197,7 +213,7 @@ try {
   $apptCount = docker exec $container psql -U postgres -d postgres -t -A -c "SELECT count(*) FROM public.appointments WHERE organization_id='a0a0a0a0-d0e0-4000-8000-000000000001' AND deleted_at IS NULL;"
   if ([int]$apptCount.Trim() -ne 5) { throw "Expected 5 demo appointments, got $apptCount" }
 
-  Write-Host 'Dry-run assertions passed (5 appointments, idempotent re-seed).'
+  Write-Host 'Dry-run assertions passed (security tests + 5 appointments + idempotent re-seed).'
 } catch {
   Write-Host "DRY-RUN FAILURE: $_"
   $seedOk = $false
@@ -205,6 +221,7 @@ try {
   $report = [pscustomobject]@{
     at              = (Get-Date).ToUniversalTime().ToString('o')
     project_ref     = $ProjectRef
+    security_ok     = $securityOk
     seed_ok         = $seedOk
     idempotent_ok   = $idempotentOk
     differences     = $differences
@@ -217,6 +234,6 @@ try {
   docker rm -f $container 2>$null | Out-Null
 }
 
-if (-not $seedOk) { exit 1 }
+if (-not $seedOk -or -not $securityOk) { exit 1 }
 Write-Host '=== Dry-run COMPLETE (no staging writes) ==='
 exit 0

@@ -2,7 +2,7 @@
 
 **Project:** `owmcrqvnfubyjxrlyhlc`  
 **Production (`lhdksiptpsubktikdses`):** never apply.  
-**Status:** Package ready — **DO NOT EXECUTE** staging writes until explicit authorization.  
+**Status:** Phase 5C.1 hardened — **DO NOT EXECUTE** staging writes until explicit authorization.  
 **Branch:** `feat/tutorial-academy-agenda`
 
 ## Goal
@@ -41,9 +41,10 @@ Appointment status enum uses **`completada`** (never `completed`).
 | `02_auth_users.ps1` | Auth Admin create/update (password login, no invite) |
 | `03_validation_queries.sql` | Assertions + before/after counts |
 | `04_rollback.sql` | Soft-delete compensating cleanup |
-| `05_protect_demo_marker.sql` | Lock marker to service_role |
-| `06_dry_run.ps1` | Disposable Postgres + staging schema dump |
+| `05_protect_demo_marker.sql` | Lock marker on INSERT+UPDATE (INVOKER; service_role / postgres) |
+| `06_dry_run.ps1` | Disposable Postgres + security tests + seed |
 | `07_run_staging_gated.ps1` | Prepare / DrySql / Commit gate (no auto-write) |
+| `08_security_tests.sql` | Unauthorized marker INSERT/UPDATE + Auth collision detect |
 | `HARDEN_DELETE_PLAN.md` | Separate `tutorial_progress` DELETE revoke |
 | `credentials.local.json` | **gitignored** secrets from Auth Admin |
 
@@ -52,10 +53,10 @@ App routing: `apps/web/src/actions/academia-demo.ts` + `lib/academia-demo-marker
 ## Authorized execution order (when approved)
 
 1. Confirm CLI `--project-ref owmcrqvnfubyjxrlyhlc`.
-2. `02_auth_users.ps1 -Execute` → writes `credentials.local.json` (do not commit).
+2. `02_auth_users.ps1 -Execute` (add `-AllowPasswordReset` only if rotating QA passwords).
 3. Apply `05_protect_demo_marker.sql`.
 4. Capture pre-seed counts via `03_validation_queries.sql`.
-5. Apply `01_seed_data.sql` inside a transaction; `COMMIT` only after validation OK.
+5. In the same transaction: `set_config('app.academia_demo_seed_approved','yes',true)` then `01_seed_data.sql`; `COMMIT` only after validation OK (use `07_run_staging_gated.ps1 -Mode DrySql|Commit`).
 6. Re-run `03_validation_queries.sql`; compare `orgs_non_demo` / `appts_non_demo` unchanged.
 7. Smoke login as QA users on Preview Academia (password from local credentials file).
 

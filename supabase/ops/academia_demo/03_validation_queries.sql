@@ -225,5 +225,43 @@ SELECT json_build_object(
     JOIN params p ON a.organization_id = p.demo_org_id AND a.deleted_at IS NULL
     JOIN public.patients pt ON pt.id = a.patient_id
     WHERE pt.organization_id <> a.organization_id
+  ),
+
+  'seed_managed_appts_only', (
+    SELECT count(*) = 5
+    FROM public.appointments a, params p
+    WHERE a.organization_id = p.demo_org_id
+      AND a.deleted_at IS NULL
+      AND a.source_system = p.source_system
+  ),
+
+  'qa_not_in_foreign_orgs', (
+    SELECT count(*) = 0
+    FROM auth.users u
+    JOIN public.profiles pr ON pr.id = u.id AND pr.deleted_at IS NULL
+    JOIN params p ON true
+    WHERE u.email IN (
+      'owner.demo@academia-demo.invalid',
+      'vet.demo@academia-demo.invalid',
+      'recepcion.demo@academia-demo.invalid'
+    )
+      AND pr.organization_id IS DISTINCT FROM p.demo_org_id
+  ),
+
+  'marker_protect_fn_present', EXISTS(
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'is_academia_demo_marker_maintainer'
+  ),
+
+  'marker_protect_trigger_insert_update', (
+    SELECT count(*) >= 1
+    FROM pg_trigger t
+    JOIN pg_class c ON c.oid = t.tgrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relname = 'organizations'
+      AND t.tgname = 'trg_protect_academia_demo_marker'
+      AND NOT t.tgisinternal
   )
 ) AS academia_demo_validation;

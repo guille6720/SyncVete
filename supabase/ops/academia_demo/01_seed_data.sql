@@ -1,25 +1,17 @@
 -- ============================================================================
--- Academia Demo SyncVete — IDEMPOTENT SEED (public schema)
+-- Academia Demo SyncVete — IDEMPOTENT SEED (public schema) — Phase 5C.1 hardened
 -- Target: STAGING owmcrqvnfubyjxrlyhlc ONLY
--- Prerequisites:
---   1) Auth users exist (see 02_auth_users.ps1) with emails below
---   2) Operator confirmed project-ref == owmcrqvnfubyjxrlyhlc
---   3) Marker protect trigger applied (05_protect_demo_marker.sql) recommended
+--
+-- Manual approval gate (required inside the same transaction):
+--   SELECT set_config('app.academia_demo_seed_approved', 'yes', true);
+-- This GUC is NOT a security boundary against attackers; it is an operator
+-- foot-gun guard. Real isolation is: staging-only apply + marker maintainer
+-- roles + ownership collision checks below.
 --
 -- Does NOT insert into auth.users.
--- Does NOT touch other organizations (scoped by fixed demo org id + marker).
--- Side-effect controls:
---   - No owner_app_settings row (cron queue_owner_app_reminders skips org)
---   - Owner.portal_user_id NULL (reminders require portal link)
---   - remind_24h/2h/confirmation = false on all demo appointments
---   - phone_whatsapp NULL; no whatsapp_messages inserts
---   - Trial subscription from ensure_default_organization_subscription is expected;
---     metadata tagged academia_demo after create
---
--- In-app notifications: trg_notify_appointment inserts into public.notifications
--- only (no WhatsApp/email/SMS/webhook). Scoped to demo org.
---
--- Gated apply: wrap with BEGIN; ... ROLLBACK; until explicitly authorized.
+-- Does NOT reassign profiles/memberships from other organizations.
+-- Fixed-ID UPSERTs refuse collisions belonging to other orgs.
+-- Seed-managed domain rows use source_system = 'academia_demo_seed'.
 -- ============================================================================
 
 DO $$
@@ -40,7 +32,12 @@ DECLARE
   v_weekday     smallint;
   v_other_orgs  int;
   v_demo_count  int;
+  v_uid         uuid;
 BEGIN
+  IF coalesce(current_setting('app.academia_demo_seed_approved', true), '') IS DISTINCT FROM 'yes' THEN
+    RAISE EXCEPTION 'ACADEMIA_DEMO: approval gate missing — set_config(''app.academia_demo_seed_approved'', ''yes'', true) in this transaction';
+  END IF;
+
   -- Refuse if marker key already on a *different* org
   SELECT count(*) INTO v_demo_count
   FROM public.organizations o
@@ -51,7 +48,19 @@ BEGIN
     RAISE EXCEPTION 'ACADEMIA_DEMO: marker key already on another organization';
   END IF;
 
-  -- Refuse slug collision with non-demo org
+  -- Fixed org id collision: must be absent or already our demo org
+  IF EXISTS (
+    SELECT 1 FROM public.organizations o
+    WHERE o.id = c_org_id
+      AND o.deleted_at IS NULL
+      AND (
+        coalesce(o.settings->>'academia_demo_key', '') IS DISTINCT FROM c_marker_key
+        OR NOT coalesce((o.settings->>'academia_demo')::boolean, false)
+      )
+  ) THEN
+    RAISE EXCEPTION 'ACADEMIA_DEMO: fixed org id % exists without demo marker (ownership conflict)', c_org_id;
+  END IF;
+
   IF EXISTS (
     SELECT 1 FROM public.organizations o
     WHERE o.slug = c_slug AND o.id <> c_org_id AND o.deleted_at IS NULL
@@ -59,7 +68,32 @@ BEGIN
     RAISE EXCEPTION 'ACADEMIA_DEMO: slug academia-demo-syncvete taken by another org';
   END IF;
 
-  -- Resolve Auth users by email (must exist; created via Admin API)
+  -- Fixed child-id collisions belonging to another org
+  IF EXISTS (
+    SELECT 1 FROM public.branches b
+    WHERE b.id = c_branch_id AND b.organization_id IS DISTINCT FROM c_org_id
+  ) THEN
+    RAISE EXCEPTION 'ACADEMIA_DEMO: branch id collision outside demo org';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.owners ow
+    WHERE ow.id = c_owner_id AND ow.organization_id IS DISTINCT FROM c_org_id
+  ) THEN
+    RAISE EXCEPTION 'ACADEMIA_DEMO: owner id collision outside demo org';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.patients pt
+    WHERE pt.id = c_patient_id AND pt.organization_id IS DISTINCT FROM c_org_id
+  ) THEN
+    RAISE EXCEPTION 'ACADEMIA_DEMO: patient id collision outside demo org';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.professionals pr
+    WHERE pr.id = c_prof_id AND pr.organization_id IS DISTINCT FROM c_org_id
+  ) THEN
+    RAISE EXCEPTION 'ACADEMIA_DEMO: professional id collision outside demo org';
+  END IF;
+
   SELECT id INTO v_owner_uid FROM auth.users WHERE email = 'owner.demo@academia-demo.invalid' LIMIT 1;
   SELECT id INTO v_vet_uid   FROM auth.users WHERE email = 'vet.demo@academia-demo.invalid' LIMIT 1;
   SELECT id INTO v_rec_uid   FROM auth.users WHERE email = 'recepcion.demo@academia-demo.invalid' LIMIT 1;
@@ -68,12 +102,34 @@ BEGIN
     RAISE EXCEPTION 'ACADEMIA_DEMO: missing auth users — run 02_auth_users.ps1 first (owner/vet/recepcion)';
   END IF;
 
-  -- Snapshot: other clinics must remain untouched (count only)
+  -- Never reassign profiles / memberships from other clinics
+  FOREACH v_uid IN ARRAY ARRAY[v_owner_uid, v_vet_uid, v_rec_uid]
+  LOOP
+    IF EXISTS (
+      SELECT 1 FROM public.profiles p
+      WHERE p.id = v_uid
+        AND p.deleted_at IS NULL
+        AND p.organization_id IS DISTINCT FROM c_org_id
+    ) THEN
+      RAISE EXCEPTION 'ACADEMIA_DEMO: auth user % already bound to another organization', v_uid;
+    END IF;
+
+    IF EXISTS (
+      SELECT 1 FROM public.branch_members bm
+      WHERE bm.user_id = v_uid
+        AND bm.deleted_at IS NULL
+        AND bm.is_active
+        AND bm.organization_id IS DISTINCT FROM c_org_id
+    ) THEN
+      RAISE EXCEPTION 'ACADEMIA_DEMO: auth user % has active membership in another organization', v_uid;
+    END IF;
+  END LOOP;
+
   SELECT count(*) INTO v_other_orgs
   FROM public.organizations
   WHERE deleted_at IS NULL AND id <> c_org_id;
 
-  -- 1) Organization (upsert by fixed id)
+  -- 1) Organization (upsert by fixed id) — marker only via maintainer session
   INSERT INTO public.organizations (id, name, slug, plan, settings)
   VALUES (
     c_org_id,
@@ -83,10 +139,11 @@ BEGIN
     jsonb_build_object(
       'academia_demo', true,
       'academia_demo_key', c_marker_key,
+      'academia_demo_managed', true,
+      'academia_demo_source', c_source,
       'timezone', c_tz,
       'currency', 'ARS',
-      'email', 'noreply@academia-demo.invalid',
-      'phone', NULL
+      'email', 'noreply@academia-demo.invalid'
     )
   )
   ON CONFLICT (id) DO UPDATE SET
@@ -94,13 +151,14 @@ BEGIN
     slug = EXCLUDED.slug,
     deleted_at = NULL,
     settings = public.organizations.settings || EXCLUDED.settings,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.organizations.id = c_org_id;
 
-  -- Tag trial subscription metadata (created by ensure_default_organization_subscription)
   UPDATE public.organization_subscriptions s
   SET metadata = coalesce(s.metadata, '{}'::jsonb) || jsonb_build_object(
     'academia_demo', true,
     'academia_demo_key', c_marker_key,
+    'academia_demo_source', c_source,
     'billing_isolated', true
   )
   WHERE s.organization_id = c_org_id;
@@ -119,10 +177,10 @@ BEGIN
     deleted_at = NULL,
     is_active = true,
     is_main = true,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.branches.organization_id = c_org_id;
 
-  -- 3) Profiles + branch_members (permissions exclude whatsapp:send)
-  -- Owner
+  -- 3) Profiles + branch_members (only when unbound or already demo org)
   INSERT INTO public.profiles (id, organization_id, full_name, active_branch_id, is_active, account_status)
   VALUES (v_owner_uid, c_org_id, 'Owner Demo Academia', c_branch_id, true, 'active')
   ON CONFLICT (id) DO UPDATE SET
@@ -132,7 +190,8 @@ BEGIN
     deleted_at = NULL,
     is_active = true,
     account_status = 'active',
-    updated_at = now();
+    updated_at = now()
+  WHERE public.profiles.organization_id = c_org_id;
 
   INSERT INTO public.branch_members (organization_id, branch_id, user_id, role, permissions, is_active)
   VALUES (
@@ -146,9 +205,9 @@ BEGIN
     permissions = EXCLUDED.permissions,
     is_active = true,
     deleted_at = NULL,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.branch_members.organization_id = c_org_id;
 
-  -- Vet (Dra. Ana Demo)
   INSERT INTO public.profiles (id, organization_id, full_name, active_branch_id, is_active, account_status)
   VALUES (v_vet_uid, c_org_id, 'Dra. Ana Demo', c_branch_id, true, 'active')
   ON CONFLICT (id) DO UPDATE SET
@@ -158,7 +217,8 @@ BEGIN
     deleted_at = NULL,
     is_active = true,
     account_status = 'active',
-    updated_at = now();
+    updated_at = now()
+  WHERE public.profiles.organization_id = c_org_id;
 
   INSERT INTO public.branch_members (organization_id, branch_id, user_id, role, permissions, is_active)
   VALUES (
@@ -172,9 +232,9 @@ BEGIN
     permissions = EXCLUDED.permissions,
     is_active = true,
     deleted_at = NULL,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.branch_members.organization_id = c_org_id;
 
-  -- Reception
   INSERT INTO public.profiles (id, organization_id, full_name, active_branch_id, is_active, account_status)
   VALUES (v_rec_uid, c_org_id, 'Recepción Demo', c_branch_id, true, 'active')
   ON CONFLICT (id) DO UPDATE SET
@@ -184,7 +244,8 @@ BEGIN
     deleted_at = NULL,
     is_active = true,
     account_status = 'active',
-    updated_at = now();
+    updated_at = now()
+  WHERE public.profiles.organization_id = c_org_id;
 
   INSERT INTO public.branch_members (organization_id, branch_id, user_id, role, permissions, is_active)
   VALUES (
@@ -198,27 +259,31 @@ BEGIN
     permissions = EXCLUDED.permissions,
     is_active = true,
     deleted_at = NULL,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.branch_members.organization_id = c_org_id;
 
-  -- 4) Professional record for Dra. Ana Demo
+  -- 4) Professional
   INSERT INTO public.professionals (
     id, organization_id, user_id, profile_id, first_name, last_name,
-    relationship_type, specialty, is_active, invoice_required, email
+    relationship_type, specialty, is_active, invoice_required, email, notes
   )
   VALUES (
     c_prof_id, c_org_id, v_vet_uid, v_vet_uid, 'Ana', 'Demo',
-    'employee', 'Medicina general', true, false, 'vet.demo@academia-demo.invalid'
+    'employee', 'Medicina general', true, false, 'vet.demo@academia-demo.invalid',
+    c_source
   )
   ON CONFLICT (id) DO UPDATE SET
     user_id = v_vet_uid,
     profile_id = v_vet_uid,
     first_name = 'Ana',
     last_name = 'Demo',
+    notes = c_source,
     deleted_at = NULL,
     is_active = true,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.professionals.organization_id = c_org_id;
 
-  -- 5) Schedules Mon–Sun 08:00–20:00 (ISODOW 1–7) so availability trigger passes
+  -- 5) Schedules only for demo vet on demo branch
   FOR v_weekday IN 1..7 LOOP
     IF NOT EXISTS (
       SELECT 1 FROM public.professional_schedules s
@@ -250,7 +315,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 6) Owner María Ejemplo (no portal, no WhatsApp)
+  -- 6) Owner María Ejemplo
   INSERT INTO public.owners (
     id, organization_id, branch_id, full_name, email, phone, phone_whatsapp,
     document_type, document_number, city, province, notes, is_active, portal_user_id,
@@ -264,15 +329,17 @@ BEGIN
     c_source, 'owner-maria'
   )
   ON CONFLICT (id) DO UPDATE SET
-    organization_id = c_org_id,
     branch_id = c_branch_id,
     full_name = EXCLUDED.full_name,
     email = EXCLUDED.email,
     phone_whatsapp = NULL,
     portal_user_id = NULL,
+    source_system = c_source,
+    source_record_id = 'owner-maria',
     deleted_at = NULL,
     is_active = true,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.owners.organization_id = c_org_id;
 
   -- 7) Patient Luna
   INSERT INTO public.patients (
@@ -284,17 +351,18 @@ BEGIN
     false, false, true, 'Paciente ficticio Academia Demo', c_source, 'patient-luna'
   )
   ON CONFLICT (id) DO UPDATE SET
-    organization_id = c_org_id,
     branch_id = c_branch_id,
     owner_id = c_owner_id,
     name = 'Luna',
     species = 'Canino',
+    source_system = c_source,
+    source_record_id = 'patient-luna',
     deleted_at = NULL,
     is_active = true,
-    updated_at = now();
+    updated_at = now()
+  WHERE public.patients.organization_id = c_org_id;
 
-  -- 8) Appointments (5) — statuses use completada (not completed)
-  -- Upsert by source_record_id within demo org (no soft-delete churn / notify spam)
+  -- 8) Appointments — only seed-tagged rows
   <<seed_appts>>
   DECLARE
     r record;
@@ -349,7 +417,6 @@ BEGIN
     END LOOP;
   END;
 
-  -- Ensure no owner_app_settings for demo org (defensive)
   DELETE FROM public.owner_app_settings WHERE organization_id = c_org_id;
 
   RAISE NOTICE 'ACADEMIA_DEMO seed OK org=% other_orgs_untouched_count=%', c_org_id, v_other_orgs;
