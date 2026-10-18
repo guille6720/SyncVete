@@ -183,14 +183,16 @@ ON CONFLICT (email) DO NOTHING;
 $securityOk = $false
 $seedOk = $false
 $idempotentOk = $false
+$ownershipOk = $false
+$forgedRollbackRefused = $false
 $assertOk = $false
 $rollback1Ok = $false
 $rollback2Ok = $false
 $validationEvidence = $null
 $failureReason = $null
 $differences = @(
-  'Disposable DB uses schema dump; no GoTrue Auth Admin — stub auth.users only',
-  'cron.job not scheduled (no pg_cron runner) — queue_owner_app_reminders not auto-invoked',
+  'Disposable DB uses schema dump; no GoTrue Auth Admin - stub auth.users only',
+  'cron.job not scheduled (no pg_cron runner) - queue_owner_app_reminders not auto-invoked',
   'No Edge Functions / WhatsApp providers / payment webhooks',
   'Some dump objects may fail restore (ownership/extensions); seed targets core public tables',
   'auth.jwt()/auth.uid() stubbed; SET ROLE authenticated approximates PostgREST role switch, not full JWT signing'
@@ -224,17 +226,56 @@ try {
 
   Write-Host 'Applying seed (with approval gate)...'
   $c2 = Invoke-PgFile $seedApply 'seed1.log' 1
-  if ($c2 -ne 0) { throw 'Seed pass 1 failed — see seed1.log' }
+  if ($c2 -ne 0) { throw 'Seed pass 1 failed - see seed1.log' }
   $seedOk = $true
 
   Write-Host 'Idempotent re-seed...'
   $c3 = Invoke-PgFile $seedApply 'seed2.log' 1
-  if ($c3 -ne 0) { throw 'Seed pass 2 (idempotency) failed — see seed2.log' }
+  if ($c3 -ne 0) { throw 'Seed pass 2 (idempotency) failed - see seed2.log' }
   $idempotentOk = $true
+
+  Write-Host 'Ownership fixtures (tester rows + strip prior claims)...'
+  $cFix = Invoke-PgFile (Join-Path $here '09a_ownership_fixtures.sql') 'ownership_fixtures.log' 1
+  if ($cFix -ne 0) { throw 'Ownership fixtures failed - see ownership_fixtures.log' }
+
+  Write-Host 'Re-seed after fixtures (must NOT adopt preexisting rows)...'
+  $c3b = Invoke-PgFile $seedApply 'seed3_no_adopt.log' 1
+  if ($c3b -ne 0) { throw 'Seed pass 3 (no-adopt) failed - see seed3_no_adopt.log' }
+
+  Write-Host 'Ownership negative assertions (registry lock + non-adoption)...'
+  $cOwn = Invoke-PgFile (Join-Path $here '09b_ownership_assertions.sql') 'ownership_assertions.log' 1
+  if ($cOwn -ne 0) { throw 'Ownership assertions failed - see ownership_assertions.log' }
+  $ownershipOk = $true
+
+  Write-Host 'Forged-registry rollback must REFUSE...'
+  $cForge = Invoke-PgFile $rollbackApply 'rollback_forged.log' 1
+  if ($cForge -eq 0) { throw 'Forged-registry rollback incorrectly succeeded - see rollback_forged.log' }
+  $forgeLog = Get-Content (Join-Path $Workdir 'rollback_forged.log') -Raw
+  if ($forgeLog -notmatch 'rollback refused') {
+    throw 'Forged-registry rollback did not report refusal - see rollback_forged.log'
+  }
+  $forgedRollbackRefused = $true
+
+  Write-Host 'Restoring unforged registry + soft-deleting tester fixtures...'
+  Invoke-Pg @"
+UPDATE public.organizations o
+SET settings = o.settings || jsonb_build_object(
+  'academia_demo_registry', b.registry
+)
+FROM public._academia_demo_registry_backup b
+WHERE o.id = 'a0a0a0a0-d0e0-4000-8000-000000000001';
+UPDATE public.profiles SET deleted_at = now(), is_active = false
+WHERE id = 'f1f1f1f1-d0e0-4000-8000-00000000aaaa';
+UPDATE public.branch_members SET deleted_at = now(), is_active = false
+WHERE user_id = 'f1f1f1f1-d0e0-4000-8000-00000000aaaa';
+UPDATE public.professional_schedules SET deleted_at = now()
+WHERE user_id = 'f1f1f1f1-d0e0-4000-8000-00000000aaaa' AND deleted_at IS NULL;
+DROP TABLE IF EXISTS public._academia_demo_registry_backup;
+"@ | Out-Null
 
   Write-Host 'Fail-closed validation assert (must RAISE on failure)...'
   $cAssert = Invoke-PgFile (Join-Path $here '03_validation_assert.sql') 'validation_assert.log' 1
-  if ($cAssert -ne 0) { throw 'Validation ASSERT failed — see validation_assert.log' }
+  if ($cAssert -ne 0) { throw 'Validation ASSERT failed - see validation_assert.log' }
   $assertLog = Get-Content (Join-Path $Workdir 'validation_assert.log') -Raw
   if ($assertLog -notmatch 'ACADEMIA_DEMO_VALIDATION' -and $assertLog -notmatch 'PASS') {
     throw 'Validation assert produced no PASS evidence'
@@ -244,7 +285,7 @@ try {
   Write-Host 'Capturing advisory validation JSON evidence...'
   docker cp (Join-Path $here '03_validation_queries.sql') "${container}:/tmp/sv_val.sql" | Out-Null
   cmd /c "docker exec $container psql -U postgres -d postgres -t -A -v ON_ERROR_STOP=1 -f /tmp/sv_val.sql > `"$Workdir\validation.json`" 2>&1"
-  if ($LASTEXITCODE -ne 0) { throw 'validation_queries.sql failed — see validation.json' }
+  if ($LASTEXITCODE -ne 0) { throw 'validation_queries.sql failed - see validation.json' }
   $validationEvidence = (Get-Content (Join-Path $Workdir 'validation.json') -Raw).Trim()
   if (-not $validationEvidence -or $validationEvidence.Length -lt 10) {
     throw 'validation.json empty or missing'
@@ -255,42 +296,44 @@ try {
 
   Write-Host 'Rollback pass 1...'
   $cR1 = Invoke-PgFile $rollbackApply 'rollback1.log' 1
-  if ($cR1 -ne 0) { throw 'Rollback pass 1 failed — see rollback1.log' }
+  if ($cR1 -ne 0) { throw 'Rollback pass 1 failed - see rollback1.log' }
   $rollback1Ok = $true
 
   Write-Host 'Rollback pass 2 (idempotency)...'
   $cR2 = Invoke-PgFile $rollbackApply 'rollback2.log' 1
-  if ($cR2 -ne 0) { throw 'Rollback pass 2 failed — see rollback2.log' }
+  if ($cR2 -ne 0) { throw 'Rollback pass 2 failed - see rollback2.log' }
   $rollback2Ok = $true
 
   $seedLeft = docker exec $container psql -U postgres -d postgres -t -A -c "SELECT count(*) FROM public.appointments WHERE organization_id='a0a0a0a0-d0e0-4000-8000-000000000001' AND source_system='academia_demo_seed' AND deleted_at IS NULL;"
   if ([int]$seedLeft.Trim() -ne 0) { throw "After rollback expected 0 active seed appts, got $seedLeft" }
 
-  Write-Host 'Dry-run assertions PASSED (security + seed + assert + rollback x2).'
+  Write-Host 'Dry-run assertions PASSED (security + ownership + seed + assert + rollback x2).'
 } catch {
   $failureReason = "$_"
   Write-Host "DRY-RUN FAILURE: $_"
 } finally {
   $overall = if (
-    $securityOk -and $seedOk -and $idempotentOk -and $assertOk -and $rollback1Ok -and $rollback2Ok -and -not $failureReason
+    $securityOk -and $seedOk -and $idempotentOk -and $ownershipOk -and $forgedRollbackRefused -and $assertOk -and $rollback1Ok -and $rollback2Ok -and -not $failureReason
   ) { 'PASS' } else { 'FAIL' }
 
   $report = [pscustomobject]@{
-    at                = (Get-Date).ToUniversalTime().ToString('o')
-    phase             = '5C.2'
-    project_ref       = $ProjectRef
-    result            = $overall
-    security_ok       = $securityOk
-    seed_ok           = $seedOk
-    idempotent_ok     = $idempotentOk
-    assert_ok         = $assertOk
-    rollback1_ok      = $rollback1Ok
-    rollback2_ok      = $rollback2Ok
-    failure_reason    = $failureReason
-    differences       = $differences
-    validation_file   = 'validation.json'
-    assert_log        = 'validation_assert.log'
-    container         = $container
+    at                       = (Get-Date).ToUniversalTime().ToString('o')
+    phase                    = '5C.2-ownership'
+    project_ref              = $ProjectRef
+    result                   = $overall
+    security_ok              = $securityOk
+    seed_ok                  = $seedOk
+    idempotent_ok            = $idempotentOk
+    ownership_ok             = $ownershipOk
+    forged_rollback_refused  = $forgedRollbackRefused
+    assert_ok                = $assertOk
+    rollback1_ok             = $rollback1Ok
+    rollback2_ok             = $rollback2Ok
+    failure_reason           = $failureReason
+    differences              = $differences
+    validation_file          = 'validation.json'
+    assert_log               = 'validation_assert.log'
+    container                = $container
   }
   $report | ConvertTo-Json -Depth 6 | Set-Content $reportFile -Encoding utf8
   Write-Host "Report: $reportFile result=$overall"
@@ -298,6 +341,6 @@ try {
   docker rm -f $container 2>$null | Out-Null
 }
 
-if ($failureReason -or -not $securityOk -or -not $assertOk -or -not $rollback2Ok) { exit 1 }
+if ($failureReason -or -not $securityOk -or -not $ownershipOk -or -not $forgedRollbackRefused -or -not $assertOk -or -not $rollback2Ok) { exit 1 }
 Write-Host '=== Dry-run COMPLETE (no staging writes) ==='
 exit 0

@@ -103,6 +103,7 @@ BEGIN
       SELECT 1 FROM public.organizations o
       WHERE o.id = c_org AND o.settings ? 'academia_demo_registry'
         AND o.settings->'academia_demo_registry'->>'source' = c_source
+        AND o.settings->'academia_demo_registry'->>'managed_by' = 'syncvete_ops'
     ),
     'marker_trigger', EXISTS(
       SELECT 1 FROM pg_trigger t

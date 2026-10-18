@@ -189,6 +189,73 @@ BEGIN
     RAISE NOTICE 'FAIL unexpected SECURITY DEFINER on marker helpers';
   END IF;
 
+  -- -----------------------------------------------------------------------
+  -- 8) authenticated cannot INSERT org with academia_demo_registry
+  -- -----------------------------------------------------------------------
+  BEGIN
+    SET LOCAL ROLE authenticated;
+    PERFORM set_config('request.jwt.claims', '{"role":"authenticated"}', true);
+    INSERT INTO public.organizations (id, name, slug, settings)
+    VALUES (
+      'a3a3a3a3-d0e0-4000-8000-00000000aa01',
+      'Forged Registry Org',
+      'forged-registry-5c2',
+      jsonb_build_object(
+        'academia_demo_registry',
+        jsonb_build_object('source', 'academia_demo_seed', 'forged', true)
+      )
+    );
+    v_failed := v_failed + 1;
+    RAISE NOTICE 'FAIL auth INSERT registry';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'ACADEMIA_DEMO_MARKER_LOCKED%' OR SQLSTATE = '42501' THEN
+      v_passed := v_passed + 1;
+      RAISE NOTICE 'PASS authenticated cannot INSERT academia_demo_registry';
+    ELSE
+      v_passed := v_passed + 1;
+      RAISE NOTICE 'PASS authenticated registry INSERT blocked (%)', SQLERRM;
+    END IF;
+  END;
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', '', true);
+  UPDATE public.organizations SET deleted_at = now()
+  WHERE id = 'a3a3a3a3-d0e0-4000-8000-00000000aa01' AND deleted_at IS NULL;
+
+  -- -----------------------------------------------------------------------
+  -- 9) Legitimate settings update without touching locked keys (as postgres)
+  -- -----------------------------------------------------------------------
+  INSERT INTO public.organizations (id, name, slug, settings)
+  VALUES (
+    'a4a4a4a4-d0e0-4000-8000-00000000aa02',
+    'Legit Settings Org',
+    'legit-settings-5c2',
+    jsonb_build_object('timezone', 'UTC')
+  )
+  ON CONFLICT (id) DO UPDATE SET deleted_at = NULL, settings = EXCLUDED.settings;
+
+  BEGIN
+    SET LOCAL ROLE authenticated;
+    PERFORM set_config('request.jwt.claims', '{"role":"authenticated"}', true);
+    UPDATE public.organizations
+    SET settings = settings || jsonb_build_object('currency', 'ARS')
+    WHERE id = 'a4a4a4a4-d0e0-4000-8000-00000000aa02';
+    -- May be blocked by RLS (no membership) - either success without locked keys or RLS deny is OK
+    v_passed := v_passed + 1;
+    RAISE NOTICE 'PASS non-locked settings path exercised (result tolerated under RLS)';
+  EXCEPTION WHEN OTHERS THEN
+    IF SQLERRM LIKE 'ACADEMIA_DEMO_MARKER_LOCKED%' THEN
+      v_failed := v_failed + 1;
+      RAISE NOTICE 'FAIL locked-key false positive on currency update';
+    ELSE
+      v_passed := v_passed + 1;
+      RAISE NOTICE 'PASS non-locked update denied by RLS/other (%)', SQLERRM;
+    END IF;
+  END;
+  RESET ROLE;
+  PERFORM set_config('request.jwt.claims', '', true);
+  UPDATE public.organizations SET deleted_at = now()
+  WHERE id = 'a4a4a4a4-d0e0-4000-8000-00000000aa02';
+
   RAISE NOTICE 'SECURITY_TESTS summary passed=% failed=%', v_passed, v_failed;
   IF v_failed > 0 THEN
     RAISE EXCEPTION 'SECURITY_TESTS failed: %', v_failed;

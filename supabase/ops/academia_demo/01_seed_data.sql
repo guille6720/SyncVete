@@ -9,8 +9,10 @@
 --   Domain rows: source_system = 'academia_demo_seed'
 --   Professional.notes = 'academia_demo_seed'
 --   Registry in organizations.settings.academia_demo_registry
---   Profiles/memberships: INSERT-only; never overwrite independent records
---   Schedules: INSERT missing only; never UPDATE tester schedules
+--   Profiles/memberships: INSERT-only; never overwrite OR adopt independent records
+--   Registry lists ONLY rows the seed created (or already verified seed-owned)
+--   Empty registry must NOT backfill preexisting demo-org rows
+--   Schedules: INSERT missing only; never UPDATE/adopt tester schedules
 --   owner_app_settings: abort if present (never DELETE)
 -- ============================================================================
 
@@ -199,7 +201,9 @@ BEGIN
     is_active = true, is_main = true, updated_at = now()
   WHERE public.branches.organization_id = c_org_id;
 
-  -- 3) Profiles — INSERT only (never reassign / overwrite independent)
+  -- 3) Profiles — INSERT only; NEVER adopt preexisting rows into the registry
+  -- Ownership recorded only when this seed creates the row, or the id is already
+  -- listed in a prior seed registry (independently verified seed ownership).
   FOREACH v_uid IN ARRAY ARRAY[v_owner_uid, v_vet_uid, v_rec_uid]
   LOOP
     IF NOT EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = v_uid) THEN
@@ -213,26 +217,24 @@ BEGIN
         END,
         c_branch_id, true, 'active'
       );
-      v_profile_ids := v_profile_ids || jsonb_build_array(v_uid::text);
-    ELSIF EXISTS (
-      SELECT 1 FROM public.profiles p
-      WHERE p.id = v_uid AND p.organization_id = c_org_id AND p.deleted_at IS NULL
-        AND (
-          v_profile_ids @> jsonb_build_array(v_uid::text)
-          OR jsonb_array_length(v_profile_ids) = 0
-        )
-    ) THEN
       IF NOT (v_profile_ids @> jsonb_build_array(v_uid::text)) THEN
         v_profile_ids := v_profile_ids || jsonb_build_array(v_uid::text);
       END IF;
+    ELSIF v_profile_ids @> jsonb_build_array(v_uid::text)
+      AND EXISTS (
+        SELECT 1 FROM public.profiles p
+        WHERE p.id = v_uid AND p.organization_id = c_org_id AND p.deleted_at IS NULL
+      )
+    THEN
+      -- Already seed-registered: refresh operational fields only
       UPDATE public.profiles
       SET deleted_at = NULL, is_active = true, active_branch_id = c_branch_id, updated_at = now()
       WHERE id = v_uid AND organization_id = c_org_id;
     END IF;
-    -- If profile exists in demo org but not seed-owned → leave untouched
+    -- Preexisting profile not in registry → leave untouched; do NOT adopt
   END LOOP;
 
-  -- Branch members — INSERT only
+  -- Branch members — INSERT only; NEVER adopt preexisting memberships into registry
   IF NOT EXISTS (
     SELECT 1 FROM public.branch_members bm
     WHERE bm.branch_id = c_branch_id AND bm.user_id = v_owner_uid
@@ -243,10 +245,11 @@ BEGIN
       '["org:manage","branch:manage","users:manage","patients:read","patients:write","appointments:read","appointments:write","clinical:read","clinical:write","billing:read","billing:write","inventory:read","inventory:write","reports:read","audit:read","data:import","data:export","waiting_room:read","waiting_room:write"]'::jsonb,
       true
     );
-    v_member_uids := v_member_uids || jsonb_build_array(v_owner_uid::text);
-  ELSIF NOT (v_member_uids @> jsonb_build_array(v_owner_uid::text)) THEN
-    v_member_uids := v_member_uids || jsonb_build_array(v_owner_uid::text);
+    IF NOT (v_member_uids @> jsonb_build_array(v_owner_uid::text)) THEN
+      v_member_uids := v_member_uids || jsonb_build_array(v_owner_uid::text);
+    END IF;
   END IF;
+  -- else: preexisting membership left untouched; not adopted into registry
 
   IF NOT EXISTS (
     SELECT 1 FROM public.branch_members bm
@@ -258,9 +261,9 @@ BEGIN
       '["patients:read","patients:write","appointments:read","appointments:write","clinical:read","clinical:write","inventory:read","reports:read","data:export","waiting_room:read","waiting_room:write"]'::jsonb,
       true
     );
-    v_member_uids := v_member_uids || jsonb_build_array(v_vet_uid::text);
-  ELSIF NOT (v_member_uids @> jsonb_build_array(v_vet_uid::text)) THEN
-    v_member_uids := v_member_uids || jsonb_build_array(v_vet_uid::text);
+    IF NOT (v_member_uids @> jsonb_build_array(v_vet_uid::text)) THEN
+      v_member_uids := v_member_uids || jsonb_build_array(v_vet_uid::text);
+    END IF;
   END IF;
 
   IF NOT EXISTS (
@@ -273,9 +276,9 @@ BEGIN
       '["patients:read","patients:write","appointments:read","appointments:write","billing:read","waiting_room:read","waiting_room:write"]'::jsonb,
       true
     );
-    v_member_uids := v_member_uids || jsonb_build_array(v_rec_uid::text);
-  ELSIF NOT (v_member_uids @> jsonb_build_array(v_rec_uid::text)) THEN
-    v_member_uids := v_member_uids || jsonb_build_array(v_rec_uid::text);
+    IF NOT (v_member_uids @> jsonb_build_array(v_rec_uid::text)) THEN
+      v_member_uids := v_member_uids || jsonb_build_array(v_rec_uid::text);
+    END IF;
   END IF;
 
   -- 4) Professional (seed-owned)
@@ -392,11 +395,13 @@ BEGIN
     END LOOP;
   END;
 
-  -- Persist registry (seed ownership ledger)
+  -- Persist registry (seed ownership ledger). Maintainer-only via protect trigger.
+  -- Lists only seed-created / previously registered ids — never silently adopted rows.
   UPDATE public.organizations
   SET settings = coalesce(settings, '{}'::jsonb) || jsonb_build_object(
     'academia_demo_registry', jsonb_build_object(
       'source', c_source,
+      'managed_by', 'syncvete_ops',
       'branch_id', c_branch_id,
       'owner_id', c_owner_id,
       'patient_id', c_patient_id,
