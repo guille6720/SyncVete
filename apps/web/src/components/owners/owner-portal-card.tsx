@@ -21,6 +21,8 @@ interface OwnerPortalCardProps {
   canWrite: boolean;
   portalEnabled?: boolean;
   status: OwnerPortalStatus | null;
+  /** When true, invite/resend lives in the App del propietario card. */
+  hideInviteActions?: boolean;
 }
 
 export function OwnerPortalCard({
@@ -29,6 +31,7 @@ export function OwnerPortalCard({
   canWrite,
   portalEnabled = true,
   status,
+  hideInviteActions = false,
 }: OwnerPortalCardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -152,7 +155,7 @@ export function OwnerPortalCard({
         {error && <p className="text-sm text-destructive">{error}</p>}
         {canWrite && (
           <div className="flex flex-wrap gap-2">
-            {access !== 'active' && (
+            {!hideInviteActions && access !== 'active' && (
               <Button
                 type="button"
                 size="sm"

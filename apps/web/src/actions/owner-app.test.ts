@@ -33,7 +33,10 @@ vi.mock('@/actions/owner-app-bridge', () => ({
   isOwnerAppConfigured: async () => true,
   sendOwnerAppInvite: mocks.bridge,
 }));
-vi.mock('@/lib/owner-app-email', () => ({ ownerAppOrigin: mocks.origin }));
+vi.mock('@/lib/owner-app-email', () => ({
+  ownerAppOrigin: mocks.origin,
+  sendOwnerAppEmail: vi.fn(async () => true),
+}));
 
 import { sendOwnerAppInvite } from './owner-app';
 
@@ -53,6 +56,7 @@ describe('integrated WhatsApp invitations', () => {
     mocks.owner.mockResolvedValue({
       is_active: true,
       full_name: 'Tutor',
+      email: 'tutor@example.com',
       phone_whatsapp: '+5491112345678',
       phone: null,
     });
@@ -90,21 +94,33 @@ describe('integrated WhatsApp invitations', () => {
   it('prepares the integrated private link without using the bridge', async () => {
     const result = await sendOwnerAppInvite('owner');
     expect(result.success).toBe(true);
-    expect(result.data?.whatsappText).toContain('app-IMILVET');
-    expect(result.data?.whatsappText).toContain(
+    expect(result.data?.channel).toBe('whatsapp');
+    expect(result.data?.activateUrl).toContain(
       'https://staging.example.com/portal/activar?token='
     );
+    expect(result.data?.whatsappText).toContain('app-IMILVET');
+    expect(result.data?.whatsappText).toContain(result.data!.activateUrl);
     expect(mocks.feature).toHaveBeenCalled();
     expect(mocks.bridge).not.toHaveBeenCalled();
+  });
+
+  it('prepares an email invitation with the same private link', async () => {
+    const result = await sendOwnerAppInvite('owner', 'email');
+    expect(result.success).toBe(true);
+    expect(result.data?.channel).toBe('email');
+    expect(result.data?.emailSent).toBe(true);
+    expect(result.data?.activateUrl).toContain('/portal/activar?token=');
+    expect(result.data?.whatsappUrl).toBeUndefined();
   });
 
   it('shares installation without rotating access for an active owner', async () => {
     mocks.status.mockResolvedValue({ status: 'active' });
     const result = await sendOwnerAppInvite('owner');
     expect(result.success).toBe(true);
-    expect(result.data?.whatsappText).toContain(
+    expect(result.data?.activateUrl).toContain(
       '/portal/instalar/11111111-1111-4111-8111-111111111111'
     );
+    expect(result.data?.whatsappText).toContain(result.data!.activateUrl);
     expect(result.data?.whatsappText).not.toContain('token=');
     expect(mocks.rpc).not.toHaveBeenCalledWith('create_owner_portal_invite', expect.anything());
   });

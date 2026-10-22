@@ -27,7 +27,7 @@ import { createHash } from 'node:crypto';
 import { ownerAppEnabled } from '@/lib/owner-app';
 import { ownerAppOrigin, sendOwnerAppEmail } from '@/lib/owner-app-email';
 import { getOwnerAppBrand } from '@/actions/owner-app';
-import { buildPortalActivatePath } from '@sincvete/shared';
+import { buildPortalActivatePath, normalizePortalInviteToken } from '@sincvete/shared';
 import { FEATURES, planRestrictionResult, requireFeature, canUseFeature } from '@/lib/entitlements';
 
 function isNextRedirect(error: unknown): boolean {
@@ -64,10 +64,11 @@ function rpcMessage(error: { message?: string } | null): string {
 }
 
 export async function previewPortalInvite(token: string): Promise<PortalInvitePreview | null> {
-  if (!token.trim()) return null;
+  const inviteToken = normalizePortalInviteToken(token);
+  if (!inviteToken) return null;
   const supabase = await createServerClient();
   const { data, error } = await supabase.rpc('preview_owner_portal_invite', {
-    p_token: token.trim(),
+    p_token: inviteToken,
   });
   if (error) return null;
   return parsePortalInvitePreview(data);
@@ -232,7 +233,7 @@ export async function acceptPortalInviteForm(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const token = String(formData.get('token') ?? '').trim();
+  const token = normalizePortalInviteToken(String(formData.get('token') ?? ''));
   if (!token) {
     return { success: false, error: 'Invitación inválida o vencida' };
   }
@@ -241,6 +242,10 @@ export async function acceptPortalInviteForm(
 
 export async function acceptPortalInvite(token: string): Promise<ActionResult> {
   try {
+    const inviteToken = normalizePortalInviteToken(token);
+    if (!inviteToken) {
+      return { success: false, error: 'Invitación inválida o vencida' };
+    }
     const supabase = await createServerClient();
     const {
       data: { user },
@@ -250,7 +255,7 @@ export async function acceptPortalInvite(token: string): Promise<ActionResult> {
     }
 
     const { error } = await supabase.rpc('accept_owner_portal_invite', {
-      p_token: token.trim(),
+      p_token: inviteToken,
       p_full_name: user.user_metadata?.full_name ?? null,
     });
     if (error) {
@@ -268,7 +273,7 @@ export async function activatePortalAccount(
   formData: FormData
 ): Promise<ActionResult> {
   const parsed = portalActivateSchema.safeParse({
-    token: formData.get('token'),
+    token: normalizePortalInviteToken(String(formData.get('token') ?? '')),
     fullName: formData.get('fullName'),
     password: formData.get('password'),
   });

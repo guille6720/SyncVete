@@ -169,6 +169,8 @@ export function OwnerDetail({
         <OwnerAppInviteCard
           ownerId={owner.id}
           hasWhatsAppPhone={pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone) !== null}
+          hasEmail={Boolean(owner.email?.trim())}
+          portalStatus={portalStatus?.status ?? null}
         />
       )}
 
@@ -178,6 +180,7 @@ export function OwnerDetail({
         canWrite={canWrite}
         portalEnabled={portalEnabled}
         status={portalStatus}
+        hideInviteActions={canSendOwnerApp}
       />
     </div>
   );

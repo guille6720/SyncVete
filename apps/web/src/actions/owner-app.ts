@@ -16,6 +16,7 @@ import {
 import {
   buildWhatsAppUrl,
   buildPortalActivatePath,
+  normalizePortalInviteToken,
   pickOwnerWhatsAppPhone,
   parsePortalInviteCreated,
   type ActionResult,
@@ -24,13 +25,18 @@ import { PermissionError } from '@/lib/permissions';
 import { planRestrictionResult } from '@/lib/entitlements';
 import { getOwner } from '@/actions/owners';
 import { getOwnerPortalStatus } from '@/actions/portal';
-import { ownerAppOrigin } from '@/lib/owner-app-email';
+import { ownerAppOrigin, sendOwnerAppEmail } from '@/lib/owner-app-email';
+import { createHash } from 'node:crypto';
 import {
   isOwnerAppConfigured as isBridgeConfigured,
   sendOwnerAppInvite as sendBridgeInvite,
+  type OwnerAppInviteChannel,
   type OwnerAppInviteResult,
 } from '@/actions/owner-app-bridge';
-export type { OwnerAppInviteResult } from '@/actions/owner-app-bridge';
+export type {
+  OwnerAppInviteChannel,
+  OwnerAppInviteResult,
+} from '@/actions/owner-app-bridge';
 import { z } from 'zod';
 
 function requireStaging() {
@@ -49,9 +55,10 @@ export async function getOwnerAppBrand(organizationId: string) {
 }
 
 export async function getOwnerAppInviteBrand(token: string) {
-  if (!ownerAppEnabled() || !/^[a-f0-9]{64}$/i.test(token)) return null;
+  const inviteToken = normalizePortalInviteToken(token);
+  if (!ownerAppEnabled() || !/^[a-f0-9]{64}$/i.test(inviteToken)) return null;
   const db = await createServerClient();
-  const { data, error } = await db.rpc('get_owner_app_invite_brand', { p_token: token });
+  const { data, error } = await db.rpc('get_owner_app_invite_brand', { p_token: inviteToken });
   if (error || !data || typeof data !== 'object' || Array.isArray(data)) return null;
   const organizationId = z
     .string()
@@ -251,9 +258,15 @@ export async function isOwnerAppConfigured(): Promise<boolean> {
 }
 
 export async function sendOwnerAppInvite(
-  ownerId: string
+  ownerId: string,
+  channel: OwnerAppInviteChannel = 'whatsapp'
 ): Promise<ActionResult<OwnerAppInviteResult>> {
-  if (!ownerAppEnabled()) return sendBridgeInvite(ownerId);
+  if (!ownerAppEnabled()) {
+    if (channel === 'email') {
+      return { success: false, error: 'El envío por email solo está disponible en staging.' };
+    }
+    return sendBridgeInvite(ownerId);
+  }
   try {
     const session = await requirePermission('patients:write');
     await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
@@ -264,17 +277,44 @@ export async function sendOwnerAppInvite(
     if (!owner) return { success: false, error: 'Propietario no encontrado' };
     if (!owner.is_active)
       return { success: false, error: 'Activa al propietario en su ficha antes de enviar la app.' };
+
     const phone = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
-    if (!phone) return { success: false, error: 'Carga un telefono de WhatsApp valido.' };
+    const email = owner.email?.trim() || '';
+    if (channel === 'whatsapp' && !phone) {
+      return { success: false, error: 'Carga un telefono de WhatsApp valido.' };
+    }
+    if (channel === 'email' && !email) {
+      return { success: false, error: 'Carga un email en la ficha del propietario.' };
+    }
+
     const origin = ownerAppOrigin();
     const status = await getOwnerPortalStatus(ownerId);
     if (status?.status === 'active') {
-      const text = `Hola ${owner.full_name}, instalá ${brand.appName} desde ${origin}${ownerAppInstallUrl(session.organizationId)}\n\nIngresá con tu cuenta para ver tus mascotas, vacunas, tratamientos y turnos.\n\nHecho por OpusOrg`;
+      const activateUrl = `${origin}${ownerAppInstallUrl(session.organizationId)}`;
+      const text = `Hola ${owner.full_name}, instalá ${brand.appName}.\n\n${activateUrl}\n\nIngresá con tu cuenta para ver tus mascotas, vacunas, tratamientos y turnos.\n\nHecho por OpusOrg`;
+      if (channel === 'email') {
+        const sent = await sendOwnerAppEmail(
+          email,
+          `Instalá ${brand.appName}`,
+          text,
+          `owner-app-install-${ownerId}-${createHash('sha256').update(activateUrl).digest('hex').slice(0, 16)}`
+        );
+        return {
+          success: true,
+          data: { activateUrl, emailSent: sent, channel },
+        };
+      }
       return {
         success: true,
-        data: { whatsappUrl: buildWhatsAppUrl(phone, text), whatsappText: text },
+        data: {
+          activateUrl,
+          whatsappUrl: buildWhatsAppUrl(phone!, text),
+          whatsappText: text,
+          channel,
+        },
       };
     }
+
     const db = await createServerClient();
     const { data, error } = await db.rpc('create_owner_portal_invite', { p_owner_id: ownerId });
     if (error)
@@ -284,14 +324,36 @@ export async function sendOwnerAppInvite(
       };
     const invite = parsePortalInviteCreated(data);
     if (!invite) return { success: false, error: 'No se pudo crear la invitacion' };
-    const text = `Hola ${owner.full_name}, activa tu acceso a ${brand.appName} e instala la app desde este enlace privado: ${origin}${buildPortalActivatePath(invite.token)}\n\nHecho por OpusOrg`;
+    const activateUrl = `${origin}${buildPortalActivatePath(invite.token)}`;
+    const text = `Hola ${owner.full_name}, activá tu acceso a ${brand.appName}.\n\n${activateUrl}\n\nHecho por OpusOrg`;
     revalidatePath(`/propietarios/${ownerId}`);
+
+    if (channel === 'email') {
+      const sent = await sendOwnerAppEmail(
+        invite.email || email,
+        `Invitación a ${brand.appName}`,
+        `Activa tu acceso e instala la app desde este enlace privado:\n\n${activateUrl}\n\nEl enlace vence el ${invite.expiresAt}.\n\nHecho por OpusOrg`,
+        `owner-app-invite-${createHash('sha256').update(invite.token).digest('hex')}`
+      );
+      return {
+        success: true,
+        data: {
+          expiresAt: invite.expiresAt,
+          activateUrl,
+          emailSent: sent,
+          channel,
+        },
+      };
+    }
+
     return {
       success: true,
       data: {
         expiresAt: invite.expiresAt,
-        whatsappUrl: buildWhatsAppUrl(phone, text),
+        activateUrl,
+        whatsappUrl: buildWhatsAppUrl(phone!, text),
         whatsappText: text,
+        channel,
       },
     };
   } catch (error) {

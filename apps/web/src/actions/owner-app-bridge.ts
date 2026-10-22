@@ -15,10 +15,15 @@ import { consumeMeteredFeature, FEATURES, planRestrictionResult } from '@/lib/en
  * Env (server-only): OWNER_APP_URL, OWNER_APP_BRIDGE_SECRET.
  */
 
+export type OwnerAppInviteChannel = 'whatsapp' | 'email';
+
 export interface OwnerAppInviteResult {
   expiresAt?: string;
-  whatsappUrl: string;
-  whatsappText: string;
+  activateUrl: string;
+  whatsappUrl?: string;
+  whatsappText?: string;
+  emailSent?: boolean;
+  channel: OwnerAppInviteChannel;
 }
 
 interface BridgeResponse {
@@ -130,8 +135,10 @@ export async function sendOwnerAppInvite(ownerId: string): Promise<ActionResult<
       success: true,
       data: {
         expiresAt: payload.expiresAt ?? '',
+        activateUrl: payload.url,
         whatsappUrl: buildWhatsAppUrl(phoneE164, payload.whatsappText),
         whatsappText: payload.whatsappText,
+        channel: 'whatsapp',
       },
     };
   } catch (error) {
