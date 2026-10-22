@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { getOwnerPortalHome } from '@/actions/portal';
 import Link from 'next/link';
 import { OwnerPetAvatar } from '@/components/portal/owner-pet-avatar';
+import { ownerAppNeonCard, ownerAppNeonToneAt } from '@/components/portal/owner-app-neon';
 
 export default async function OwnerPetsPage() {
   if (!ownerAppEnabled()) notFound();
@@ -13,11 +14,14 @@ export default async function OwnerPetsPage() {
       <p className="text-sm text-muted-foreground">
         Los datos y el historial los actualiza tu veterinaria.
       </p>
-      {home?.patients.map((pet) => (
+      {home?.patients.map((pet, index) => (
         <Link
           key={pet.id}
           href={`/portal/mascotas/${pet.id}`}
-          className="flex items-center gap-4 rounded-2xl border bg-card p-5"
+          className={ownerAppNeonCard(
+            ownerAppNeonToneAt(index),
+            'flex items-center gap-4 rounded-2xl p-5'
+          )}
         >
           <OwnerPetAvatar
             name={pet.name}

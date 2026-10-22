@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { OwnerVaccineCalendar } from '@/components/portal/owner-vaccine-calendar';
+import { ownerAppNeonCard } from '@/components/portal/owner-app-neon';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -33,7 +34,7 @@ export function PortalPatientView({ detail }: PortalPatientViewProps) {
         </Link>
       </Button>
 
-      <Card>
+      <Card className={ownerAppNeonCard('emerald', 'rounded-2xl')}>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <span>{SPECIES_EMOJI[patient.species] ?? '🐾'}</span>
@@ -53,9 +54,11 @@ export function PortalPatientView({ detail }: PortalPatientViewProps) {
         </CardContent>
       </Card>
 
-      <OwnerVaccineCalendar vaccines={detail.vaccines} />
+      <div className={ownerAppNeonCard('amber', 'rounded-2xl p-4')}>
+        <OwnerVaccineCalendar vaccines={detail.vaccines} />
+      </div>
 
-      <Card>
+      <Card className={ownerAppNeonCard('cyan', 'rounded-2xl')}>
         <CardHeader>
           <CardTitle className="text-lg">Vacunas</CardTitle>
         </CardHeader>
@@ -81,7 +84,7 @@ export function PortalPatientView({ detail }: PortalPatientViewProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={ownerAppNeonCard('violet', 'rounded-2xl')}>
         <CardHeader>
           <CardTitle className="text-lg">Turnos</CardTitle>
         </CardHeader>
@@ -104,7 +107,7 @@ export function PortalPatientView({ detail }: PortalPatientViewProps) {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card className={ownerAppNeonCard('rose', 'rounded-2xl')}>
         <CardHeader>
           <CardTitle className="text-lg">Seguimiento de tratamientos</CardTitle>
         </CardHeader>

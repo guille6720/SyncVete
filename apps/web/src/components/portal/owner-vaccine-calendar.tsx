@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PortalVaccineDueRow } from '@sincvete/shared';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 export function OwnerVaccineCalendar({ vaccines }: { vaccines: PortalVaccineDueRow[] }) {
   const [month, setMonth] = useState(
@@ -63,9 +64,16 @@ export function OwnerVaccineCalendar({ vaccines }: { vaccines: PortalVaccineDueR
               className="relative flex aspect-square max-h-16 items-center justify-center border"
               aria-label={`${key(i + 1)}${rows.length ? `: ${rows.map((row) => row.vaccineName).join(', ')}` : ''}`}
             >
-              <span className={rows.length ? 'font-bold text-emerald-700' : ''}>{i + 1}</span>
+              <span
+                className={cn(
+                  rows.length &&
+                    'font-bold text-amber-600 drop-shadow-[0_0_6px_rgba(245,158,11,0.55)] dark:text-amber-400'
+                )}
+              >
+                {i + 1}
+              </span>
               {rows.length > 0 && (
-                <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                <span className="absolute bottom-1 h-1.5 w-1.5 rounded-full bg-amber-500 shadow-[0_0_6px_rgba(245,158,11,0.7)] dark:bg-amber-400" />
               )}
             </div>
           );
