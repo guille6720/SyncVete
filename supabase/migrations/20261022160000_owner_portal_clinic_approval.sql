@@ -13,7 +13,7 @@ RETURNS UUID
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT o.id
   FROM public.owners o
@@ -31,7 +31,7 @@ CREATE OR REPLACE FUNCTION public.accept_owner_portal_invite(
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_user_id UUID;
@@ -281,7 +281,7 @@ CREATE OR REPLACE FUNCTION public.create_owner_portal_invite(p_owner_id UUID)
 RETURNS JSONB
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   v_org_id UUID;
@@ -422,3 +422,7 @@ REVOKE ALL ON FUNCTION public.get_portal_pending_owner_id() FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.get_portal_pending_owner_id() TO authenticated;
 REVOKE ALL ON FUNCTION public.approve_owner_portal_access(UUID) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.approve_owner_portal_access(UUID) TO authenticated;
+REVOKE ALL ON FUNCTION public.accept_owner_portal_invite(TEXT, TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.accept_owner_portal_invite(TEXT, TEXT) TO authenticated;
+
+NOTIFY pgrst, 'reload schema';

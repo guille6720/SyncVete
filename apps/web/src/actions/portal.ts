@@ -51,31 +51,17 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   return { success: false, error: 'Ocurrió un error inesperado' };
 }
 
-function rpcMessage(error: { message?: string; code?: string } | null): string {
+function rpcMessage(error: { message?: string; code?: string; details?: string; hint?: string } | null): string {
   const message = (error?.message ?? '').trim();
-  if (!message) return 'Ocurrió un error inesperado';
-  if (message.includes('email')) return message;
-  if (message.includes('permisos')) return message;
-  if (message.includes('Invitación')) return message;
-  if (message.includes('portal')) return message;
-  if (message.includes('clínica') || message.includes('clinica')) return message;
-  if (message.includes('cuenta')) return message;
-  if (message.includes('Propietario')) return message;
-  if (message.includes('Not authenticated') || message.includes('Sesión')) {
+  const details = (error?.details ?? '').trim();
+  const hint = (error?.hint ?? '').trim();
+  const combined = [message, details, hint].filter(Boolean).join(' — ');
+  if (!combined) return 'Ocurrió un error inesperado';
+  if (combined.includes('Not authenticated')) {
     return 'Sesión no válida. Volvé a abrir el enlace de invitación.';
   }
-  // Schema / migration not applied yet on this Supabase project.
-  if (
-    message.includes('does not exist') ||
-    message.includes('portal_pending_user_id') ||
-    message.includes('get_portal_pending_owner_id') ||
-    message.includes('schema cache') ||
-    error?.code === '42703' ||
-    error?.code === '42883'
-  ) {
-    return 'Falta aplicar la migración del portal en Supabase. Pedile a la clínica que corra el SQL de aprobación.';
-  }
-  return message.length <= 180 ? message : 'Ocurrió un error inesperado';
+  // Always surface the DB/PostgREST text so staging SQL issues are actionable.
+  return combined.length <= 280 ? combined : `${combined.slice(0, 277)}...`;
 }
 
 export async function previewPortalInvite(token: string): Promise<PortalInvitePreview | null> {
