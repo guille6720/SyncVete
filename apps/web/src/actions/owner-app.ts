@@ -263,7 +263,7 @@ export async function sendOwnerAppInvite(
 ): Promise<ActionResult<OwnerAppInviteResult>> {
   if (!ownerAppEnabled()) {
     if (channel === 'email') {
-      return { success: false, error: 'El envío por email solo está disponible en staging.' };
+      return { success: false, error: 'El envío por email de la app no está habilitado en este entorno.' };
     }
     return sendBridgeInvite(ownerId);
   }

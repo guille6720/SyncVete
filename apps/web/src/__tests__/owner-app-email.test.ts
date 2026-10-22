@@ -2,10 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 import { ownerAppOrigin, sendOwnerAppEmail } from '../lib/owner-app-email';
 
-function staging() {
-  vi.stubEnv('SYNCVETE_ENV', 'staging');
+function enableOwnerApp() {
   vi.stubEnv('OWNER_APP_ENABLED', 'true');
-  vi.stubEnv('VERCEL_ENV', 'preview');
   vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://owmcrqvnfubyjxrlyhlc.supabase.co');
   vi.stubEnv('OWNER_APP_STAGING_SUPABASE_URL', 'https://owmcrqvnfubyjxrlyhlc.supabase.co');
 }
@@ -15,16 +13,16 @@ afterEach(() => {
 });
 
 describe('owner app delivery', () => {
-  it('never calls the provider outside staging', async () => {
+  it('never calls the provider when the owner app is disabled', async () => {
     const fetch = vi.fn();
     vi.stubGlobal('fetch', fetch);
     await expect(
       sendOwnerAppEmail('owner@example.test', 'Invite', 'Private link', 'invite-key')
-    ).rejects.toThrow('Staging');
+    ).rejects.toThrow('Owner app is not enabled');
     expect(fetch).not.toHaveBeenCalled();
   });
   it('reports missing credentials and provider failure without claiming delivery', async () => {
-    staging();
+    enableOwnerApp();
     vi.stubEnv('OWNER_APP_RESEND_API_KEY', '');
     expect(
       await sendOwnerAppEmail('owner@example.test', 'Invite', 'Private link', 'invite-key')
@@ -39,12 +37,13 @@ describe('owner app delivery', () => {
     expect(fetch.mock.calls[0][1].headers['Idempotency-Key']).toBe('invite-key');
     expect(JSON.parse(fetch.mock.calls[0][1].body).to).toEqual(['owner@example.test']);
   });
-  it('requires a configured origin and rejects the production app host', () => {
+  it('requires a configured origin and accepts https production hosts', () => {
+    vi.stubEnv('OWNER_APP_ORIGIN', '');
     vi.stubEnv('OWNER_APP_STAGING_ORIGIN', '');
     expect(() => ownerAppOrigin()).toThrow();
-    vi.stubEnv('OWNER_APP_STAGING_ORIGIN', 'https://syncvete.opusorg.com');
-    expect(() => ownerAppOrigin()).toThrow('Production');
-    vi.stubEnv('OWNER_APP_STAGING_ORIGIN', 'http://localhost:3017');
+    vi.stubEnv('OWNER_APP_ORIGIN', 'https://syncvete.opusorg.com');
+    expect(ownerAppOrigin()).toBe('https://syncvete.opusorg.com');
+    vi.stubEnv('OWNER_APP_ORIGIN', 'http://localhost:3017');
     expect(ownerAppOrigin()).toBe('http://localhost:3017');
   });
 });

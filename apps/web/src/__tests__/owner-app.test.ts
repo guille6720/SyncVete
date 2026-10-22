@@ -7,29 +7,43 @@ import {
   ownerAppTextColor,
 } from '../lib/owner-app';
 
-describe('staging-only owner app', () => {
+describe('owner app enablement', () => {
   const staging = {
-    SYNCVETE_ENV: 'staging',
     OWNER_APP_ENABLED: 'true',
     NEXT_PUBLIC_SUPABASE_URL: 'https://owmcrqvnfubyjxrlyhlc.supabase.co',
     OWNER_APP_STAGING_SUPABASE_URL: 'https://owmcrqvnfubyjxrlyhlc.supabase.co',
   };
-  it('requires an explicit flag and pinned staging database', () => {
+  const production = {
+    OWNER_APP_ENABLED: 'true',
+    VERCEL_ENV: 'production',
+    SYNCVETE_ENV: 'production',
+    NEXT_PUBLIC_SUPABASE_URL: 'https://prod.supabase.co',
+    OWNER_APP_PRODUCTION_SUPABASE_URL: 'https://prod.supabase.co',
+  };
+
+  it('requires an explicit flag and a pinned Supabase URL', () => {
     expect(ownerAppEnabled({})).toBe(false);
     expect(ownerAppEnabled(staging)).toBe(true);
     expect(ownerAppEnabled({ ...staging, OWNER_APP_STAGING_SUPABASE_URL: undefined })).toBe(false);
     expect(
-      ownerAppEnabled({ ...staging, NEXT_PUBLIC_SUPABASE_URL: 'https://production.supabase.co' })
-    ).toBe(false);
-    expect(ownerAppEnabled({ ...staging, VERCEL_ENV: 'production' })).toBe(false);
-    expect(
-      ownerAppEnabled({
-        ...staging,
-        OWNER_APP_STAGING_SUPABASE_URL: 'https://production.supabase.co',
-        NEXT_PUBLIC_SUPABASE_URL: 'https://production.supabase.co',
-      })
+      ownerAppEnabled({ ...staging, NEXT_PUBLIC_SUPABASE_URL: 'https://other.supabase.co' })
     ).toBe(false);
   });
+
+  it('allows production when the production Supabase URL is pinned', () => {
+    expect(ownerAppEnabled(production)).toBe(true);
+    expect(
+      ownerAppEnabled({ ...production, OWNER_APP_PRODUCTION_SUPABASE_URL: undefined })
+    ).toBe(false);
+    expect(
+      ownerAppEnabled({
+        ...production,
+        OWNER_APP_PRODUCTION_SUPABASE_URL: undefined,
+        OWNER_APP_SUPABASE_URL: 'https://prod.supabase.co',
+      })
+    ).toBe(true);
+  });
+
   it('rejects unsafe image protocols and invalid colors', () => {
     const brand = {
       appName: 'app-IMILVET',

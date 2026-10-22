@@ -55,18 +55,24 @@ export function parseOwnerAppBrand(value: unknown, clinicName = 'Mi veterinaria'
   return parsed.success ? parsed.data : defaults;
 }
 
+/**
+ * Owner PWA is on when OWNER_APP_ENABLED=true and the live Supabase URL is
+ * explicitly pinned (staging and/or production). No pin → off.
+ */
 export function ownerAppEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  if (
-    env.VERCEL_ENV === 'production' ||
-    env.SYNCVETE_ENV !== 'staging' ||
-    env.OWNER_APP_ENABLED !== 'true'
-  )
-    return false;
-  const expected = env.OWNER_APP_STAGING_SUPABASE_URL;
-  return (
-    expected === 'https://owmcrqvnfubyjxrlyhlc.supabase.co' &&
-    expected === env.NEXT_PUBLIC_SUPABASE_URL
+  if (env.OWNER_APP_ENABLED !== 'true') return false;
+  const supabaseUrl = env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return false;
+
+  const allowed = new Set(
+    [
+      env.OWNER_APP_STAGING_SUPABASE_URL,
+      env.OWNER_APP_PRODUCTION_SUPABASE_URL,
+      env.OWNER_APP_SUPABASE_URL,
+    ].filter((value): value is string => Boolean(value))
   );
+
+  return allowed.has(supabaseUrl);
 }
 
 export function ownerAppUrl(organizationId: string): string {
