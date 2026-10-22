@@ -241,33 +241,30 @@ export class ContinuousNarrationSession {
     if (this.useEleven) {
       const started = await this.eleven.speak(clip.text, this.voice, {
         rate: this.rate,
+        // Slight headroom — screen capture / laptop speakers clip ElevenLabs peaks.
+        volume: 0.9,
         onEnd: () => {
           if (gen !== this.generation || this.paused) return;
           void this.advance(gen);
         },
         onError: () => {
           if (gen !== this.generation || this.paused) return;
-          window.setTimeout(() => {
-            if (gen === this.generation && !this.paused) void this.advance(gen);
-          }, 350);
+          // Keep the step on screen; do not race through the playlist.
+          void this.scheduleClipHold(gen);
         },
       });
 
       if (gen !== this.generation) return;
       if (!started) {
-        // ElevenLabs probe said available but clip failed — try browser once.
-        if (await this.speakWithBrowser(clip.text, gen)) return;
-        window.setTimeout(() => {
-          if (gen === this.generation && !this.paused) void this.advance(gen);
-        }, 350);
+        // Never fall back to browser TTS when ElevenLabs is the engine —
+        // Windows/Chrome voices sound harsh next to Brian C / Horacio.
+        void this.scheduleClipHold(gen);
       }
       return;
     }
 
     if (!(await this.speakWithBrowser(clip.text, gen))) {
-      window.setTimeout(() => {
-        if (gen === this.generation && !this.paused) void this.advance(gen);
-      }, 350);
+      void this.scheduleClipHold(gen);
     }
   }
 
@@ -280,21 +277,26 @@ export class ContinuousNarrationSession {
 
     this.browser.speak(text, {
       rate: this.rate,
+      // Browser TTS peaks hard; lower gain reduces metallic clipping.
+      volume: 0.82,
       onEnd: () => {
         if (gen !== this.generation || this.paused) return;
         void this.advance(gen);
       },
       onError: () => {
         if (gen !== this.generation || this.paused) return;
-        window.setTimeout(() => {
-          if (gen === this.generation && !this.paused) void this.advance(gen);
-        }, 350);
+        void this.scheduleClipHold(gen);
       },
     });
     return true;
   }
 
   private async scheduleMutedHold(gen: number): Promise<void> {
+    await this.scheduleClipHold(gen);
+  }
+
+  /** Hold for an estimated read time so failed/missing audio does not skip steps. */
+  private async scheduleClipHold(gen: number): Promise<void> {
     if (gen !== this.generation || !this.running || this.paused) return;
     const clip = this.clips[this.index];
     if (!clip) {

@@ -9,7 +9,7 @@ const RATE_OPTIONS = [
   { value: 0.85, label: '0.85× Tranquila' },
   { value: 1, label: '1× Natural' },
   { value: 1.05, label: '1.05× Ágil' },
-  { value: 1.15, label: '1.15× Rápida' },
+  { value: 1.12, label: '1.12× Rápida' },
 ] as const;
 
 interface TutorialPlaybackBarProps {
@@ -135,8 +135,9 @@ export function TutorialPlaybackBar({
               <option value="horacio">Horacio</option>
             </select>
             {!elevenLabsAvailable ? (
-              <span className="text-[10px] text-amber-700">
-                Falta ELEVENLABS_API_KEY (usando voz del navegador)
+              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-200">
+                Sin ElevenLabs en este entorno — se usa la voz del navegador (suena peor).
+                Configurá ELEVENLABS_API_KEY en Vercel Production.
               </span>
             ) : null}
           </label>
