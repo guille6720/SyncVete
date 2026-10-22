@@ -98,6 +98,7 @@ function parsePatientSummary(raw: unknown): PortalPatientSummary | null {
     breed: strOrNull(data.breed),
     sex: str(data.sex) as PatientSex,
     birthDate: strOrNull(data.birth_date),
+    photoUrl: strOrNull(data.photo_url),
     isDeceased: bool(data.is_deceased),
   };
 }

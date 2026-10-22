@@ -17,6 +17,7 @@ const patient = {
   breed: 'Labrador',
   sex: 'Hembra' as const,
   birthDate: '2021-01-01',
+  photoUrl: null,
   isDeceased: false,
 };
 const date = new Date();

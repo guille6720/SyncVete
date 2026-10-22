@@ -1,9 +1,9 @@
-import { getOwnerAppData, getOwnerProfessionalAvailability } from '@/actions/owner-app';
-import { OwnerProfessionalBooking } from '@/components/portal/owner-professional-booking';
+import { getOwnerProfessionalAvailability } from '@/actions/owner-app';
 import { getOwnerPortalHome } from '@/actions/portal';
-import { OwnerAppAgenda } from '@/components/portal/owner-app-agenda';
+import { OwnerTurnosCalendar } from '@/components/portal/owner-turnos-calendar';
 import { ownerAppEnabled } from '@/lib/owner-app';
 import { notFound } from 'next/navigation';
+
 export default async function OwnerAppointmentsPage({
   searchParams,
 }: {
@@ -11,28 +11,24 @@ export default async function OwnerAppointmentsPage({
 }) {
   if (!ownerAppEnabled()) notFound();
   const { date, professional } = await searchParams;
-  const [home, app, availability] = await Promise.all([
+  const [home, availability] = await Promise.all([
     getOwnerPortalHome(),
-    getOwnerAppData(),
     getOwnerProfessionalAvailability(date),
   ]);
+
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold">Turnos</h1>
-      <p className="text-sm text-muted-foreground">
-        Elegí profesional, fecha y horario para tu mascota.
-      </p>
-      <OwnerProfessionalBooking
-        key={`${availability.date}:${professional || ''}`}
-        initialProfessionalId={professional}
+      <div>
+        <h1 className="text-2xl font-bold">Turnos</h1>
+        <p className="text-sm text-muted-foreground">
+          Calendario de tu veterinaria. Elegí un día, profesional y horario.
+        </p>
+      </div>
+      <OwnerTurnosCalendar
         availability={availability}
         patients={home?.patients || []}
-      />
-      <OwnerAppAgenda
-        {...app}
-        patients={home?.patients || []}
-        showReminders={false}
-        showReservation={false}
+        appointments={home?.upcomingAppointments || []}
+        initialProfessionalId={professional}
       />
     </div>
   );
