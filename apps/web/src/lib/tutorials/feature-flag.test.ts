@@ -6,7 +6,7 @@ describe('isAcademiaEnabled', () => {
     vi.resetModules();
   });
 
-  it('defaults to disabled outside Vercel preview', async () => {
+  it('defaults to disabled outside Vercel preview/production', async () => {
     vi.stubEnv('NEXT_PUBLIC_ACADEMIA_ENABLED', undefined);
     vi.stubEnv('VERCEL_ENV', 'development');
     const { isAcademiaEnabled } = await import('./feature-flag');
@@ -20,15 +20,22 @@ describe('isAcademiaEnabled', () => {
     expect(isAcademiaEnabled()).toBe(true);
   });
 
-  it('enables on non-production when flag is true', async () => {
-    vi.stubEnv('NEXT_PUBLIC_ACADEMIA_ENABLED', 'true');
-    vi.stubEnv('VERCEL_ENV', 'preview');
+  it('enables on Vercel production by default', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ACADEMIA_ENABLED', undefined);
+    vi.stubEnv('VERCEL_ENV', 'production');
     const { isAcademiaEnabled } = await import('./feature-flag');
     expect(isAcademiaEnabled()).toBe(true);
   });
 
-  it('forces off on Vercel production even if flag is true', async () => {
+  it('enables when flag is true', async () => {
     vi.stubEnv('NEXT_PUBLIC_ACADEMIA_ENABLED', 'true');
+    vi.stubEnv('VERCEL_ENV', 'development');
+    const { isAcademiaEnabled } = await import('./feature-flag');
+    expect(isAcademiaEnabled()).toBe(true);
+  });
+
+  it('can force off on production with flag false', async () => {
+    vi.stubEnv('NEXT_PUBLIC_ACADEMIA_ENABLED', 'false');
     vi.stubEnv('VERCEL_ENV', 'production');
     const { isAcademiaEnabled } = await import('./feature-flag');
     expect(isAcademiaEnabled()).toBe(false);
