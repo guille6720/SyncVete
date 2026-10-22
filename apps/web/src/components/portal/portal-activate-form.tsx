@@ -7,7 +7,7 @@ import { OwnerAppBrandMark } from './owner-app-brand';
 import { acceptPortalInviteForm, activatePortalAccount } from '@/actions/portal';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import type { PortalInvitePreview } from '@sincvete/shared';
