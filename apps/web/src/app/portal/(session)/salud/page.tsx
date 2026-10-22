@@ -2,6 +2,7 @@ import { ownerAppEnabled } from '@/lib/owner-app';
 import { notFound } from 'next/navigation';
 import { getOwnerPortalHome, getOwnerPortalPatient } from '@/actions/portal';
 import { OwnerVaccineCalendar } from '@/components/portal/owner-vaccine-calendar';
+import { ownerAppNeonCard, ownerAppNeonToneAt } from '@/components/portal/owner-app-neon';
 import { formatDashboardDateTime } from '@sincvete/shared';
 
 export default async function OwnerHealthPage() {
@@ -18,8 +19,11 @@ export default async function OwnerHealthPage() {
       <p className="text-sm text-muted-foreground">
         Vacunas y evolución registrada por tu veterinaria.
       </p>
-      {pets.map((pet) => (
-        <section key={pet.patient.id} className="space-y-3">
+      {pets.map((pet, index) => (
+        <section
+          key={pet.patient.id}
+          className={ownerAppNeonCard(ownerAppNeonToneAt(index), 'space-y-3 rounded-2xl p-5')}
+        >
           <h2 className="text-lg font-semibold">Vacunas de {pet.patient.name}</h2>
           <OwnerVaccineCalendar vaccines={pet.vaccines} />
         </section>
@@ -29,15 +33,18 @@ export default async function OwnerHealthPage() {
         <p className="text-sm text-muted-foreground">
           Información de solo lectura. Ante cualquier duda, contactá a la veterinaria.
         </p>
-        {pets.map((pet) => (
-          <div key={pet.patient.id} className="rounded-2xl border bg-card p-5">
+        {pets.map((pet, index) => (
+          <div
+            key={pet.patient.id}
+            className={ownerAppNeonCard(ownerAppNeonToneAt(index + 2), 'rounded-2xl p-5')}
+          >
             <h3 className="mb-4 font-semibold">{pet.patient.name}</h3>
-            <ol className="space-y-4 border-l-2 border-primary/20 pl-4">
+            <ol className="space-y-4 border-l-2 border-rose-400/40 pl-4 dark:border-rose-400/50">
               {pet.clinical
                 .filter((row) => row.treatment || row.plan || row.diagnosis)
                 .map((row) => (
                   <li key={row.id} className="space-y-1 text-sm">
-                    <p className="font-medium text-primary">
+                    <p className="font-medium text-rose-600 dark:text-rose-400">
                       {formatDashboardDateTime(row.entryDate)}
                     </p>
                     {row.title && <p className="font-semibold">{row.title}</p>}

@@ -13,6 +13,7 @@ import {
   type PortalPatientSummary,
 } from '@sincvete/shared';
 import { Button } from '@/components/ui/button';
+import { ownerAppNeonCard, ownerAppNeonToneAt } from './owner-app-neon';
 import { cn } from '@/lib/utils';
 
 const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D'];
@@ -94,7 +95,12 @@ export function OwnerTurnosCalendar({
 
   return (
     <div className="space-y-4">
-      <section className="mx-auto w-full max-w-[17.5rem] overflow-hidden rounded-2xl border border-border/80 bg-card shadow-sm dark:border-border">
+      <section
+        className={ownerAppNeonCard(
+          'cyan',
+          'mx-auto w-full max-w-[17.5rem] overflow-hidden rounded-2xl'
+        )}
+      >
         <div className="bg-primary px-2.5 py-2 text-primary-foreground">
           <div className="flex items-center justify-between gap-1">
             <Button
@@ -185,12 +191,15 @@ export function OwnerTurnosCalendar({
         <section className="space-y-2">
           <h3 className="text-sm font-semibold">Tus turnos del día</h3>
           <div className="space-y-2">
-            {dayAppointments.map((appt) => {
+            {dayAppointments.map((appt, index) => {
               const pet = appt.patientId ? petsById.get(appt.patientId) : null;
               return (
                 <div
                   key={appt.id}
-                  className="flex items-center gap-3 rounded-2xl border border-primary/20 bg-primary/5 p-3 dark:bg-primary/10"
+                  className={ownerAppNeonCard(
+                    ownerAppNeonToneAt(index + 2),
+                    'flex items-center gap-3 rounded-2xl p-3'
+                  )}
                 >
                   <OwnerPetAvatar
                     name={appt.patientName || 'Mascota'}
