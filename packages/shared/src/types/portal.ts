@@ -47,6 +47,7 @@ export interface PortalPatientSummary {
   breed: string | null;
   sex: PatientSex;
   birthDate: string | null;
+  photoUrl: string | null;
   isDeceased: boolean;
 }
 

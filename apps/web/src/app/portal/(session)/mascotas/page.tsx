@@ -2,7 +2,8 @@ import { ownerAppEnabled } from '@/lib/owner-app';
 import { notFound } from 'next/navigation';
 import { getOwnerPortalHome } from '@/actions/portal';
 import Link from 'next/link';
-import { OwnerPetIcon } from '@/components/portal/owner-pet-icon';
+import { OwnerPetAvatar } from '@/components/portal/owner-pet-avatar';
+
 export default async function OwnerPetsPage() {
   if (!ownerAppEnabled()) notFound();
   const home = await getOwnerPortalHome();
@@ -18,9 +19,12 @@ export default async function OwnerPetsPage() {
           href={`/portal/mascotas/${pet.id}`}
           className="flex items-center gap-4 rounded-2xl border bg-card p-5"
         >
-          <span className="text-3xl">
-            <OwnerPetIcon species={pet.species} />
-          </span>
+          <OwnerPetAvatar
+            name={pet.name}
+            species={pet.species}
+            photoUrl={pet.photoUrl}
+            size="md"
+          />
           <div>
             <h2 className="font-semibold">{pet.name}</h2>
             <p className="text-sm text-muted-foreground">

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { OwnerPetIcon } from './owner-pet-icon';
+import { OwnerPetAvatar } from './owner-pet-avatar';
 import { CalendarDays, Syringe, HeartPulse, PawPrint, ChevronRight } from 'lucide-react';
 import {
   formatDashboardDateTime,
@@ -15,6 +15,16 @@ export function OwnerAppDashboard({
   clinicName?: string;
 }) {
   const next = home.upcomingAppointments[0];
+  const petsById = new Map(home.patients.map((pet) => [pet.id, pet]));
+  const scheduledPets = home.upcomingAppointments
+    .map((appt) => (appt.patientId ? petsById.get(appt.patientId) : null))
+    .filter((pet): pet is NonNullable<typeof pet> => Boolean(pet))
+    .filter((pet, index, list) => list.findIndex((p) => p.id === pet.id) === index);
+  const heroPets = scheduledPets.length
+    ? scheduledPets.slice(0, 3)
+    : home.patients.filter((p) => !p.isDeceased).slice(0, 3);
+  const nextPet = next?.patientId ? petsById.get(next.patientId) : null;
+
   return (
     <div className="space-y-6">
       <div>
@@ -22,25 +32,50 @@ export function OwnerAppDashboard({
           Solo para pacientes de {clinicName || home.clinic.name}
         </p>
         <h1 className="mt-1 text-2xl font-bold">Hola, {home.owner.fullName.split(' ')[0]}</h1>
-        <p className="text-sm text-muted-foreground">Así están tus mascotas hoy.</p>
+        <p className="text-sm text-muted-foreground">Así van tus mascotas hoy.</p>
       </div>
-      <section className="rounded-3xl bg-primary p-5 text-primary-foreground">
-        <p className="mb-2 flex items-center gap-2 text-sm">
-          <CalendarDays size={18} /> Próximo turno
-        </p>
-        <p className="text-xl font-semibold">{next?.patientName || 'Todo al día'}</p>
-        <p className="mt-1 text-sm">
-          {next
-            ? formatDashboardDateTime(next.startsAt)
-            : 'Podés consultar los horarios de tu veterinaria.'}
-        </p>
-        <Link
-          className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-medium"
-          href="/portal/turnos"
-        >
-          {next ? 'Ver mis turnos' : 'Pedir turno'}
-          <ChevronRight size={16} />
-        </Link>
+      <section className="relative overflow-hidden rounded-3xl bg-primary p-5 text-primary-foreground">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="mb-2 flex items-center gap-2 text-sm">
+              <CalendarDays size={18} /> Próximo turno
+            </p>
+            <p className="text-xl font-semibold">{next?.patientName || 'Todo al día'}</p>
+            <p className="mt-1 text-sm opacity-90">
+              {next
+                ? formatDashboardDateTime(next.startsAt)
+                : 'Podés consultar los horarios de tu veterinaria.'}
+            </p>
+            <Link
+              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur"
+              href="/portal/turnos"
+            >
+              {next ? 'Ver mis turnos' : 'Pedir turno'}
+              <ChevronRight size={16} />
+            </Link>
+          </div>
+          <div className="relative flex shrink-0 items-center">
+            {heroPets.length > 0 ? (
+              <div className="flex items-center -space-x-3">
+                {heroPets.map((pet, index) => (
+                  <OwnerPetAvatar
+                    key={pet.id}
+                    name={pet.name}
+                    species={pet.species}
+                    photoUrl={pet.photoUrl}
+                    size={index === 0 && nextPet?.id === pet.id ? 'lg' : 'md'}
+                    ring
+                    className="border border-white/30"
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/15">
+                <PawPrint className="h-10 w-10 opacity-80" />
+              </div>
+            )}
+          </div>
+        </div>
       </section>
       <section>
         <div className="mb-3 flex items-center justify-between">
@@ -56,9 +91,12 @@ export function OwnerAppDashboard({
               key={pet.id}
               className="flex items-center gap-4 rounded-2xl border bg-card p-4"
             >
-              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-accent text-3xl">
-                <OwnerPetIcon species={pet.species} />
-              </span>
+              <OwnerPetAvatar
+                name={pet.name}
+                species={pet.species}
+                photoUrl={pet.photoUrl}
+                size="md"
+              />
               <div>
                 <p className="font-semibold">{pet.name}</p>
                 <p className="text-sm text-muted-foreground">{pet.breed || pet.species}</p>
