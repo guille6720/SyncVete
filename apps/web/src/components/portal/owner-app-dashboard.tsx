@@ -1,11 +1,13 @@
 import Link from 'next/link';
 import { OwnerPetAvatar } from './owner-pet-avatar';
+import { ownerAppNeonButton, ownerAppNeonCard } from './owner-app-neon';
 import { CalendarDays, Syringe, HeartPulse, PawPrint, ChevronRight } from 'lucide-react';
 import {
   formatDashboardDateTime,
   formatVaccinationDate,
   type OwnerPortalHome,
 } from '@sincvete/shared';
+import { cn } from '@/lib/utils';
 
 export function OwnerAppDashboard({
   home,
@@ -34,7 +36,12 @@ export function OwnerAppDashboard({
         <h1 className="mt-1 text-2xl font-bold">Hola, {home.owner.fullName.split(' ')[0]}</h1>
         <p className="text-sm text-muted-foreground">Así van tus mascotas hoy.</p>
       </div>
-      <section className="relative overflow-hidden rounded-3xl bg-primary p-5 text-primary-foreground">
+      <section
+        className={cn(
+          'relative overflow-hidden rounded-3xl bg-primary p-5 text-primary-foreground',
+          'shadow-[0_0_28px_color-mix(in_srgb,var(--color-primary)_55%,transparent)] ring-2 ring-primary/40'
+        )}
+      >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
             <p className="mb-2 flex items-center gap-2 text-sm">
@@ -47,7 +54,10 @@ export function OwnerAppDashboard({
                 : 'Podés consultar los horarios de tu veterinaria.'}
             </p>
             <Link
-              className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white/15 px-4 py-2 text-sm font-medium backdrop-blur"
+              className={cn(
+                'mt-4 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium',
+                ownerAppNeonButton
+              )}
               href="/portal/turnos"
             >
               {next ? 'Ver mis turnos' : 'Pedir turno'}
@@ -89,7 +99,7 @@ export function OwnerAppDashboard({
             <Link
               href={`/portal/mascotas/${pet.id}`}
               key={pet.id}
-              className="flex items-center gap-4 rounded-2xl border bg-card p-4"
+              className={cn('flex items-center gap-4 rounded-2xl p-4', ownerAppNeonCard)}
             >
               <OwnerPetAvatar
                 name={pet.name}
@@ -118,8 +128,8 @@ export function OwnerAppDashboard({
           { href: '/portal/turnos', label: 'Agendar turno', Icon: CalendarDays },
           { href: '/portal/mascotas', label: 'Historial', Icon: PawPrint },
         ].map(({ href, label, Icon }) => (
-          <Link key={label} href={href} className="rounded-2xl border bg-card p-4">
-            <Icon className="mb-3 h-6 w-6 text-primary" />
+          <Link key={label} href={href} className={cn('rounded-2xl p-4', ownerAppNeonCard)}>
+            <Icon className="mb-3 h-6 w-6 text-primary drop-shadow-[0_0_8px_color-mix(in_srgb,var(--color-primary)_70%,transparent)]" />
             <p className="text-sm font-medium">{label}</p>
           </Link>
         ))}
