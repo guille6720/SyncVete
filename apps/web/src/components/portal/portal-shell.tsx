@@ -15,6 +15,8 @@ import { InstallAppButton } from '@/components/pwa/install-app-button';
 
 interface PortalShellProps {
   showAlerts?: boolean;
+  /** Bottom tab bar for the installed owner app. */
+  showNav?: boolean;
   brand?: OwnerAppBrand | null;
   children: React.ReactNode;
   userName: string;
@@ -27,6 +29,7 @@ export function PortalShell({
   signOutAction,
   brand,
   showAlerts = true,
+  showNav = true,
 }: PortalShellProps) {
   const pathname = usePathname();
 
@@ -34,7 +37,7 @@ export function PortalShell({
     <div
       className={
         brand?.enabled
-          ? 'flex min-h-dvh flex-col bg-muted/20 pb-20'
+          ? `flex min-h-dvh flex-col bg-muted/20 ${showNav ? 'pb-20' : ''}`
           : 'flex min-h-screen flex-col bg-background'
       }
       style={
@@ -105,7 +108,7 @@ export function PortalShell({
         {showAlerts && <PortalWaitingRoomAlerts />}
         {children}
       </main>
-      {brand?.enabled && <OwnerAppMobileNav />}
+      {brand?.enabled && showNav && <OwnerAppMobileNav />}
       {brand?.enabled && (
         <footer className="border-t px-4 py-4 text-center text-xs text-muted-foreground">
           Hecho por OpusOrg

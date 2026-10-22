@@ -1,10 +1,13 @@
 import { redirect } from 'next/navigation';
 import { getSessionContext, signOut } from '@/actions/auth';
 import { PortalShell } from '@/components/portal/portal-shell';
+import { PortalPendingApproval } from '@/components/portal/portal-pending-approval';
 import { FEATURES, canUseFeature } from '@/lib/entitlements';
 import { getOwnerAppBrand, signOutOwnerApp } from '@/actions/owner-app';
 import { ownerAppMetadata } from '@/lib/owner-app-metadata';
 import type { Metadata } from 'next';
+
+export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const session = await getSessionContext();
@@ -49,14 +52,14 @@ export default async function PortalSessionLayout({ children }: { children: Reac
 
   if (session.portalPendingApproval) {
     return (
-      <PortalShell userName={session.profile.full_name} signOutAction={signOutAction} brand={brand}>
-        <div className="mx-auto max-w-lg space-y-3 rounded-lg border p-6">
-          <h1 className="text-xl font-semibold">Cuenta creada</h1>
-          <p className="text-sm text-muted-foreground">
-            Tu veterinaria todavía tiene que activar el acceso. Cuando lo haga vas a poder ver tus
-            mascotas, vacunas y turnos acá.
-          </p>
-        </div>
+      <PortalShell
+        userName={session.profile.full_name}
+        signOutAction={signOutAction}
+        brand={brand}
+        showAlerts={false}
+        showNav={false}
+      >
+        <PortalPendingApproval />
       </PortalShell>
     );
   }
