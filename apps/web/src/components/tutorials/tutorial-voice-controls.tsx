@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import {
   Pause,
   Play,
@@ -28,37 +27,8 @@ export function TutorialVoiceControls({
   narration,
   className,
 }: TutorialVoiceControlsProps) {
-  const profileHint = useMemo(() => {
-    if (!narration.supported) return null;
-    const { availability, voiceProfile } = narration;
-    if (voiceProfile === 'female' && availability.female.length === 0) {
-      return 'No hay una voz femenina identificable en este navegador. Elegí Automática o Masculina si está disponible.';
-    }
-    if (voiceProfile === 'male' && availability.male.length === 0) {
-      return 'No hay una voz masculina identificable en este navegador. Elegí Automática o Femenina si está disponible.';
-    }
-    if (availability.female.length === 0 && availability.male.length === 0) {
-      return 'Este navegador no expone voces con género confiable. Usá Automática (voz del sistema en español, sin etiqueta de género).';
-    }
-    return null;
-  }, [narration]);
-
-  if (!narration.supported) {
-    return (
-      <p
-        className={cn('mt-1 text-[11px] text-muted-foreground', className)}
-        role="status"
-      >
-        Narración no disponible en este navegador. Podés seguir el tutorial con el texto en
-        pantalla.
-      </p>
-    );
-  }
-
   const isSpeaking = narration.status === 'speaking';
   const isPaused = narration.status === 'paused';
-  const femaleOk = narration.availability.female.length > 0;
-  const maleOk = narration.availability.male.length > 0;
 
   return (
     <div
@@ -68,25 +38,20 @@ export function TutorialVoiceControls({
     >
       <div className="mb-2 grid gap-2 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-          <span>Voz</span>
+          <span>Voz (ElevenLabs)</span>
           <select
             className="h-8 rounded-md border border-input bg-background px-1.5 text-xs text-foreground"
-            value={narration.voiceProfile}
+            value={narration.voiceProfile === 'horacio' ? 'horacio' : 'brian'}
             onChange={(event) =>
               narration.setVoiceProfile(
                 event.target.value as TutorialNarrationApi['voiceProfile']
               )
             }
-            aria-label="Perfil de voz"
+            aria-label="Voz de narración"
             disabled={narration.muted}
           >
-            <option value="auto">Automática (sin género)</option>
-            <option value="female" disabled={!femaleOk}>
-              {femaleOk ? 'Femenina' : 'Femenina (no disponible)'}
-            </option>
-            <option value="male" disabled={!maleOk}>
-              {maleOk ? 'Masculina' : 'Masculina (no disponible)'}
-            </option>
+            <option value="brian">Brian C</option>
+            <option value="horacio">Horacio</option>
           </select>
         </label>
 
@@ -108,6 +73,12 @@ export function TutorialVoiceControls({
         </label>
       </div>
 
+      {!narration.availability.elevenLabs ? (
+        <p className="mb-2 text-[11px] text-amber-700" role="status">
+          Configurá ELEVENLABS_API_KEY en staging para escuchar Brian C y Horacio.
+        </p>
+      ) : null}
+
       <div className="flex flex-wrap items-center gap-1.5">
         {isSpeaking ? (
           <Button
@@ -127,75 +98,50 @@ export function TutorialVoiceControls({
             size="sm"
             variant="outline"
             onClick={isPaused ? narration.resume : narration.play}
-            disabled={narration.muted || Boolean(profileHint && narration.voiceProfile !== 'auto')}
-            aria-label={isPaused ? 'Reanudar narración' : 'Reproducir narración'}
-            title={isPaused ? 'Reanudar' : 'Reproducir'}
+            aria-label={isPaused ? 'Continuar narración' : 'Reproducir narración'}
+            title={isPaused ? 'Continuar' : 'Reproducir'}
+            disabled={narration.muted}
           >
             <Play className="h-3.5 w-3.5" aria-hidden />
-            {isPaused ? 'Reanudar' : 'Escuchar'}
+            {isPaused ? 'Continuar' : 'Escuchar'}
           </Button>
         )}
-
         <Button
           type="button"
           size="sm"
           variant="ghost"
           onClick={narration.replay}
-          disabled={narration.muted || Boolean(profileHint && narration.voiceProfile !== 'auto')}
-          aria-label="Repetir paso actual"
+          aria-label="Repetir narración"
           title="Repetir"
+          disabled={narration.muted}
         >
           <RotateCcw className="h-3.5 w-3.5" aria-hidden />
-          Repetir
         </Button>
-
-        <Button
-          type="button"
-          size="sm"
-          variant="ghost"
-          onClick={narration.preview}
-          disabled={narration.muted || Boolean(profileHint && narration.voiceProfile !== 'auto')}
-          aria-label="Vista previa de la voz"
-          title="Probar voz"
-        >
-          Probar
-        </Button>
-
         <Button
           type="button"
           size="sm"
           variant="ghost"
           onClick={narration.toggleMute}
-          aria-label={narration.muted ? 'Activar narración' : 'Silenciar narración'}
+          aria-label={narration.muted ? 'Activar voz' : 'Silenciar voz'}
           aria-pressed={narration.muted}
-          title={narration.muted ? 'Activar voz' : 'Silenciar'}
+          title={narration.muted ? 'Activar' : 'Silenciar'}
         >
           {narration.muted ? (
             <VolumeX className="h-3.5 w-3.5" aria-hidden />
           ) : (
             <Volume2 className="h-3.5 w-3.5" aria-hidden />
           )}
-          {narration.muted ? 'Sin voz' : 'Voz'}
         </Button>
+        <span className="ml-auto text-[10px] text-muted-foreground">
+          {narration.activeSource === 'elevenlabs'
+            ? 'ElevenLabs'
+            : narration.activeSource === 'prerecorded'
+              ? 'Audio guardado'
+              : narration.activeSource === 'browser'
+                ? 'Navegador (respaldo)'
+                : 'Listo'}
+        </span>
       </div>
-
-      {profileHint ? (
-        <p className="mt-2 text-[10px] leading-snug text-amber-700 dark:text-amber-300" role="status">
-          {profileHint}
-        </p>
-      ) : null}
-
-      <p className="mt-1 text-[10px] text-muted-foreground" aria-live="polite">
-        {narration.muted
-          ? 'Narración silenciada'
-          : isSpeaking
-            ? narration.activeSource === 'prerecorded'
-              ? 'Reproduciendo audio profesional…'
-              : 'Narrando este paso…'
-            : isPaused
-              ? 'Narración en pausa'
-              : 'Listo para narrar'}
-      </p>
     </div>
   );
 }

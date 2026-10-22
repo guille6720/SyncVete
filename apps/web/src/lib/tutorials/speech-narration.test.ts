@@ -128,24 +128,25 @@ describe('speech narration engine', () => {
     expect(engine.getStatus()).toBe('unsupported');
   });
 
-  it('prefers es-AR Spanish voices automatically without gender claims', () => {
+  it('prefers male es-AR Spanish voices for browser fallback', () => {
     const picked = pickPreferredSpanishVoice([
       voice({ name: 'Google US English', lang: 'en-US' }),
       voice({ name: 'Microsoft Sabina', lang: 'es-MX' }),
       voice({ name: 'Paulina', lang: 'es-AR' }),
       voice({ name: 'Diego', lang: 'es-AR' }),
     ]);
+    expect(picked?.name).toBe('Diego');
     expect(picked?.lang).toBe('es-AR');
   });
 
-  it('honors an explicit gendered voice profile when classification is reliable', async () => {
+  it('browser fallback maps ElevenLabs profiles to male Spanish voices', async () => {
     const { fakeSynth } = installSpeechMocks();
     fakeSynth.__setVoices([
       voice({ name: 'Paulina', lang: 'es-AR' }),
       voice({ name: 'Diego', lang: 'es-AR' }),
     ]);
     const engine = new SpeechNarrationEngine(fakeSynth);
-    engine.setVoiceProfile('male');
+    engine.setVoiceProfile('brian');
     await engine.ensureVoices();
     expect(engine.getSelectedVoice()?.name).toBe('Diego');
   });

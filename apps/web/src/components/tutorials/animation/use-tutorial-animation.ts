@@ -95,7 +95,7 @@ export function useTutorialAnimation(
     step != null &&
     stepIndex >= (tutorial?.steps.length ?? 1) - 1;
 
-  // Cursor choreography is demo-only so interactive mode stays click-to-advance.
+  // Cursor choreography for continuous demo playback (no click-to-advance).
   const showCursor =
     active &&
     mode === 'demo' &&

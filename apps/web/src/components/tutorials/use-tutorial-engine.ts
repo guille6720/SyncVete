@@ -24,15 +24,10 @@ import {
 } from '@/lib/tutorials/tutorial-session';
 import { isEditableKeyboardTarget, waitForTarget } from '@/lib/tutorials/wait-for-target';
 import { getNarrationController } from '@/lib/tutorials/narration-controller';
-import { waitForDemoSceneAdvance } from '@/lib/tutorials/demo-scene-advance';
+import { getContinuousNarrationSession } from '@/lib/tutorials/continuous-narration-session';
 import { scrollTargetAwayFromGuidePanel } from '@/lib/tutorials/tutorial-guide-layout';
-import {
-  resolveDemoSceneIndex,
-  resolveStepAnimation,
-  resolveStepDemoScene,
-} from '@/lib/tutorials/animation/resolve-demo-scene';
+import { resolveDemoSceneIndex } from '@/lib/tutorials/animation/resolve-demo-scene';
 import { prefersReducedMotion } from '@/lib/tutorials/animation/prefers-reduced-motion';
-import { resolveAnimationDurationMs } from '@sincvete/shared';
 
 export type TutorialGuidePhase = 'intro' | 'guide';
 
@@ -295,6 +290,7 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
     (status: TutorialProgressStatus = 'skipped') => {
       clearDemoTimer();
       clearIntroTimer();
+      getContinuousNarrationSession().stop();
       getNarrationController().stop();
       navSeqRef.current += 1;
       pendingHrefRef.current = null;
@@ -435,7 +431,8 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
       const nextIndex = Math.max(0, Math.min(index, tutorial.steps.length - 1));
       const nextStep = tutorial.steps[nextIndex];
       if (!nextStep) return;
-      getNarrationController().stop();
+      // Do not stop narration here — the player swaps to the next cached clip.
+      // Explicit seek/close call narration.stop() from the overlay.
       setPhase('guide');
       setStepIndex(nextIndex);
       setDemoSceneIndex(resolveDemoSceneIndex(tutorial, nextStep));
@@ -480,69 +477,44 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
   const pause = useCallback(() => {
     setPaused(true);
     clearDemoTimer();
+    getContinuousNarrationSession().pause();
     getNarrationController().pause();
   }, []);
   const resume = useCallback(() => {
     setPaused(false);
+    getContinuousNarrationSession().resume();
     getNarrationController().resume();
   }, []);
 
-  // Continuous auto-advance (interactive + demo): narration + min hold, no “Siguiente”.
-  // Pause does NOT restart the timer — we only defer the final advance while paused.
-  // Seeking via the bottom scrubber still jumps immediately via goTo().
-  const demoAdvanceSeqRef = useRef(0);
   const pausedRef = useRef(paused);
   pausedRef.current = paused;
 
-  useEffect(() => {
-    clearDemoTimer();
-    if (!active || navigating || !tutorial || phase !== 'guide') return;
-    const currentStep = tutorial.steps[stepIndex];
-    if (!currentStep) return;
+  /**
+   * Audio playlist drives the UI. Never stop narration here — the session
+   * is already moving to the next cached clip.
+   */
+  const syncStepFromNarration = useCallback(
+    (index: number) => {
+      if (!tutorial || !active) return;
+      const nextIndex = Math.max(0, Math.min(index, tutorial.steps.length - 1));
+      const nextStep = tutorial.steps[nextIndex];
+      if (!nextStep) return;
+      setPhase('guide');
+      setStepIndex(nextIndex);
+      setDemoSceneIndex(resolveDemoSceneIndex(tutorial, nextStep));
+      setAnimationReplayToken((token) => token + 1);
+      persist(nextIndex, 'in_progress');
+      void syncRouteForStep(tutorial, nextStep, nextIndex);
+    },
+    [tutorial, active, persist, syncRouteForStep]
+  );
 
-    const scene = resolveStepDemoScene(tutorial, currentStep);
-    const animation = resolveStepAnimation(tutorial, currentStep);
-    const reduced = prefersReducedMotion();
-    const minMs = resolveAnimationDurationMs(
-      animation ?? undefined,
-      scene?.durationMs ?? currentStep.animation?.durationMs,
-      reduced
-    );
-    const narrationText =
-      mode === 'demo'
-        ? scene?.narration?.trim() || currentStep.narration?.trim() || currentStep.body
-        : currentStep.narration?.trim() || currentStep.body;
-    const seq = ++demoAdvanceSeqRef.current;
-    const engine = getNarrationController();
-    let cancelled = false;
-
-    const sleep = (ms: number) =>
-      new Promise<void>((resolve) => {
-        demoTimerRef.current = setTimeout(() => resolve(), ms);
-      });
-
-    const run = async () => {
-      const shouldAdvance = await waitForDemoSceneAdvance({
-        engine,
-        minMs,
-        waitForNarration:
-          engine.isSupported() && !engine.isMuted() && Boolean(narrationText?.trim()),
-        isCancelled: () => cancelled || seq !== demoAdvanceSeqRef.current,
-        isPaused: () => pausedRef.current,
-        sleep,
-      });
-      if (!shouldAdvance) return;
-      next();
-    };
-
-    void run();
-
-    return () => {
-      cancelled = true;
-      clearDemoTimer();
-      demoAdvanceSeqRef.current += 1;
-    };
-  }, [active, navigating, mode, tutorial, stepIndex, phase, next]);
+  const completeFromNarration = useCallback(() => {
+    if (!tutorial) return;
+    persist(tutorial.steps.length - 1, 'completed');
+    onComplete?.(tutorial.id);
+    stop('completed');
+  }, [tutorial, persist, onComplete, stop]);
 
   useEffect(() => {
     if (!active) return;
@@ -555,12 +527,6 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
         event.preventDefault();
         if (pausedRef.current) resume();
         else pause();
-      } else if (event.key === 'ArrowRight') {
-        event.preventDefault();
-        next();
-      } else if (event.key === 'ArrowLeft') {
-        event.preventDefault();
-        previous();
       }
     };
     window.addEventListener('keydown', onKey);
@@ -599,6 +565,8 @@ export function useTutorialEngine(options: UseTutorialEngineOptions = {}) {
     goTo: (index: number) => {
       void goTo(index);
     },
+    syncStepFromNarration,
+    completeFromNarration,
     stop,
     /** Marker for tests: demo path never mutates appointments. */
     demoWritesDatabase: false as const,

@@ -1,26 +1,21 @@
 /**
- * Honest Spanish voice-profile classification for Web Speech.
- * Gender is only reported when the voice name/URI contains a reliable cue.
- * Never invent male/female labels from language alone.
+ * Browser Web Speech voice helpers (fallback only).
+ * Tutoriales primary voices are ElevenLabs Brian C / Horacio (male).
  */
-
-import type { NarrationVoiceProfileId } from '@sincvete/shared';
-
-export type { NarrationVoiceProfileId };
 
 /** Strong female cues only — avoid broad matches like "Google español". */
 const FEMALE_VOICE_HINTS =
-  /\b(female|mujer|femenin[oa]?|sabina|m[oó]nica|paulina|helena|elena|luc[ií]a|sof[ií]a|mar[ií]a|carmen|isabela|paloma|dalia|zira|elsa|pilar|conchita|linda|laura|sara|joanna|ivy|salli|kendra|kimberly|amy|emma|olivia)\b/i;
+  /\b(female|mujer|femenin[oa]?|sabina|m[oó]nica|paulina|helena|elena|luc[ií]a|sof[ií]a|mar[ií]a|carmen|isabela|paloma|dalia|zira|elsa|pilar|conchita|linda|laura|sara|joanna|ivy|salli|kendra|kimberly|amy|emma|olivia|hedda|katja|susan|hazel|catherine)\b/i;
 
 /** Strong male cues only. */
 const MALE_VOICE_HINTS =
-  /\b(male|hombre|masculin[oa]?|pablo|jorge|diego|ra[uú]l|tom[aá]s|tomas|carlos|enrique|miguel|antonio|juan|pedro|david|mark|matthew|justin|joey|brian|arthur|george|james|ravi)\b/i;
+  /\b(male|hombre|masculin[oa]?|pablo|jorge|diego|ra[uú]l|tom[aá]s|tomas|carlos|enrique|miguel|antonio|juan|pedro|david|mark|matthew|justin|joey|brian|arthur|george|james|ravi|raul|alvaro|álvaro|javi|javier)\b/i;
 
-export type ClassifiedVoiceGender = NarrationVoiceProfileId | 'unknown';
+export type BrowserVoiceGender = 'female' | 'male' | 'unknown';
 
 export function classifySpeechVoiceGender(
   voice: Pick<SpeechSynthesisVoice, 'name' | 'voiceURI'>
-): ClassifiedVoiceGender {
+): BrowserVoiceGender {
   const haystack = `${voice.name} ${voice.voiceURI}`;
   const female = FEMALE_VOICE_HINTS.test(haystack);
   const male = MALE_VOICE_HINTS.test(haystack);
@@ -38,33 +33,15 @@ export function listSpanishVoices(voices: SpeechSynthesisVoice[]): SpeechSynthes
   return voices.filter(isSpanishVoice);
 }
 
-export function listVoicesForProfile(
-  voices: SpeechSynthesisVoice[],
-  profile: NarrationVoiceProfileId
-): SpeechSynthesisVoice[] {
-  return listSpanishVoices(voices).filter(
-    (voice) => classifySpeechVoiceGender(voice) === profile
-  );
-}
-
 export interface VoiceProfileAvailability {
-  female: SpeechSynthesisVoice[];
-  male: SpeechSynthesisVoice[];
-  spanishAny: SpeechSynthesisVoice[];
+  /** ElevenLabs Brian C available (API configured). */
+  brian: boolean;
+  /** ElevenLabs Horacio available (API configured). */
+  horacio: boolean;
+  /** True when ElevenLabs TTS endpoint is ready. */
+  elevenLabs: boolean;
 }
 
-export function analyzeVoiceProfileAvailability(
-  voices: SpeechSynthesisVoice[]
-): VoiceProfileAvailability {
-  const spanishAny = listSpanishVoices(voices);
-  return {
-    female: spanishAny.filter((v) => classifySpeechVoiceGender(v) === 'female'),
-    male: spanishAny.filter((v) => classifySpeechVoiceGender(v) === 'male'),
-    spanishAny,
-  };
-}
-
-/** Higher = more human / higher quality for Spanish tutorial narration. */
 export function scoreSpanishVoiceQuality(
   voice: SpeechSynthesisVoice,
   preferredLang = 'es-AR'
@@ -85,39 +62,58 @@ export function scoreSpanishVoiceQuality(
   else if (lang.startsWith('es-us')) score += 30;
   else if (lang.startsWith('es-es') || lang === 'es') score += 20;
 
-  // Known warmer Spanish voices on Windows/Edge when gender is identifiable.
-  if (/sabina|elena|paulina|m[oó]nica|lucia|lucía/i.test(name)) score += 25;
+  // Prefer known male Spanish voices when ranking neutrally.
+  if (MALE_VOICE_HINTS.test(name)) score += 30;
+  if (FEMALE_VOICE_HINTS.test(name)) score -= 40;
 
   return score;
 }
 
 /**
- * Pick a voice for a requested profile.
- * Returns null when the profile cannot be satisfied honestly.
- * For profile=null (automatic), returns best Spanish voice without gender claims.
+ * Browser fallback voice picker.
+ * Brian C / Horacio are male — never return a female voice for male/default.
+ * Prefer explicit male voices; if none, return null (caller skips speech).
  */
 export function pickVoiceForProfile(
   voices: SpeechSynthesisVoice[],
-  profile: NarrationVoiceProfileId | null,
+  profile: BrowserVoiceGender | 'female' | 'male' | null,
   preferredLang = 'es-AR'
 ): SpeechSynthesisVoice | null {
-  const pickBest = (pool: SpeechSynthesisVoice[]) => {
-    if (!pool.length) return null;
-    const ranked = [...pool].sort(
+  const spanish = listSpanishVoices(voices);
+  const pool = spanish.length ? spanish : voices;
+  if (!pool.length) return null;
+
+  const wantMale = profile === 'male' || profile == null;
+  const wantFemale = profile === 'female';
+
+  if (wantMale) {
+    const males = pool.filter((voice) => classifySpeechVoiceGender(voice) === 'male');
+    if (!males.length) return null;
+    const ranked = [...males].sort(
       (a, b) =>
         scoreSpanishVoiceQuality(b, preferredLang) -
         scoreSpanishVoiceQuality(a, preferredLang)
     );
     return ranked[0] ?? null;
-  };
-
-  if (profile === 'female' || profile === 'male') {
-    return pickBest(listVoicesForProfile(voices, profile));
   }
 
-  const spanish = listSpanishVoices(voices);
-  return pickBest(spanish.length ? spanish : voices);
+  if (wantFemale) {
+    const females = pool.filter((voice) => classifySpeechVoiceGender(voice) === 'female');
+    const ranked = [...(females.length ? females : pool)].sort(
+      (a, b) =>
+        scoreSpanishVoiceQuality(b, preferredLang) -
+        scoreSpanishVoiceQuality(a, preferredLang)
+    );
+    return ranked[0] ?? null;
+  }
+
+  const ranked = [...pool].sort(
+    (a, b) =>
+      scoreSpanishVoiceQuality(b, preferredLang) -
+      scoreSpanishVoiceQuality(a, preferredLang)
+  );
+  return ranked[0] ?? null;
 }
 
 export const VOICE_PREVIEW_SAMPLE =
-  'Hola, soy la narración de Tutoriales Sinc Vete. Así vas a escuchar las guías del tutorial.';
+  'Hola. Así se escucha la narración de Tutoriales Sync Vete para cada módulo.';

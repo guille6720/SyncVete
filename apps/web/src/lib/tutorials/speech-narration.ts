@@ -1,12 +1,13 @@
 /**
- * Browser Web Speech API narration for Academia SyncVete.
- * Prefers es-AR, then other Spanish voices. Gendered profiles only when
- * the voice identity is reliably classified (see voice-profiles.ts).
- * Uses generation tokens so cancelled/async voice loads never speak after stop.
- * No external paid APIs or credentials.
+ * Browser Web Speech API narration for Academia SyncVete (fallback only).
+ * Prefers male Spanish voices (Brian C / Horacio are men). Uses generation
+ * tokens so cancelled/async voice loads never speak after stop.
  */
 
-import type { NarrationVoiceProfileId } from '@sincvete/shared';
+import {
+  migrateLegacyVoiceProfile,
+  type NarrationVoiceProfileId,
+} from '@sincvete/shared';
 import { pickVoiceForProfile } from '@/lib/tutorials/voice-profiles';
 import { splitNarrationChunks } from '@/lib/tutorials/narration-chunks';
 
@@ -38,15 +39,12 @@ export function isSpeechSynthesisSupported(
   return Boolean(synth && typeof SpeechSynthesisUtterance !== 'undefined');
 }
 
-/**
- * Automatic Spanish voice selection (no gender claim).
- * For gendered selection use pickVoiceForProfile / setVoiceProfile.
- */
+/** Male Spanish voice selection for browser fallback. */
 export function pickPreferredSpanishVoice(
   voices: SpeechSynthesisVoice[],
   preferredLang = 'es-AR'
 ): SpeechSynthesisVoice | null {
-  return pickVoiceForProfile(voices, null, preferredLang);
+  return pickVoiceForProfile(voices, 'male', preferredLang);
 }
 
 export function clampNarrationRate(rate: number): number {
@@ -64,15 +62,15 @@ export type StoredVoiceProfile = NarrationVoiceProfileId | 'auto';
 export interface NarrationPreferences {
   muted: boolean;
   rate: number;
-  /** 'auto' = best Spanish without gender claim; female/male only when available. */
+  /** ElevenLabs: brian (Brian C) or horacio. 'auto' picks Brian C. */
   voiceProfile: StoredVoiceProfile;
 }
 
 export const DEFAULT_NARRATION_PREFS: NarrationPreferences = {
   muted: false,
-  /** Near-natural pace; too slow sounds drowsy, too fast sounds robotic. */
-  rate: 0.92,
-  voiceProfile: 'auto',
+  /** Natural pace — avoid slow rates that exaggerate clip seams. */
+  rate: 1,
+  voiceProfile: 'brian',
 };
 
 /**
@@ -84,12 +82,18 @@ export function pitchForVoiceProfile(
   return 1;
 }
 
+/** Map ElevenLabs profiles to male browser fallback. */
+export function browserProfileFromStored(
+  _profile: StoredVoiceProfile | NarrationVoiceProfileId | null | undefined
+): 'male' {
+  return 'male';
+}
+
 /** Tiny breath only when a long script must be split. */
 const CHUNK_GAP_MS = 90;
 
 function normalizeStoredVoiceProfile(value: unknown): StoredVoiceProfile {
-  if (value === 'female' || value === 'male' || value === 'auto') return value;
-  return DEFAULT_NARRATION_PREFS.voiceProfile;
+  return migrateLegacyVoiceProfile(value);
 }
 
 export function readNarrationPreferences(): NarrationPreferences {
@@ -208,13 +212,12 @@ export class SpeechNarrationEngine {
   }
 
   /**
-   * Request a gendered browser voice. Null = automatic Spanish (no gender claim).
-   * If the profile cannot be satisfied, voice stays null and speak() uses default lang.
+   * Browser fallback always uses a male Spanish voice (never Sabina/Paulina).
    */
   setVoiceProfile(profile: NarrationVoiceProfileId | null): void {
     this.voiceProfile = profile;
     if (this.voicesReady && this.synth) {
-      this.voice = pickVoiceForProfile(this.synth.getVoices(), profile);
+      this.voice = pickVoiceForProfile(this.synth.getVoices(), 'male');
     }
   }
 
@@ -228,7 +231,7 @@ export class SpeechNarrationEngine {
     const current = this.synth.getVoices();
     if (current.length > 0) {
       this.voicesReady = true;
-      this.voice = pickVoiceForProfile(current, this.voiceProfile);
+      this.voice = pickVoiceForProfile(current, 'male');
       return Promise.resolve(current);
     }
 
@@ -243,7 +246,7 @@ export class SpeechNarrationEngine {
         this.detachVoicesWaiter(waiter);
         const voices = this.synth?.getVoices() ?? [];
         this.voicesReady = true;
-        this.voice = pickVoiceForProfile(voices, this.voiceProfile);
+        this.voice = pickVoiceForProfile(voices, 'male');
         resolve(voices);
       };
 

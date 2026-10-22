@@ -1,10 +1,9 @@
 /**
- * Static narration asset map for Academia.
- * Professional neural audio files are optional; the web app falls back to
- * browser speech when a clip is missing. No patient data is sent externally.
+ * Narration voice profiles for Tutoriales SyncVete.
+ * Voices are ElevenLabs: Brian C and Horacio (Argentine/Latin Spanish).
  */
 
-export type NarrationVoiceProfileId = 'female' | 'male';
+export type NarrationVoiceProfileId = 'brian' | 'horacio';
 
 export interface NarrationClipRef {
   tutorialId: string;
@@ -32,12 +31,17 @@ export const AGENDA_NARRATION_CLIP_IDS = [
 export type AgendaNarrationClipId = (typeof AGENDA_NARRATION_CLIP_IDS)[number];
 
 export const NARRATION_VOICE_PROFILES: readonly NarrationVoiceProfileId[] = [
-  'female',
-  'male',
+  'brian',
+  'horacio',
 ] as const;
 
+export const NARRATION_VOICE_LABELS: Record<NarrationVoiceProfileId, string> = {
+  brian: 'Brian C',
+  horacio: 'Horacio',
+};
+
 /**
- * Public URL path for a static narration clip.
+ * Public URL path for optional static narration clips.
  * Convention: /academia/narration/{tutorialId}/{voiceProfile}/{clipId}.mp3
  */
 export function buildNarrationAssetPath(ref: NarrationClipRef): string {
@@ -61,4 +65,14 @@ export function listAgendaNarrationAssetPaths(): string[] {
     }
   }
   return paths;
+}
+
+/** Map legacy female/male prefs to the ElevenLabs profiles. */
+export function migrateLegacyVoiceProfile(
+  value: unknown
+): NarrationVoiceProfileId | 'auto' {
+  if (value === 'brian' || value === 'horacio' || value === 'auto') return value;
+  if (value === 'male') return 'brian';
+  if (value === 'female') return 'horacio';
+  return 'brian';
 }

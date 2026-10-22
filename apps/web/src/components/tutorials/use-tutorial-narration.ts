@@ -13,32 +13,22 @@ import {
   getNarrationController,
   type NarrationSource,
 } from '@/lib/tutorials/narration-controller';
+import { getElevenLabsAudioEngine } from '@/lib/tutorials/elevenlabs-audio';
 import {
-  analyzeVoiceProfileAvailability,
   VOICE_PREVIEW_SAMPLE,
   type VoiceProfileAvailability,
 } from '@/lib/tutorials/voice-profiles';
 
 export interface UseTutorialNarrationOptions {
-  /** Spoken text for the current step or demo scene. */
   text: string | null | undefined;
-  /**
-   * When true, the step UI is ready for auto-play (target measured / not navigating).
-   * Must NOT flip false merely because the demo is paused.
-   */
   ready: boolean;
-  /** Tutorial/demo is active. */
   active: boolean;
-  /**
-   * Demo/tutorial pause flag. Uses pause/resume — does not restart.
-   */
   paused?: boolean;
-  /** Tutorial id for static neural clips (e.g. agenda-basico). */
   tutorialId?: string | null;
-  /** Step or demo scene id for static clip lookup. */
   clipId?: string | null;
-  /** Optional clip ids to preload for the active tutorial. */
   preloadClipIds?: string[];
+  /** Prefetch these scripts (next steps) while the current clip plays. */
+  prefetchTexts?: string[];
 }
 
 export interface TutorialNarrationApi {
@@ -60,11 +50,9 @@ export interface TutorialNarrationApi {
   setVoiceProfile: (profile: StoredVoiceProfile) => void;
 }
 
-function toEngineProfile(
-  profile: StoredVoiceProfile
-): NarrationVoiceProfileId | null {
-  if (profile === 'female' || profile === 'male') return profile;
-  return null;
+function toEngineProfile(profile: StoredVoiceProfile): NarrationVoiceProfileId {
+  if (profile === 'horacio') return 'horacio';
+  return 'brian';
 }
 
 export function useTutorialNarration(
@@ -78,16 +66,17 @@ export function useTutorialNarration(
     tutorialId = null,
     clipId = null,
     preloadClipIds = [],
+    prefetchTexts = [],
   } = options;
   const controller = useMemo(() => getNarrationController(), []);
   const [status, setStatus] = useState<SpeechNarrationStatus>(() => controller.getStatus());
   const [muted, setMuted] = useState(false);
-  const [rate, setRateState] = useState(0.92);
-  const [voiceProfile, setVoiceProfileState] = useState<StoredVoiceProfile>('auto');
+  const [rate, setRateState] = useState(1);
+  const [voiceProfile, setVoiceProfileState] = useState<StoredVoiceProfile>('brian');
   const [availability, setAvailability] = useState<VoiceProfileAvailability>({
-    female: [],
-    male: [],
-    spanishAny: [],
+    brian: false,
+    horacio: false,
+    elevenLabs: false,
   });
   const [activeSource, setActiveSource] = useState<NarrationSource>('none');
   const [prefsReady, setPrefsReady] = useState(false);
@@ -98,14 +87,16 @@ export function useTutorialNarration(
     const prefs = readNarrationPreferences();
     setMuted(prefs.muted);
     setRateState(prefs.rate);
-    setVoiceProfileState(prefs.voiceProfile);
+    setVoiceProfileState(prefs.voiceProfile === 'auto' ? 'brian' : prefs.voiceProfile);
     controller.setMuted(prefs.muted);
     controller.setRate(prefs.rate);
     controller.setVoiceProfile(toEngineProfile(prefs.voiceProfile));
     setPrefsReady(true);
-    void controller.ensureVoices().then((voices) => {
-      setAvailability(analyzeVoiceProfileAvailability(voices));
-    });
+    void getElevenLabsAudioEngine()
+      .isAvailable()
+      .then((ok) => {
+        setAvailability({ brian: ok, horacio: ok, elevenLabs: ok });
+      });
     return () => {
       controller.stop();
     };
@@ -120,16 +111,10 @@ export function useTutorialNarration(
     []
   );
 
-  const profileBlocked = useMemo(() => {
-    if (voiceProfile === 'female' && availability.female.length === 0) return true;
-    if (voiceProfile === 'male' && availability.male.length === 0) return true;
-    return false;
-  }, [voiceProfile, availability]);
-
   const speakCurrent = useCallback(
     async (force = false) => {
       const value = text?.trim();
-      if (!value || !controller.isSupported() || muted || profileBlocked) return;
+      if (!value || muted) return;
       const key = `${tutorialId ?? ''}|${clipId ?? ''}|${value}|${voiceProfile}`;
       if (!force && lastSpokenKeyRef.current === key && controller.getStatus() !== 'idle') {
         return;
@@ -143,30 +128,29 @@ export function useTutorialNarration(
       });
       setActiveSource(source);
     },
-    [
-      controller,
-      text,
-      muted,
-      rate,
-      tutorialId,
-      clipId,
-      voiceProfile,
-      profileBlocked,
-    ]
+    [controller, text, muted, rate, tutorialId, clipId, voiceProfile]
   );
 
-  // Preload static clips when a gendered profile is selected
   useEffect(() => {
     if (!prefsReady || !active || !tutorialId) return;
-    const profile = toEngineProfile(voiceProfile);
-    if (!profile || preloadClipIds.length === 0) return;
+    if (preloadClipIds.length === 0) return;
     void controller.preloadClips(
       preloadClipIds.map((id) => ({ tutorialId, clipId: id })),
-      profile
+      toEngineProfile(voiceProfile)
     );
   }, [prefsReady, active, tutorialId, voiceProfile, preloadClipIds, controller]);
 
-  // Hard-stop when tutorial closes
+  // Prefetch upcoming scripts so step changes do not wait on the network.
+  useEffect(() => {
+    if (!prefsReady || !active || muted || prefetchTexts.length === 0) return;
+    const profile = toEngineProfile(voiceProfile);
+    for (const script of prefetchTexts) {
+      const value = script.trim();
+      if (!value) continue;
+      void controller.prefetch(value, profile);
+    }
+  }, [prefsReady, active, muted, voiceProfile, prefetchTexts, controller]);
+
   useEffect(() => {
     if (!active) {
       lastSpokenKeyRef.current = null;
@@ -176,34 +160,24 @@ export function useTutorialNarration(
     }
   }, [active, controller]);
 
-  /**
-   * Auto-play on step/text change only.
-   * Intentionally ignores `paused` so pause/resume does not cancel+restart.
-   */
   useEffect(() => {
     if (!prefsReady) return;
 
-    if (!active || !ready || muted || profileBlocked) {
-      if (!active || !ready) {
-        lastSpokenKeyRef.current = null;
-        controller.stop();
-        setActiveSource('none');
-      }
-      return;
-    }
+    // Only hard-stop when the tutorial closes or mute — never on route navigation.
+    if (!active) return;
+    if (muted) return;
+    if (!ready) return;
 
     const value = text?.trim();
     if (!value) return;
 
     const key = `${tutorialId ?? ''}|${clipId ?? ''}|${value}|${voiceProfile}`;
-    if (lastSpokenKeyRef.current === key) {
-      return;
-    }
+    if (lastSpokenKeyRef.current === key) return;
 
     const timer = window.setTimeout(() => {
-      if (!active || muted || profileBlocked) return;
+      if (!active || muted) return;
       void speakCurrent(true);
-    }, 220);
+    }, 60);
 
     return () => {
       window.clearTimeout(timer);
@@ -216,27 +190,11 @@ export function useTutorialNarration(
     prefsReady,
     controller,
     speakCurrent,
-    profileBlocked,
     tutorialId,
     clipId,
     voiceProfile,
   ]);
 
-  // When text identity changes, cancel previous utterance before the delayed speak
-  const previousTextRef = useRef<string | null | undefined>(undefined);
-  useEffect(() => {
-    const next = text?.trim() ?? null;
-    const prev = previousTextRef.current;
-    previousTextRef.current = next;
-    if (prev === undefined) return;
-    if (prev !== next) {
-      lastSpokenKeyRef.current = null;
-      controller.stop();
-      setActiveSource('none');
-    }
-  }, [text, controller]);
-
-  // Pause / resume without restarting from the beginning
   useEffect(() => {
     if (!active || !prefsReady) return;
 
@@ -278,7 +236,7 @@ export function useTutorialNarration(
   }, [speakCurrent]);
 
   const preview = useCallback(() => {
-    if (muted || profileBlocked) return;
+    if (muted) return;
     lastSpokenKeyRef.current = null;
     void controller
       .speak(VOICE_PREVIEW_SAMPLE, {
@@ -286,7 +244,7 @@ export function useTutorialNarration(
         voiceProfile: toEngineProfile(voiceProfile),
       })
       .then(setActiveSource);
-  }, [controller, muted, profileBlocked, rate, voiceProfile]);
+  }, [controller, muted, rate, voiceProfile]);
 
   const stop = useCallback(() => {
     lastSpokenKeyRef.current = null;
@@ -314,75 +272,34 @@ export function useTutorialNarration(
       setRateState(clamped);
       controller.setRate(clamped);
       persist({ muted, rate: clamped, voiceProfile });
-      if (
-        !muted &&
-        !profileBlocked &&
-        text?.trim() &&
-        (controller.getStatus() === 'speaking' || controller.getStatus() === 'paused')
-      ) {
-        lastSpokenKeyRef.current = null;
-        void controller
-          .speak(text.trim(), {
-            rate: clamped,
-            tutorialId,
-            clipId,
-            voiceProfile: toEngineProfile(voiceProfile),
-          })
-          .then((source) => {
-            setActiveSource(source);
-            lastSpokenKeyRef.current = `${tutorialId ?? ''}|${clipId ?? ''}|${text.trim()}|${voiceProfile}`;
-          });
-      }
+      // Live rate change on the current element — do not restart the clip.
     },
-    [controller, muted, persist, text, voiceProfile, tutorialId, clipId, profileBlocked]
+    [controller, muted, persist, voiceProfile]
   );
 
   const setVoiceProfile = useCallback(
     (nextProfile: StoredVoiceProfile) => {
-      setVoiceProfileState(nextProfile);
-      controller.setVoiceProfile(toEngineProfile(nextProfile));
-      persist({ muted, rate, voiceProfile: nextProfile });
+      const normalized = nextProfile === 'auto' ? 'brian' : nextProfile;
+      setVoiceProfileState(normalized);
+      controller.setVoiceProfile(toEngineProfile(normalized));
+      persist({ muted, rate, voiceProfile: normalized });
       lastSpokenKeyRef.current = null;
-      void controller.ensureVoices().then((voices) => {
-        setAvailability(analyzeVoiceProfileAvailability(voices));
-      });
-      if (
-        !muted &&
-        active &&
-        ready &&
-        text?.trim() &&
-        !(
-          (nextProfile === 'female' && availability.female.length === 0) ||
-          (nextProfile === 'male' && availability.male.length === 0)
-        )
-      ) {
+      if (!muted && active && ready && text?.trim()) {
         void controller
           .speak(text.trim(), {
             rate,
             tutorialId,
             clipId,
-            voiceProfile: toEngineProfile(nextProfile),
+            voiceProfile: toEngineProfile(normalized),
           })
           .then(setActiveSource);
       }
     },
-    [
-      controller,
-      muted,
-      rate,
-      persist,
-      active,
-      ready,
-      text,
-      tutorialId,
-      clipId,
-      availability.female.length,
-      availability.male.length,
-    ]
+    [controller, muted, rate, persist, active, ready, text, tutorialId, clipId]
   );
 
   return {
-    supported: controller.isSupported(),
+    supported: true,
     status,
     muted,
     rate,

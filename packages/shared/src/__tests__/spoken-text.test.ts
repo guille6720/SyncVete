@@ -36,13 +36,13 @@ describe('narration asset map', () => {
     expect(AGENDA_NARRATION_CLIP_IDS).toHaveLength(13);
     const paths = listAgendaNarrationAssetPaths();
     expect(paths).toHaveLength(26);
-    expect(paths[0]).toBe('/academia/narration/agenda-basico/female/welcome.mp3');
+    expect(paths[0]).toBe('/academia/narration/agenda-basico/brian/welcome.mp3');
     expect(
       buildNarrationAssetPath({
         tutorialId: 'agenda-basico',
         clipId: 'demo-status',
-        voiceProfile: 'male',
+        voiceProfile: 'horacio',
       })
-    ).toBe('/academia/narration/agenda-basico/male/demo-status.mp3');
+    ).toBe('/academia/narration/agenda-basico/horacio/demo-status.mp3');
   });
 });

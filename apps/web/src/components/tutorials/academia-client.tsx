@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import Link from 'next/link';
-import { BookOpen, CirclePlay, Clapperboard, GraduationCap, MonitorPlay } from 'lucide-react';
+import { BookOpen, Clapperboard, GraduationCap, MonitorPlay } from 'lucide-react';
 import { getTutorialById, type AcademyModuleCard, type VideoScene } from '@sincvete/shared';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -99,17 +99,7 @@ export function AcademiaClient({ cards }: AcademiaClientProps) {
                   disabled={!engine || scenes.length === 0}
                 >
                   <MonitorPlay className="mr-2 h-4 w-4" />
-                  Ver explicación
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => engine?.start(card.tutorialId, 'interactive')}
-                  disabled={!engine}
-                >
-                  <CirclePlay className="mr-2 h-4 w-4" />
-                  Iniciar tutorial
+                  Reproducir
                 </Button>
                 {card.tutorialId === 'agenda-basico' ? (
                   <Button type="button" size="sm" variant="ghost" asChild>
@@ -121,8 +111,7 @@ export function AcademiaClient({ cards }: AcademiaClientProps) {
                 ) : null}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                La explicación se reproduce en el módulo real, en pantalla completa, con voz y
-                avance automático.
+                Reproducción continua con voz: se avanza solo. Solo tenés que pausar o terminar.
               </p>
               <Button type="button" variant="ghost" className="h-auto px-0 text-sm" asChild>
                 <Link href={card.startRoute}>Ir al módulo</Link>

@@ -7,9 +7,9 @@ import { cn } from '@/lib/utils';
 
 const RATE_OPTIONS = [
   { value: 0.85, label: '0.85× Tranquila' },
-  { value: 0.92, label: '0.92× Natural' },
-  { value: 0.98, label: '0.98× Ágil' },
-  { value: 1.05, label: '1.05× Rápida' },
+  { value: 1, label: '1× Natural' },
+  { value: 1.05, label: '1.05× Ágil' },
+  { value: 1.15, label: '1.15× Rápida' },
 ] as const;
 
 interface TutorialPlaybackBarProps {
@@ -21,9 +21,7 @@ interface TutorialPlaybackBarProps {
   muted: boolean;
   rate: number;
   voiceProfile: StoredVoiceProfile;
-  femaleAvailable: boolean;
-  maleAvailable: boolean;
-  onSeek: (stepIndex: number) => void;
+  elevenLabsAvailable: boolean;
   onTogglePause: () => void;
   onToggleMute: () => void;
   onRateChange: (rate: number) => void;
@@ -33,8 +31,8 @@ interface TutorialPlaybackBarProps {
 }
 
 /**
- * Compact bottom chrome for continuous tutorial playback.
- * Includes speed + masculine/feminine voice selectors.
+ * Continuous tutorial chrome: plays by itself.
+ * User actions: pause / resume, mute, voice, speed, and close.
  */
 export function TutorialPlaybackBar({
   title,
@@ -45,9 +43,7 @@ export function TutorialPlaybackBar({
   muted,
   rate,
   voiceProfile,
-  femaleAvailable,
-  maleAvailable,
-  onSeek,
+  elevenLabsAvailable,
   onTogglePause,
   onToggleMute,
   onRateChange,
@@ -64,7 +60,7 @@ export function TutorialPlaybackBar({
   return (
     <div
       role="region"
-      aria-label="Reproducción del tutorial"
+      aria-label="Reproducción continua del tutorial"
       data-tutorial-playback-bar="true"
       className={cn(
         'pointer-events-auto fixed bottom-0 left-0 right-0 z-[70] border-t bg-background/95 shadow-[0_-8px_24px_rgba(15,23,42,0.18)] backdrop-blur-sm',
@@ -75,7 +71,7 @@ export function TutorialPlaybackBar({
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-              Tutoriales · Paso {stepIndex + 1} de {totalSteps}
+              Reproducción continua · Paso {stepIndex + 1} de {totalSteps}
             </p>
             <p className="truncate text-sm font-semibold text-foreground">{title}</p>
             {caption ? (
@@ -116,7 +112,7 @@ export function TutorialPlaybackBar({
               size="sm"
               variant="ghost"
               onClick={onClose}
-              aria-label="Cerrar tutorial"
+              aria-label="Terminar tutorial"
             >
               <X className="h-4 w-4" aria-hidden />
             </Button>
@@ -128,21 +124,21 @@ export function TutorialPlaybackBar({
             <span>Voz</span>
             <select
               className="h-8 rounded-md border border-input bg-background px-1.5 text-xs text-foreground"
-              value={voiceProfile}
+              value={voiceProfile === 'horacio' ? 'horacio' : 'brian'}
               onChange={(event) =>
                 onVoiceProfileChange(event.target.value as StoredVoiceProfile)
               }
-              aria-label="Perfil de voz"
+              aria-label="Voz de narración ElevenLabs"
               disabled={muted}
             >
-              <option value="auto">Automática</option>
-              <option value="female" disabled={!femaleAvailable}>
-                {femaleAvailable ? 'Femenina' : 'Femenina (no disponible)'}
-              </option>
-              <option value="male" disabled={!maleAvailable}>
-                {maleAvailable ? 'Masculina' : 'Masculina (no disponible)'}
-              </option>
+              <option value="brian">Brian C</option>
+              <option value="horacio">Horacio</option>
             </select>
+            {!elevenLabsAvailable ? (
+              <span className="text-[10px] text-amber-700">
+                Falta ELEVENLABS_API_KEY (usando voz del navegador)
+              </span>
+            ) : null}
           </label>
 
           <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
@@ -163,26 +159,26 @@ export function TutorialPlaybackBar({
           </label>
         </div>
 
-        <label className="block space-y-1">
-          <span className="sr-only">Progreso del tutorial</span>
-          <input
-            type="range"
-            min={0}
-            max={Math.max(totalSteps - 1, 0)}
-            step={1}
-            value={Math.min(stepIndex, Math.max(totalSteps - 1, 0))}
-            onChange={(event) => onSeek(Number(event.target.value))}
-            className="h-2 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
-            aria-valuemin={1}
-            aria-valuemax={totalSteps}
-            aria-valuenow={stepIndex + 1}
-            aria-valuetext={`Paso ${stepIndex + 1} de ${totalSteps}`}
-          />
+        <div
+          className="space-y-1"
+          role="progressbar"
+          aria-valuemin={1}
+          aria-valuemax={totalSteps}
+          aria-valuenow={stepIndex + 1}
+          aria-valuetext={`Paso ${stepIndex + 1} de ${totalSteps}`}
+          aria-label="Progreso de la reproducción continua"
+        >
+          <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-[width] duration-500 ease-out"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Desplazá para saltar a otro paso</span>
+            <span>Se avanza solo · solo pausá o terminá</span>
             <span>{pct}%</span>
           </div>
-        </label>
+        </div>
       </div>
     </div>
   );

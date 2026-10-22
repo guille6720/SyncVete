@@ -1,60 +1,69 @@
 'use client';
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TutorialEngineApi } from '@/components/tutorials/use-tutorial-engine';
 import { TutorialPlaybackBar } from '@/components/tutorials/tutorial-playback-bar';
-import { useTutorialNarration } from '@/components/tutorials/use-tutorial-narration';
 import { TutorialIntroLogo } from '@/components/tutorials/animation/tutorial-intro-logo';
 import { TutorialCursor } from '@/components/tutorials/animation/tutorial-cursor';
 import { DemoMockAppointment } from '@/components/tutorials/animation/demo-mock-appointment';
 import { DemoStatusCycle } from '@/components/tutorials/animation/demo-status-cycle';
 import { useTutorialAnimation } from '@/components/tutorials/animation/use-tutorial-animation';
-import { AGENDA_NARRATION_CLIP_IDS } from '@sincvete/shared';
-import { getNarrationController } from '@/lib/tutorials/narration-controller';
+import {
+  getContinuousNarrationSession,
+  type ContinuousNarrationClip,
+} from '@/lib/tutorials/continuous-narration-session';
 import { resolveStepDemoScene } from '@/lib/tutorials/animation/resolve-demo-scene';
+import {
+  clampNarrationRate,
+  readNarrationPreferences,
+  writeNarrationPreferences,
+  type StoredVoiceProfile,
+  type SpeechNarrationStatus,
+} from '@/lib/tutorials/speech-narration';
+import type { NarrationVoiceProfileId } from '@sincvete/shared';
+import { getElevenLabsAudioEngine } from '@/lib/tutorials/elevenlabs-audio';
 import { cn } from '@/lib/utils';
 
 interface TutorialOverlayProps {
   engine: TutorialEngineApi;
 }
 
-function resolveNarrationText(engine: TutorialEngineApi): string | null {
-  const { state } = engine;
-  if (!state.tutorial || !state.step) return null;
-  if (state.phase === 'intro') {
-    return 'Bienvenido a Tutoriales SyncVete. Esta demostración usa solo datos ficticios.';
-  }
-
-  if (state.mode === 'demo') {
-    const scene = resolveStepDemoScene(state.tutorial, state.step);
-    if (scene?.narration?.trim()) return scene.narration.trim();
-  }
-
-  return state.step.narration?.trim() || state.step.body;
+function toEngineProfile(profile: StoredVoiceProfile): NarrationVoiceProfileId {
+  return profile === 'horacio' ? 'horacio' : 'brian';
 }
 
-function resolveClipId(engine: TutorialEngineApi): string | null {
+function buildPlaylist(engine: TutorialEngineApi): ContinuousNarrationClip[] {
   const { state } = engine;
-  if (!state.tutorial || !state.step) return null;
-  if (state.phase === 'intro') return 'demo-welcome';
-  if (state.mode === 'demo') {
-    const scene = resolveStepDemoScene(state.tutorial, state.step);
-    if (scene?.id) return scene.id;
-  }
-  return state.step.id;
+  const tutorial = state.tutorial;
+  if (!tutorial) return [];
+
+  return tutorial.steps.map((step, stepIndex) => {
+    let text = step.narration?.trim() || step.body;
+    if (state.mode === 'demo') {
+      const scene = resolveStepDemoScene(tutorial, step);
+      if (scene?.narration?.trim()) text = scene.narration.trim();
+    }
+    return {
+      stepIndex,
+      text,
+      clipId: step.id,
+    };
+  });
 }
 
 export function TutorialOverlay({ engine }: TutorialOverlayProps) {
-  const {
-    state,
-    next,
-    skip,
-    pause,
-    resume,
-    skipIntro,
-    goTo,
-  } = engine;
+  const { state, skip, pause, resume, skipIntro, syncStepFromNarration, completeFromNarration } =
+    engine;
   const chromeRef = useRef<HTMLDivElement | null>(null);
+  const session = useMemo(() => getContinuousNarrationSession(), []);
+  const sessionKeyRef = useRef<string | null>(null);
+
+  const [muted, setMuted] = useState(false);
+  const [rate, setRate] = useState(1);
+  const [voiceProfile, setVoiceProfile] = useState<StoredVoiceProfile>('brian');
+  const [status, setStatus] = useState<SpeechNarrationStatus>('idle');
+  const [elevenLabsAvailable, setElevenLabsAvailable] = useState(false);
+  const [prefsReady, setPrefsReady] = useState(false);
 
   const animation = useTutorialAnimation({
     tutorial: state.tutorial,
@@ -68,52 +77,72 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
     replayToken: state.animationReplayToken,
   });
 
-  const narrationText = useMemo(
-    () => resolveNarrationText(engine),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional granular deps
-    [
-      state.mode,
-      state.stepIndex,
-      state.demoSceneIndex,
-      state.phase,
-      state.step?.id,
-      state.step?.narration,
-      state.tutorial?.id,
-    ]
-  );
+  useEffect(() => {
+    const prefs = readNarrationPreferences();
+    setMuted(prefs.muted);
+    setRate(prefs.rate);
+    setVoiceProfile(prefs.voiceProfile === 'auto' ? 'brian' : prefs.voiceProfile);
+    setPrefsReady(true);
+    void getElevenLabsAudioEngine()
+      .isAvailable()
+      .then(setElevenLabsAvailable);
+  }, []);
 
-  const clipId = useMemo(
-    () => resolveClipId(engine),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional granular deps
-    [state.mode, state.stepIndex, state.demoSceneIndex, state.phase, state.step?.id, state.tutorial?.id]
-  );
+  // Audio-driven continuous playlist — starts once per tutorial run in guide phase.
+  useEffect(() => {
+    if (!prefsReady || !state.active || !state.tutorial || state.phase !== 'guide') {
+      if (!state.active) {
+        session.stop();
+        sessionKeyRef.current = null;
+      }
+      return;
+    }
 
-  const preloadClipIds = useMemo(() => {
-    if (state.tutorial?.id !== 'agenda-basico') return [] as string[];
-    return [...AGENDA_NARRATION_CLIP_IDS];
-  }, [state.tutorial?.id]);
+    const key = `${state.tutorial.id}:${state.mode}`;
+    if (sessionKeyRef.current === key && session.isRunning()) return;
 
-  const narrationReady =
-    state.active &&
-    !state.navigating &&
-    Boolean(narrationText) &&
-    (state.phase === 'intro' || state.phase === 'guide');
+    sessionKeyRef.current = key;
+    const clips = buildPlaylist(engine);
+    const startIndex = Math.max(0, Math.min(state.stepIndex, clips.length - 1));
 
-  const narration = useTutorialNarration({
-    text: narrationText,
-    ready: narrationReady,
-    active: state.active,
-    paused: state.paused,
-    tutorialId: state.tutorial?.id ?? null,
-    clipId,
-    preloadClipIds,
-  });
+    void session.start(
+      clips,
+      {
+        voice: toEngineProfile(voiceProfile),
+        rate,
+        muted,
+        startIndex,
+      },
+      {
+        onStep: (stepIndex) => {
+          syncStepFromNarration(stepIndex);
+        },
+        onComplete: () => {
+          sessionKeyRef.current = null;
+          completeFromNarration();
+        },
+        onStatus: setStatus,
+      }
+    );
+    // Intentionally omit stepIndex/voice — audio owns progression; voice uses setVoice().
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- continuous playlist
+  }, [
+    prefsReady,
+    state.active,
+    state.tutorial?.id,
+    state.mode,
+    state.phase,
+    session,
+    syncStepFromNarration,
+    completeFromNarration,
+  ]);
 
   useEffect(() => {
-    if (!state.active || state.navigating) {
-      getNarrationController().stop();
+    if (!state.active) {
+      session.stop();
+      sessionKeyRef.current = null;
     }
-  }, [state.active, state.navigating, state.stepIndex, state.phase]);
+  }, [state.active, session]);
 
   if (!state.active || !state.tutorial || !state.step) return null;
 
@@ -130,24 +159,49 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
 
   const demoScene = animation.demoScene;
 
+  const persistPrefs = (next: {
+    muted: boolean;
+    rate: number;
+    voiceProfile: StoredVoiceProfile;
+  }) => {
+    writeNarrationPreferences(next);
+  };
+
   const handleClose = () => {
-    narration.stop();
+    session.stop();
+    sessionKeyRef.current = null;
     skip();
   };
 
   const handleTogglePause = () => {
     if (state.paused) {
       resume();
-      narration.resume();
       return;
     }
-    narration.pause();
     pause();
   };
 
-  const handleSeek = (index: number) => {
-    narration.stop();
-    goTo(index);
+  const handleToggleMute = () => {
+    setMuted((prev) => {
+      const next = !prev;
+      session.setMuted(next);
+      persistPrefs({ muted: next, rate, voiceProfile });
+      return next;
+    });
+  };
+
+  const handleRateChange = (nextRate: number) => {
+    const clamped = clampNarrationRate(nextRate);
+    setRate(clamped);
+    session.setRate(clamped);
+    persistPrefs({ muted, rate: clamped, voiceProfile });
+  };
+
+  const handleVoiceChange = (nextProfile: StoredVoiceProfile) => {
+    const normalized = nextProfile === 'auto' ? 'brian' : nextProfile;
+    setVoiceProfile(normalized);
+    persistPrefs({ muted, rate, voiceProfile: normalized });
+    void session.setVoice(toEngineProfile(normalized));
   };
 
   const handleIntroSkip = () => {
@@ -156,8 +210,8 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
       return;
     }
     if (animation.showOutroLogo) {
-      narration.stop();
-      next();
+      session.stop();
+      completeFromNarration();
     }
   };
 
@@ -263,36 +317,33 @@ export function TutorialOverlay({ engine }: TutorialOverlayProps) {
       />
 
       <div className="pointer-events-none" ref={chromeRef}>
-        {state.phase === 'intro' || animation.showOutroLogo ? null : state.navigating ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="pointer-events-auto fixed bottom-[11.5rem] left-1/2 z-[70] w-[min(100vw-1.5rem,320px)] -translate-x-1/2 rounded-lg border bg-background p-4 text-center shadow-lg"
-          >
-            <p className="text-sm font-medium">Cargando el siguiente paso…</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              La explicación continúa sola cuando la pantalla esté lista.
-            </p>
-          </div>
-        ) : (
+        {state.phase === 'intro' || animation.showOutroLogo ? null : (
           <>
-            {floatingDemo}
+            {state.navigating ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="pointer-events-none fixed bottom-[11.5rem] left-1/2 z-[70] w-[min(100vw-1.5rem,320px)] -translate-x-1/2 rounded-lg border bg-background/95 p-3 text-center shadow-lg"
+              >
+                <p className="text-xs text-muted-foreground">Actualizando pantalla…</p>
+              </div>
+            ) : (
+              floatingDemo
+            )}
             <TutorialPlaybackBar
               title={state.step.title}
               caption={state.step.caption ?? state.step.body}
               stepIndex={state.stepIndex}
               totalSteps={state.tutorial.steps.length}
-              paused={state.paused}
-              muted={narration.muted}
-              rate={narration.rate}
-              voiceProfile={narration.voiceProfile}
-              femaleAvailable={narration.availability.female.length > 0}
-              maleAvailable={narration.availability.male.length > 0}
-              onSeek={handleSeek}
+              paused={state.paused || status === 'paused'}
+              muted={muted}
+              rate={rate}
+              voiceProfile={voiceProfile}
+              elevenLabsAvailable={elevenLabsAvailable}
               onTogglePause={handleTogglePause}
-              onToggleMute={narration.toggleMute}
-              onRateChange={narration.setRate}
-              onVoiceProfileChange={narration.setVoiceProfile}
+              onToggleMute={handleToggleMute}
+              onRateChange={handleRateChange}
+              onVoiceProfileChange={handleVoiceChange}
               onClose={handleClose}
             />
           </>

@@ -18,9 +18,34 @@ export interface DemoSceneAdvanceOptions {
   sleep?: (ms: number) => Promise<void>;
 }
 
+async function waitForNarrationSettled(
+  engine: DemoNarrationWaiter,
+  minMs: number,
+  isCancelled: () => boolean
+): Promise<void> {
+  let replacements = 0;
+  while (!isCancelled() && replacements < 12) {
+    const reason = await engine.waitUntilSettled({
+      // ElevenLabs needs network time before audio starts; do not advance early.
+      timeoutMs: Math.max(minMs + 90_000, 120_000),
+      startGraceMs: 4_500,
+    });
+    if (isCancelled()) return;
+    // speak() soft-stops the previous clip before starting the next — keep holding.
+    if (reason === 'stopped') {
+      replacements += 1;
+      continue;
+    }
+    return;
+  }
+}
+
 /**
  * Hold a demo scene until the minimum display time elapses and (optionally)
  * narration settles. Returns false if cancelled before advance is allowed.
+ *
+ * If narration is replaced mid-scene (`stopped`), keep waiting for the new clip
+ * instead of advancing with the explanation cut off.
  */
 export async function waitForDemoSceneAdvance(
   options: DemoSceneAdvanceOptions
@@ -35,16 +60,17 @@ export async function waitForDemoSceneAdvance(
   } = options;
 
   const narrationWait = waitForNarration
-    ? engine.waitUntilSettled({
-        timeoutMs: Math.max(minMs + 25_000, 30_000),
-        startGraceMs: 900,
-      })
-    : Promise.resolve('muted' as const);
+    ? waitForNarrationSettled(engine, minMs, isCancelled)
+    : Promise.resolve();
 
   await sleep(minMs);
   if (isCancelled()) return false;
 
   await narrationWait;
+  if (isCancelled()) return false;
+
+  // Short natural breath between clips — not a long dead gap.
+  await sleep(280);
   if (isCancelled()) return false;
 
   while (isPaused()) {

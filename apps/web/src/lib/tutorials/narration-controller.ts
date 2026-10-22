@@ -1,6 +1,6 @@
 /**
- * Provider-independent Academia narration controller.
- * Prefers static neural clips when present; falls back to browser speech.
+ * Tutoriales narration controller.
+ * Prefers ElevenLabs (Brian C / Horacio). Browser TTS is last resort and male-only.
  */
 
 import { normalizeSpokenText, type NarrationVoiceProfileId } from '@sincvete/shared';
@@ -17,43 +17,54 @@ import {
   getPrerecordedAudioEngine,
   PrerecordedAudioEngine,
 } from '@/lib/tutorials/prerecorded-audio';
+import {
+  getElevenLabsAudioEngine,
+  ElevenLabsAudioEngine,
+} from '@/lib/tutorials/elevenlabs-audio';
 
-export type NarrationSource = 'prerecorded' | 'browser' | 'none';
+export type NarrationSource = 'elevenlabs' | 'prerecorded' | 'browser' | 'none';
 
 export interface NarrationSpeakRequest extends SpeechNarrationSpeakOptions {
-  /** Tutorial id for static asset lookup (e.g. agenda-basico). */
   tutorialId?: string | null;
-  /** Step / demo scene id matching the asset map. */
   clipId?: string | null;
-  /** Requested gendered neural / browser profile. */
   voiceProfile?: NarrationVoiceProfileId | null;
 }
 
-/**
- * Unified narration surface used by the tutorial hook and demo advance waiters.
- */
 export class NarrationController {
   private browser: SpeechNarrationEngine;
   private audio: PrerecordedAudioEngine;
+  private eleven: ElevenLabsAudioEngine;
   private activeSource: NarrationSource = 'none';
   private status: SpeechNarrationStatus = 'idle';
   private listeners = new Set<(status: SpeechNarrationStatus) => void>();
   private unsubBrowser: (() => void) | null = null;
   private unsubAudio: (() => void) | null = null;
-  private voiceProfile: NarrationVoiceProfileId | null = null;
+  private unsubEleven: (() => void) | null = null;
+  private voiceProfile: NarrationVoiceProfileId | null = 'brian';
 
   constructor(
     browser: SpeechNarrationEngine = getSpeechNarrationEngine(),
-    audio: PrerecordedAudioEngine = getPrerecordedAudioEngine()
+    audio: PrerecordedAudioEngine = getPrerecordedAudioEngine(),
+    eleven: ElevenLabsAudioEngine = getElevenLabsAudioEngine()
   ) {
     this.browser = browser;
     this.audio = audio;
-    this.status = browser.isSupported() ? 'idle' : 'unsupported';
+    this.eleven = eleven;
+    this.status = 'idle';
     this.unsubBrowser = this.browser.subscribe((status) => {
-      if (this.activeSource === 'browser') this.setStatus(status);
+      if (this.activeSource !== 'browser') return;
+      this.setStatus(status);
+      if (status === 'idle') this.activeSource = 'none';
     });
     this.unsubAudio = this.audio.subscribe((status) => {
-      if (this.activeSource === 'prerecorded') this.setStatus(status);
+      if (this.activeSource !== 'prerecorded') return;
+      this.setStatus(status);
+      if (status === 'idle') this.activeSource = 'none';
+    });
+    this.unsubEleven = this.eleven.subscribe((status) => {
+      if (this.activeSource !== 'elevenlabs') return;
+      this.setStatus(status);
+      if (status === 'idle') this.activeSource = 'none';
     });
   }
 
@@ -62,7 +73,7 @@ export class NarrationController {
   }
 
   isSupported(): boolean {
-    return this.browser.isSupported();
+    return true;
   }
 
   isMuted(): boolean {
@@ -92,6 +103,7 @@ export class NarrationController {
   setMuted(muted: boolean): void {
     this.browser.setMuted(muted);
     this.audio.setMuted(muted);
+    this.eleven.setMuted(muted);
     if (muted) {
       this.activeSource = 'none';
       this.setStatus('idle');
@@ -102,11 +114,13 @@ export class NarrationController {
     const clamped = clampNarrationRate(rate);
     this.browser.setRate(clamped);
     this.audio.setRate(clamped);
+    this.eleven.setRate(clamped);
   }
 
   setVoiceProfile(profile: NarrationVoiceProfileId | null): void {
-    this.voiceProfile = profile;
-    this.browser.setVoiceProfile(profile);
+    this.voiceProfile = profile ?? 'brian';
+    // Browser fallback must stay male (Brian C / Horacio are men).
+    this.browser.setVoiceProfile(this.voiceProfile);
   }
 
   ensureVoices(): Promise<SpeechSynthesisVoice[]> {
@@ -128,10 +142,14 @@ export class NarrationController {
     await this.audio.preload(refs);
   }
 
-  /**
-   * Speak with optional prerecorded clip. Falls back to browser TTS.
-   * Applies SyncVete spoken-text normalization for browser synthesis.
-   */
+  /** Prefetch ElevenLabs audio for the next step while the current one plays. */
+  async prefetch(text: string, voiceProfile?: NarrationVoiceProfileId | null): Promise<void> {
+    const spoken = normalizeSpokenText(text.trim());
+    if (!spoken) return;
+    const profile = voiceProfile ?? this.voiceProfile ?? 'brian';
+    await this.eleven.prefetch(spoken, profile);
+  }
+
   async speak(text: string, options: NarrationSpeakRequest = {}): Promise<NarrationSource> {
     const trimmed = text.trim();
     if (!trimmed) return 'none';
@@ -141,13 +159,41 @@ export class NarrationController {
       return 'none';
     }
 
-    this.stopEnginesSoft();
-
-    const profile = options.voiceProfile ?? this.voiceProfile;
+    const profile = options.voiceProfile ?? this.voiceProfile ?? 'brian';
     const tutorialId = options.tutorialId ?? null;
     const clipId = options.clipId ?? null;
+    const spoken = normalizeSpokenText(trimmed);
 
-    if (profile && tutorialId && clipId) {
+    // Claim ElevenLabs immediately; do not hard-stop other engines until needed.
+    // ElevenLabs speak() keeps the previous clip until the next blob is ready.
+    this.activeSource = 'elevenlabs';
+    this.setStatus('speaking');
+    this.browser.stop();
+    this.audio.stop();
+
+    const elevenStarted = await this.eleven.speak(spoken, profile, {
+      rate: options.rate,
+      volume: options.volume,
+      onEnd: options.onEnd,
+      onError: options.onError,
+    });
+    if (elevenStarted) {
+      this.activeSource = 'elevenlabs';
+      this.setStatus(this.eleven.getStatus());
+      return 'elevenlabs';
+    }
+
+    // If ElevenLabs is configured, never fall back to a browser female voice.
+    const elevenConfigured = await this.eleven.isAvailable();
+    if (elevenConfigured) {
+      this.activeSource = 'none';
+      this.setStatus('idle');
+      return 'none';
+    }
+
+    // 2) Optional static MP3 clips
+    if (tutorialId && clipId) {
+      this.activeSource = 'prerecorded';
       const started = await this.audio.speak(
         buildClipRef({ tutorialId, clipId, voiceProfile: profile }),
         {
@@ -164,21 +210,26 @@ export class NarrationController {
       }
     }
 
+    // 3) Browser fallback only when ElevenLabs is unavailable — male Spanish only.
     if (!this.browser.isSupported()) {
       this.activeSource = 'none';
       this.setStatus('unsupported');
       return 'none';
     }
 
-    const spoken = normalizeSpokenText(trimmed);
     this.activeSource = 'browser';
-    this.browser.setVoiceProfile(profile ?? null);
+    this.browser.setVoiceProfile(profile);
     this.browser.speak(spoken, options);
     this.setStatus(this.browser.getStatus());
     return 'browser';
   }
 
   pause(): void {
+    if (this.activeSource === 'elevenlabs') {
+      this.eleven.pause();
+      this.setStatus(this.eleven.getStatus());
+      return;
+    }
     if (this.activeSource === 'prerecorded') {
       this.audio.pause();
       this.setStatus(this.audio.getStatus());
@@ -191,6 +242,11 @@ export class NarrationController {
   }
 
   resume(): void {
+    if (this.activeSource === 'elevenlabs') {
+      this.eleven.resume();
+      this.setStatus(this.eleven.getStatus());
+      return;
+    }
     if (this.activeSource === 'prerecorded') {
       this.audio.resume();
       this.setStatus(this.audio.getStatus());
@@ -205,30 +261,116 @@ export class NarrationController {
   stop(): void {
     this.browser.stop();
     this.audio.stop();
+    this.eleven.stop();
     this.activeSource = 'none';
     if (this.status !== 'unsupported') this.setStatus('idle');
   }
 
+  /**
+   * Unified settle wait — does not depend on activeSource already being set.
+   * Critical: auto-advance starts before React fires speak(); we must wait
+   * through ElevenLabs fetch + full playback.
+   *
+   * Uses a short quiet gap so soft-stop → new speak (voice/rate change) does
+   * not look like “narration finished”.
+   */
   waitUntilSettled(options: {
     timeoutMs?: number;
     startGraceMs?: number;
   } = {}): Promise<SpeechSettledReason> {
-    if (this.activeSource === 'prerecorded') {
-      return this.audio.waitUntilSettled(options);
-    }
-    return this.browser.waitUntilSettled(options);
+    const timeoutMs = options.timeoutMs ?? 120_000;
+    const startGraceMs = options.startGraceMs ?? 4_500;
+    const quietGapMs = 400;
+
+    if (this.isMuted()) return Promise.resolve('muted');
+
+    return new Promise((resolve) => {
+      let settled = false;
+      let sawSpeak =
+        this.status === 'speaking' ||
+        this.status === 'paused' ||
+        this.activeSource !== 'none';
+      let graceTimer: ReturnType<typeof setTimeout> | null = null;
+      let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
+      let quietTimer: ReturnType<typeof setTimeout> | null = null;
+
+      const cleanup = () => {
+        if (graceTimer != null) clearTimeout(graceTimer);
+        if (timeoutTimer != null) clearTimeout(timeoutTimer);
+        if (quietTimer != null) clearTimeout(quietTimer);
+        unsub();
+      };
+
+      const finish = (reason: SpeechSettledReason) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        resolve(reason);
+      };
+
+      const armQuietFinish = () => {
+        if (quietTimer != null) clearTimeout(quietTimer);
+        quietTimer = setTimeout(() => {
+          quietTimer = null;
+          if (settled) return;
+          if (this.status === 'speaking' || this.status === 'paused') return;
+          if (this.activeSource !== 'none') return;
+          finish(sawSpeak ? 'ended' : 'idle');
+        }, quietGapMs);
+      };
+
+      const unsub = this.subscribe((status) => {
+        if (settled) return;
+        if (status === 'speaking' || status === 'paused' || this.activeSource !== 'none') {
+          sawSpeak = true;
+          if (quietTimer != null) {
+            clearTimeout(quietTimer);
+            quietTimer = null;
+          }
+          return;
+        }
+        if (sawSpeak && status === 'idle') {
+          armQuietFinish();
+        }
+      });
+
+      timeoutTimer = setTimeout(() => finish('timeout'), timeoutMs);
+
+      if (sawSpeak && this.status === 'idle' && this.activeSource === 'none') {
+        armQuietFinish();
+      }
+
+      graceTimer = setTimeout(() => {
+        if (settled) return;
+        if (
+          sawSpeak ||
+          this.status === 'speaking' ||
+          this.status === 'paused' ||
+          this.activeSource !== 'none'
+        ) {
+          sawSpeak = true;
+          if (this.status === 'idle' && this.activeSource === 'none') {
+            armQuietFinish();
+          }
+          return;
+        }
+        finish('idle');
+      }, startGraceMs);
+    });
   }
 
   dispose(): void {
     this.unsubBrowser?.();
     this.unsubAudio?.();
+    this.unsubEleven?.();
     this.unsubBrowser = null;
     this.unsubAudio = null;
+    this.unsubEleven = null;
     this.listeners.clear();
   }
 
-  /** Stop without bumping browser generation twice when about to re-speak. */
   private stopEnginesSoft(): void {
+    this.eleven.stop();
     this.audio.stop();
     this.browser.stop();
     this.activeSource = 'none';
