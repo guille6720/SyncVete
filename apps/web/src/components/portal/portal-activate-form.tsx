@@ -125,8 +125,8 @@ export function PortalActivateForm({
         <h2 className="text-lg font-semibold">Creá tu cuenta</h2>
         <p className={`text-sm ${embedded ? 'mt-1 text-slate-600' : 'text-muted-foreground'}`}>
           {embedded
-            ? `Completá tus datos para ver las mascotas de ${preview.ownerName}.`
-            : `Creá tu acceso para ver las mascotas de ${preview.ownerName}`}
+            ? `Completá tus datos. La veterinaria activará el acceso para ver las mascotas de ${preview.ownerName}.`
+            : `Creá tu acceso. La veterinaria lo activará para ver las mascotas de ${preview.ownerName}`}
         </p>
       </div>
       <form action={formAction} className="space-y-4">

@@ -473,6 +473,7 @@ export interface Database {
           notes: string | null;
           is_active: boolean;
           portal_user_id: string | null;
+          portal_pending_user_id: string | null;
           import_batch_id: string | null;
           source_system: string | null;
           source_record_id: string | null;
@@ -500,6 +501,7 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          portal_pending_user_id?: string | null;
           import_batch_id?: string | null;
           source_system?: string | null;
           source_record_id?: string | null;
@@ -527,6 +529,7 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          portal_pending_user_id?: string | null;
           import_batch_id?: string | null;
           source_system?: string | null;
           source_record_id?: string | null;
@@ -6612,6 +6615,16 @@ export interface Database {
           p_owner_id: string;
         };
         Returns: undefined;
+      };
+      approve_owner_portal_access: {
+        Args: {
+          p_owner_id: string;
+        };
+        Returns: string;
+      };
+      get_portal_pending_owner_id: {
+        Args: Record<string, never>;
+        Returns: string;
       };
       get_owner_portal_status: {
         Args: {

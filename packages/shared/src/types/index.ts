@@ -103,6 +103,8 @@ export interface SessionContext {
   permissions: Permission[];
   profile: Profile;
   ownerId: string | null;
+  /** True when the tutor created an account and waits for clinic activation. */
+  portalPendingApproval?: boolean;
   /** Platform Superadmin (commercial entitlements). Never grant via clinic roles. */
   isPlatformAdmin: boolean;
 }

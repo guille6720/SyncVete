@@ -30,6 +30,9 @@ export default async function PortalSessionLayout({ children }: { children: Reac
     featureKey: FEATURES.OWNER_PORTAL,
   });
 
+  const brand = await getOwnerAppBrand(session.organizationId);
+  const signOutAction = brand?.enabled ? signOutOwnerApp : signOut;
+
   if (!allowed) {
     return (
       <PortalShell userName={session.profile.full_name} signOutAction={signOut}>
@@ -44,12 +47,24 @@ export default async function PortalSessionLayout({ children }: { children: Reac
     );
   }
 
-  const brand = await getOwnerAppBrand(session.organizationId);
+  if (session.portalPendingApproval) {
+    return (
+      <PortalShell userName={session.profile.full_name} signOutAction={signOutAction} brand={brand}>
+        <div className="mx-auto max-w-lg space-y-3 rounded-lg border p-6">
+          <h1 className="text-xl font-semibold">Cuenta creada</h1>
+          <p className="text-sm text-muted-foreground">
+            Tu veterinaria todavía tiene que activar el acceso. Cuando lo haga vas a poder ver tus
+            mascotas, vacunas y turnos acá.
+          </p>
+        </div>
+      </PortalShell>
+    );
+  }
 
   return (
     <PortalShell
       userName={session.profile.full_name}
-      signOutAction={brand?.enabled ? signOutOwnerApp : signOut}
+      signOutAction={signOutAction}
       brand={brand}
     >
       {children}

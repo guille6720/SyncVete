@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { inviteOwnerToPortal, revokeOwnerPortalAccess } from '@/actions/portal';
+import {
+  approveOwnerPortalAccess,
+  inviteOwnerToPortal,
+  revokeOwnerPortalAccess,
+} from '@/actions/portal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -64,6 +68,18 @@ export function OwnerPortalCard({
     router.refresh();
   };
 
+  const handleApprove = async () => {
+    setPending(true);
+    setError(null);
+    const result = await approveOwnerPortalAccess(ownerId);
+    setPending(false);
+    if (!result.success) {
+      setError(result.error ?? 'No se pudo activar el acceso');
+      return;
+    }
+    router.refresh();
+  };
+
   const handleCopy = async () => {
     if (!inviteUrl) return;
     setCopyMessage(null);
@@ -110,7 +126,8 @@ export function OwnerPortalCard({
           </Badge>
         </div>
         <CardDescription>
-          El propietario puede ver mascotas, turnos, vacunas y facturas emitidas.
+          El propietario crea su cuenta con el enlace. Después vos activás el acceso para que vea
+          mascotas y turnos.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -120,6 +137,12 @@ export function OwnerPortalCard({
         {status?.status === 'invited' && status.expiresAt && (
           <p className="text-sm text-muted-foreground">
             Invitación válida hasta {formatDashboardDateTime(status.expiresAt)}
+          </p>
+        )}
+        {access === 'pending_approval' && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            El propietario ya creó su cuenta. Activá el acceso para que vea la información de sus
+            mascotas y turnos.
           </p>
         )}
         {inviteUrl && (
@@ -155,7 +178,17 @@ export function OwnerPortalCard({
         {error && <p className="text-sm text-destructive">{error}</p>}
         {canWrite && (
           <div className="flex flex-wrap gap-2">
-            {!hideInviteActions && access !== 'active' && (
+            {access === 'pending_approval' && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleApprove()}
+                disabled={pending || !portalEnabled}
+              >
+                {pending ? 'Activando…' : 'Activar acceso'}
+              </Button>
+            )}
+            {!hideInviteActions && access !== 'active' && access !== 'pending_approval' && (
               <Button
                 type="button"
                 size="sm"

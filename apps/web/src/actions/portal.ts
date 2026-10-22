@@ -138,6 +138,27 @@ export async function revokeOwnerPortalAccess(ownerId: string): Promise<ActionRe
   }
 }
 
+export async function approveOwnerPortalAccess(ownerId: string): Promise<ActionResult> {
+  try {
+    await requirePermission('patients:write');
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('approve_owner_portal_access', {
+      p_owner_id: ownerId,
+    });
+    if (error) {
+      return { success: false, error: rpcMessage(error) };
+    }
+    if (data !== ownerId) {
+      return { success: false, error: 'No se pudo activar el acceso del propietario' };
+    }
+    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath('/portal', 'layout');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function getOwnerPortalHome(): Promise<OwnerPortalHome | null> {
   const session = await requirePortalSession();
   const allowed = await canUseFeature({

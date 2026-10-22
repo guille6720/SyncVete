@@ -31,10 +31,11 @@ export function OwnerAppInviteCard({
   const [result, setResult] = useState<OwnerAppInviteResult | null>(null);
   const [copied, setCopied] = useState<'link' | 'message' | null>(null);
 
-  const alreadyInvited = portalStatus === 'invited' || portalStatus === 'active';
-  const whatsappLabel = alreadyInvited
-    ? 'Reenviar por WhatsApp'
-    : 'Enviar por WhatsApp';
+  const alreadyInvited =
+    portalStatus === 'invited' ||
+    portalStatus === 'pending_approval' ||
+    portalStatus === 'active';
+  const whatsappLabel = alreadyInvited ? 'Reenviar por WhatsApp' : 'Enviar por WhatsApp';
   const emailLabel = alreadyInvited ? 'Reenviar por email' : 'Enviar por email';
 
   const handleSend = async (channel: OwnerAppInviteChannel) => {
@@ -92,6 +93,11 @@ export function OwnerAppInviteCard({
         {!hasEmail && (
           <p className="text-sm text-muted-foreground">
             Cargá un email en la ficha para enviar por correo.
+          </p>
+        )}
+        {portalStatus === 'pending_approval' && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            El propietario ya creó la cuenta. Activá el acceso en la tarjeta Portal del tutor.
           </p>
         )}
 

@@ -1,12 +1,18 @@
 export const PORTAL_INVITE_DAYS = 7;
 
-export const PORTAL_ACCESS_STATUSES = ['inactive', 'invited', 'active'] as const;
+export const PORTAL_ACCESS_STATUSES = [
+  'inactive',
+  'invited',
+  'pending_approval',
+  'active',
+] as const;
 
 export type PortalAccessStatus = (typeof PORTAL_ACCESS_STATUSES)[number];
 
 export const PORTAL_ACCESS_STATUS_LABELS: Record<PortalAccessStatus, string> = {
   inactive: 'Sin acceso',
   invited: 'Invitación pendiente',
+  pending_approval: 'Cuenta creada — falta activar',
   active: 'Portal activo',
 };
 
@@ -16,6 +22,7 @@ export const PORTAL_ACCESS_STATUS_VARIANT: Record<
 > = {
   inactive: 'default',
   invited: 'warning',
+  pending_approval: 'warning',
   active: 'success',
 };
 
