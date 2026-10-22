@@ -58,7 +58,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Farmacia', href: '/farmacia', icon: Pill, groupId: 'clinical' },
   { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles, groupId: 'clinical' },
 
-  { label: 'Propietarios', href: '/propietarios', icon: Users, groupId: 'patients' },
+  { label: 'Tutores', href: '/tutores', icon: Users, groupId: 'patients' },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, groupId: 'patients' },
 
   { label: 'Agenda', href: '/agenda', icon: Calendar, groupId: 'agenda' },

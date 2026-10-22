@@ -134,7 +134,7 @@ function formatReportTimestamp(iso: string | null | undefined): string {
 /** CSV rows for each waiting-room check-in in a report period. */
 export function buildWaitingRoomReportEntriesCsv(entries: ReportWaitingRoomEntry[]): string {
   const lines: string[] = [
-    'Check-in,Paciente,Propietario,Profesional,Turno,Estado,Consultorio,Llamado,Completado,Min hasta llamado,Min total,Quitado',
+    'Check-in,Paciente,Tutor,Profesional,Turno,Estado,Consultorio,Llamado,Completado,Min hasta llamado,Min total,Quitado',
   ];
 
   for (const row of entries) {

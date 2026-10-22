@@ -89,7 +89,7 @@ export function isLimitFeatureKey(value: string): value is LimitFeatureKey {
 /** Clinic sidebar href → commercial feature. Unmapped routes stay visible. */
 export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/dashboard': FEATURES.DASHBOARD,
-  '/propietarios': FEATURES.OWNERS,
+  '/tutores': FEATURES.OWNERS,
   '/pacientes': FEATURES.PATIENTS,
   '/agenda': FEATURES.APPOINTMENTS,
   '/sala-espera': FEATURES.WAITING_ROOM,

@@ -26,7 +26,7 @@ export type ImportType = (typeof IMPORT_TYPES)[number];
 
 export const IMPORT_TYPE_LABELS: Record<ImportType, string> = {
   branches: 'Sucursales',
-  owners: 'Propietarios',
+  owners: 'Tutores',
   patients: 'Pacientes',
   clinical_entries: 'Historias clínicas',
   vaccinations: 'Vacunaciones',
@@ -91,7 +91,7 @@ export type FullMigrationStep = (typeof FULL_MIGRATION_STEPS)[number];
 
 export const FULL_MIGRATION_STEP_LABELS: Record<FullMigrationStep, string> = {
   branches: '1. Sucursales',
-  owners: '2. Propietarios',
+  owners: '2. Tutores',
   patients: '3. Pacientes',
   clinical_entries: '4. Historias clínicas',
   vaccinations: '5. Vacunaciones',
@@ -194,7 +194,7 @@ export type ExportType = (typeof EXPORT_TYPES)[number];
 
 export const EXPORT_TYPE_LABELS: Record<ExportType, string> = {
   branches: 'Sucursales',
-  owners: 'Propietarios',
+  owners: 'Tutores',
   patients: 'Pacientes',
   clinical_entries: 'Historias clínicas',
   vaccinations: 'Vacunaciones',
@@ -670,7 +670,7 @@ export const BRANCH_IMPORT_FIELDS: ImportFieldDef[] = [
 export const OWNER_IMPORT_FIELDS: ImportFieldDef[] = [
   {
     key: 'external_owner_id',
-    label: 'ID externo propietario',
+    label: 'ID externo tutor',
     required: true,
     aliases: ['external_owner_id', 'owner_id', 'id_externo', 'codigo', 'código'],
   },
@@ -737,9 +737,9 @@ export const PATIENT_IMPORT_FIELDS: ImportFieldDef[] = [
   },
   {
     key: 'external_owner_id',
-    label: 'ID externo propietario',
+    label: 'ID externo tutor',
     required: true,
-    aliases: ['external_owner_id', 'owner_id', 'id_propietario', 'propietario_id'],
+    aliases: ['external_owner_id', 'owner_id', 'id_propietario', 'id_tutor', 'propietario_id', 'tutor_id'],
   },
   EXTERNAL_BRANCH_IMPORT_FIELD,
   {
@@ -1354,7 +1354,7 @@ export const INVOICE_IMPORT_FIELDS: ImportFieldDef[] = [
   EXTERNAL_ASSIGNED_USER_IMPORT_FIELD,
   {
     key: 'external_owner_id',
-    label: 'ID externo propietario',
+    label: 'ID externo tutor',
     aliases: ['external_owner_id', 'owner_id', 'id_propietario', 'id_tutor'],
   },
   {
@@ -1875,7 +1875,7 @@ export function validateOwnerRows(
         entityType: 'owners',
         field: 'external_owner_id',
         code: 'required',
-        message: 'Falta ID externo de propietario',
+        message: 'Falta ID externo de tutor',
         severity: 'error',
         recommendedAction: 'Completar external_owner_id',
       });
@@ -1993,7 +1993,7 @@ export function validatePatientRows(
         entityType: 'patients',
         field: 'external_owner_id',
         code: 'required',
-        message: 'Falta ID externo de propietario',
+        message: 'Falta ID externo de tutor',
         severity: 'error',
       });
     } else if (
@@ -2005,9 +2005,9 @@ export function validatePatientRows(
         entityType: 'patients',
         field: 'external_owner_id',
         code: 'missing_owner',
-        message: 'No se encontró el propietario referenciado',
+        message: 'No se encontró el tutor referenciado',
         severity: 'error',
-        recommendedAction: 'Importar propietarios primero o corregir ID',
+        recommendedAction: 'Importar tutores primero o corregir ID',
         sourceReference: row.externalOwnerId,
       });
     }
@@ -3710,7 +3710,7 @@ export function validateInvoiceRows(
         entityType: 'invoices',
         field: 'external_owner_id',
         code: 'required',
-        message: 'Indicá propietario o paciente externo',
+        message: 'Indicá tutor o paciente externo',
         severity: 'error',
       });
     }
@@ -3720,7 +3720,7 @@ export function validateInvoiceRows(
         entityType: 'invoices',
         field: 'external_owner_id',
         code: 'unknown_owner',
-        message: 'Propietario externo no mapeado',
+        message: 'Tutor externo no mapeado',
         severity: 'error',
       });
     }

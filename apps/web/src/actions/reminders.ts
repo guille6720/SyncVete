@@ -201,7 +201,7 @@ export async function sendReminder(input: {
 
     const owner = await getOwner(ownerId);
     if (!owner) {
-      return { success: false, error: 'Propietario no encontrado' };
+      return { success: false, error: 'Tutor no encontrado' };
     }
 
     vars.owner = owner.full_name;

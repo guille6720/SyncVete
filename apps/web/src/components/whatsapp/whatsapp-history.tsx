@@ -81,7 +81,7 @@ export function WhatsAppHistory({ data, initialSearch = '' }: WhatsAppHistoryPro
           {data.data.map((row) => (
             <div key={row.id} className="space-y-2 rounded-lg border p-3">
               <div className="flex flex-wrap items-center gap-2 text-sm">
-                <Link href={`/propietarios/${row.owner_id}`} className="font-medium text-primary hover:underline">
+                <Link href={`/tutores/${row.owner_id}`} className="font-medium text-primary hover:underline">
                   {row.owner_full_name}
                 </Link>
                 {row.patient_name && (

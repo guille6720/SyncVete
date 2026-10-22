@@ -12,6 +12,7 @@ export const ROLES = [
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
+  // Clinic account owner (not the Tutores / pet-guardian module).
   owner: 'Propietario',
   admin: 'Administrador',
   veterinarian: 'Veterinario',

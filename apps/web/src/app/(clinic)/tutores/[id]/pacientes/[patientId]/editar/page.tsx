@@ -2,35 +2,35 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getOwner, canReadOwners } from '@/actions/owners';
-import { canManagePatients } from '@/actions/patients';
+import { getPatient, canManagePatients } from '@/actions/patients';
 import { getUserBranches } from '@/actions/settings';
-import { getSessionContext } from '@/actions/auth';
 import { PatientForm } from '@/components/patients/patient-form';
 import { Button } from '@/components/ui/button';
 
-interface NuevoPacienteDesdePropietarioPageProps {
-  params: Promise<{ id: string }>;
+interface EditarPacienteDesdeTutorPageProps {
+  params: Promise<{ id: string; patientId: string }>;
 }
 
-export default async function NuevoPacienteDesdePropietarioPage({
+export default async function EditarPacienteDesdeTutorPage({
   params,
-}: NuevoPacienteDesdePropietarioPageProps) {
+}: EditarPacienteDesdeTutorPageProps) {
   const canWrite = await canManagePatients();
-  if (!canWrite) redirect('/propietarios');
+  if (!canWrite) redirect('/tutores');
 
   const canRead = await canReadOwners();
   if (!canRead) redirect('/dashboard');
 
-  const { id: ownerId } = await params;
-  const [owner, session, branches] = await Promise.all([
+  const { id: ownerId, patientId } = await params;
+  const [owner, patient, branches] = await Promise.all([
     getOwner(ownerId),
-    getSessionContext(),
+    getPatient(patientId),
     getUserBranches(),
   ]);
 
-  if (!owner) notFound();
+  if (!owner || !patient) notFound();
+  if (patient.owner_id !== owner.id) notFound();
 
-  const returnTo = `/propietarios/${ownerId}`;
+  const returnTo = `/tutores/${ownerId}`;
 
   return (
     <div className="space-y-4">
@@ -41,10 +41,9 @@ export default async function NuevoPacienteDesdePropietarioPage({
         </Link>
       </Button>
       <PatientForm
-        branches={branches}
-        defaultBranchId={session?.branchId}
-        defaultOwnerId={owner.id}
+        patient={patient}
         ownerName={owner.full_name}
+        branches={branches}
         returnTo={returnTo}
       />
     </div>

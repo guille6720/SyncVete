@@ -868,7 +868,7 @@ export function buildClinicalPdfHtml(input: {
     · Nacimiento: ${String(input.patient.birth_date ?? '—')}
     · Microchip: ${String(input.patient.microchip ?? '—')}
   </p>
-  <h2>Propietario</h2>
+  <h2>Tutor</h2>
   <p class="meta">${String(input.owner?.full_name ?? '—')} · ${String(input.owner?.phone ?? '')} · ${String(input.owner?.email ?? '')}</p>
   <h2>Historia clínica</h2>
   ${entriesHtml || '<p>Sin evoluciones.</p>'}

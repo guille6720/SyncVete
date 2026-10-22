@@ -25,7 +25,7 @@ interface OwnerPortalCardProps {
   canWrite: boolean;
   portalEnabled?: boolean;
   status: OwnerPortalStatus | null;
-  /** When true, invite/resend lives in the App del propietario card. */
+  /** When true, invite/resend lives in the App del tutor card. */
   hideInviteActions?: boolean;
 }
 
@@ -110,7 +110,7 @@ export function OwnerPortalCard({
       <ConfirmDialog
         open={revokeOpen}
         title="Revocar acceso al portal"
-        description="¿Revocar el acceso al portal de este propietario?"
+        description="¿Revocar el acceso al portal de este tutor?"
         confirmLabel="Revocar"
         variant="destructive"
         onClose={() => setRevokeOpen(false)}
@@ -126,7 +126,7 @@ export function OwnerPortalCard({
           </Badge>
         </div>
         <CardDescription>
-          El propietario crea su cuenta con el enlace. Después vos activás el acceso para que vea
+          El tutor crea su cuenta con el enlace. Después vos activás el acceso para que vea
           mascotas y turnos.
         </CardDescription>
       </CardHeader>
@@ -141,7 +141,7 @@ export function OwnerPortalCard({
         )}
         {access === 'pending_approval' && (
           <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-            El propietario ya creó su cuenta. Activá el acceso para que vea la información de sus
+            El tutor ya creó su cuenta. Activá el acceso para que vea la información de sus
             mascotas y turnos.
           </p>
         )}

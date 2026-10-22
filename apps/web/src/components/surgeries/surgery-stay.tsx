@@ -138,9 +138,9 @@ export function SurgeryStay({
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${surgery.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${surgery.owner_id}`} className="text-primary hover:underline">
                 {surgery.owner_full_name}
               </Link>
             }

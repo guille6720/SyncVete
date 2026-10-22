@@ -47,7 +47,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
         <a href="#inicio">1. Entrar y moverte</a>
         <a href="#dashboard">2. Dashboard</a>
         <a href="#agenda">3. Agenda</a>
-        <a href="#pacientes">4. Propietarios y pacientes</a>
+        <a href="#pacientes">4. Tutores y pacientes</a>
         <a href="#consultas">5. Consultas e historia</a>
         <a href="#clinica">6. Internación, vacunas y cirugías</a>
         <a href="#lab">7. Laboratorio e imágenes</a>
@@ -143,12 +143,12 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       </section>
 
       <section className="sv-section" id="pacientes">
-        <h2>4. Propietarios y pacientes</h2>
+        <h2>4. Tutores y pacientes</h2>
         <div className="sv-split">
           <Figure src={ILLUSTRATIONS.pacientes} alt="Ficha digital de mascotas con una gata y un perro" />
           <div>
             <p>
-              Primero el <strong>propietario</strong> (tutor): nombre, contacto y datos de facturación. Después el{' '}
+              Primero el <strong>tutor</strong> (tutor): nombre, contacto y datos de facturación. Después el{' '}
               <strong>paciente</strong>: especie, raza, sexo, fecha de nacimiento y vínculo con el tutor.
             </p>
             <ul className="sv-steps">
@@ -332,12 +332,12 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       <section className="sv-section" id="import-export">
         <h2>11b. Importar / Exportar datos</h2>
         <p>
-          En <strong>Configuración → Importar / Exportar</strong> podés migrar propietarios, pacientes, historias,
+          En <strong>Configuración → Importar / Exportar</strong> podés migrar tutores, pacientes, historias,
           vacunas, laboratorio, cirugías, recetas, internaciones y adjuntos (ZIP SyncVete).
         </p>
         <ul className="sv-steps">
           <li>
-            <strong>Orden recomendado:</strong> sucursales → propietarios → pacientes → historias → vacunas → especialidades →
+            <strong>Orden recomendado:</strong> sucursales → tutores → pacientes → historias → vacunas → especialidades →
             adjuntos.
           </li>
           <li>
@@ -381,7 +381,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
             stale y podar mapas huérfanos (simulá primero).
           </li>
           <li>
-            <strong>Multi-sede:</strong> en propietarios, pacientes, historias clínicas, vacunas, laboratorio,
+            <strong>Multi-sede:</strong> en tutores, pacientes, historias clínicas, vacunas, laboratorio,
             cirugías, recetas, internaciones, agenda, consultas, inventario y facturas podés usar la columna
             opcional `external_branch_id` para asignar cada fila a una sucursal. Importá sucursales antes; cargá el
             mapa sucursales (CSV external_branch_id → internal_branch_id) o usá UUID internos del tenant en
@@ -409,7 +409,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           </li>
           <li>
             <strong>Checklist go-live:</strong> en el historial de importación podés correr un
-            checklist (propietarios, pacientes, citas 30d, vacunas, inventario, locks/huérfanos) y
+            checklist (tutores, pacientes, citas 30d, vacunas, inventario, locks/huérfanos) y
             descargarlo en CSV.
           </li>
           <li>

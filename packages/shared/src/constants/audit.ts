@@ -75,7 +75,7 @@ export const AUDIT_LIQUIDACIONES_FAMILY_ENTITY_TYPES = [
 
 export const AUDIT_ENTITY_LABELS: Record<AuditEntityType, string> = {
   patients: 'Pacientes',
-  owners: 'Propietarios',
+  owners: 'Tutores',
   appointments: 'Citas',
   clinical_entries: 'Historia clínica',
   consultations: 'Consultas',

@@ -15,7 +15,7 @@ export function OwnerAppMobileNav() {
   ];
   return (
     <nav
-      aria-label="App del propietario"
+      aria-label="App del tutor"
       className="fixed inset-x-0 bottom-0 z-40 border-t bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
     >
       <div className="mx-auto grid max-w-lg grid-cols-5">

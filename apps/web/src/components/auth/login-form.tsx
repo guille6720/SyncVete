@@ -31,7 +31,7 @@ export function LoginForm({ redirectTo, errorCode, brand, ownerAccess = false }:
         </div>
         <CardDescription>
           {brand || ownerAccess
-            ? 'Ingresá con tu acceso de propietario'
+            ? 'Ingresá con tu acceso de tutor'
             : 'Ingresá a tu clínica o al portal del tutor'}
         </CardDescription>
       </CardHeader>

@@ -41,9 +41,9 @@ export const CLINIC_MODULE_TUTORIALS: TutorialDefinition[] = [
       {
         id: 'activity',
         title: 'Actividad y recientes',
-        body: '1) Bajá a la actividad reciente. 2) Tocá un paciente o propietario reciente para retomar. 3) Usalo como atajo al trabajo del día.',
+        body: '1) Bajá a la actividad reciente. 2) Tocá un paciente o tutor reciente para retomar. 3) Usalo como atajo al trabajo del día.',
         narration:
-          'Más abajo está la actividad reciente. Revisá los movimientos del día y tocá un paciente o propietario reciente para abrir su ficha y retomar el trabajo sin buscarlo de cero.',
+          'Más abajo está la actividad reciente. Revisá los movimientos del día y tocá un paciente o tutor reciente para abrir su ficha y retomar el trabajo sin buscarlo de cero.',
         durationSec: 15,
       },
     ],
@@ -89,9 +89,9 @@ export const CLINIC_MODULE_TUTORIALS: TutorialDefinition[] = [
       {
         id: 'search',
         title: 'Buscar paciente',
-        body: '1) Hacé clic en el buscador. 2) Escribí nombre, microchip o propietario. 3) Esperá a que la lista se filtre sola.',
+        body: '1) Hacé clic en el buscador. 2) Escribí nombre, microchip o tutor. 3) Esperá a que la lista se filtre sola.',
         narration:
-          'Para buscar un paciente, tocá el campo de búsqueda. Escribí el nombre de la mascota, el microchip o el propietario. La lista se actualiza sola: no hace falta apretar Enter.',
+          'Para buscar un paciente, tocá el campo de búsqueda. Escribí el nombre de la mascota, el microchip o el tutor. La lista se actualiza sola: no hace falta apretar Enter.',
         durationSec: 15,
       },
       {
@@ -122,34 +122,34 @@ export const CLINIC_MODULE_TUTORIALS: TutorialDefinition[] = [
     ],
   }),
   buildStandardModuleTutorial({
-    moduleId: 'propietarios',
-    startRoute: '/propietarios',
-    titleName: 'Propietarios',
-    description: 'Buscar tutores, abrir fichas y registrar nuevos propietarios.',
+    moduleId: 'tutores',
+    startRoute: '/tutores',
+    titleName: 'Tutores',
+    description: 'Buscar tutores, abrir fichas y registrar nuevos tutores.',
     actions: [
       {
         id: 'search',
         title: 'Buscar tutor',
         body: '1) Tocá el buscador. 2) Escribí nombre o documento. 3) Revisá la lista filtrada.',
         narration:
-          'Para encontrar un tutor, usá el buscador. Escribí el nombre o el documento. La lista se filtra al instante. Así ubicás al propietario aunque la clínica tenga muchos registros.',
+          'Para encontrar un tutor, usá el buscador. Escribí el nombre o el documento. La lista se filtra al instante. Así ubicás al tutor aunque la clínica tenga muchos registros.',
         durationSec: 14,
       },
       {
         id: 'list',
         title: 'Abrir la ficha del tutor',
-        body: '1) Tocá un propietario de la lista. 2) Revisá contacto y mascotas. 3) Desde ahí podés seguir a un paciente.',
+        body: '1) Tocá un tutor de la lista. 2) Revisá contacto y mascotas. 3) Desde ahí podés seguir a un paciente.',
         narration:
-          'Tocá un propietario en la lista para abrir su ficha. Ahí ves teléfono, email, documento y las mascotas vinculadas. Desde esa ficha podés entrar a cada paciente asociado.',
+          'Tocá un tutor en la lista para abrir su ficha. Ahí ves teléfono, email, documento y las mascotas vinculadas. Desde esa ficha podés entrar a cada paciente asociado.',
         durationSec: 15,
       },
       {
         id: 'new',
-        title: 'Alta de propietario',
-        body: '1) Tocá Nuevo propietario. 2) Completá contacto y documento. 3) Guardá. En la demo no se guarda nada real.',
+        title: 'Alta de tutor',
+        body: '1) Tocá Nuevo tutor. 2) Completá contacto y documento. 3) Guardá. En la demo no se guarda nada real.',
         narration:
-          'Para registrar un tutor nuevo tocá Nuevo propietario. Completá nombre, teléfono, email y documento. Guardá cuando esté listo. En la demo no se modifica la base real.',
-        route: '/propietarios/nuevo',
+          'Para registrar un tutor nuevo tocá Nuevo tutor. Completá nombre, teléfono, email y documento. Guardá cuando esté listo. En la demo no se modifica la base real.',
+        route: '/tutores/nuevo',
         durationSec: 15,
       },
     ],
@@ -476,17 +476,17 @@ export const CLINIC_MODULE_TUTORIALS: TutorialDefinition[] = [
       {
         id: 'search',
         title: 'Buscar factura',
-        body: '1) En el historial usá el buscador. 2) Escribí número, propietario o paciente. 3) Abrí el comprobante.',
+        body: '1) En el historial usá el buscador. 2) Escribí número, tutor o paciente. 3) Abrí el comprobante.',
         narration:
-          'En el historial buscá por número, propietario o paciente. Cuando aparezca la factura, abrila para revisar ítems, estado y saldo.',
+          'En el historial buscá por número, tutor o paciente. Cuando aparezca la factura, abrila para revisar ítems, estado y saldo.',
         durationSec: 14,
       },
       {
         id: 'new',
         title: 'Nueva factura',
-        body: '1) Tocá Nueva factura. 2) Asociá paciente o propietario e ítems. 3) Emití. En la demo no se emite nada real.',
+        body: '1) Tocá Nueva factura. 2) Asociá paciente o tutor e ítems. 3) Emití. En la demo no se emite nada real.',
         narration:
-          'Para emitir un comprobante tocá Nueva factura. Asociá el paciente o propietario, cargá los ítems y confirmá. En la demo no se emite ninguna factura real.',
+          'Para emitir un comprobante tocá Nueva factura. Asociá el paciente o tutor, cargá los ítems y confirmá. En la demo no se emite ninguna factura real.',
         route: '/facturacion/nueva',
         durationSec: 16,
       },

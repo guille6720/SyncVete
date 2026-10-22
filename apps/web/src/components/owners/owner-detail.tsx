@@ -55,24 +55,24 @@ export function OwnerDetail({
   const entitled = (href: string) => isClinicPathEntitled(href, entitledHrefs);
   const queueHref = `/sala-espera?q=${encodeURIComponent(owner.full_name)}`;
   const patientsEnabled = entitled('/pacientes');
-  const newPatientHref = `/propietarios/${owner.id}/pacientes/nuevo`;
+  const newPatientHref = `/tutores/${owner.id}/pacientes/nuevo`;
 
   const handleDelete = async () => {
-    if (!confirm('¿Eliminar este propietario? Esta acción no se puede deshacer.')) return;
+    if (!confirm('¿Eliminar este tutor? Esta acción no se puede deshacer.')) return;
     setDeleteError(null);
     const result = await deleteOwner(owner.id);
     if (result.success) {
-      router.push('/propietarios');
+      router.push('/tutores');
       return;
     }
-    setDeleteError(result.error ?? 'No se pudo eliminar el propietario');
+    setDeleteError(result.error ?? 'No se pudo eliminar el tutor');
   };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/propietarios">
+          <Link href="/tutores">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Link>
@@ -105,7 +105,7 @@ export function OwnerDetail({
           {canWrite && (
             <>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/propietarios/${owner.id}/editar`}>
+                <Link href={`/tutores/${owner.id}/editar`}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Editar
                 </Link>

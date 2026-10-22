@@ -77,7 +77,7 @@ export function OwnerAppInviteCard({
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-lg">
           <Smartphone className="h-5 w-5" />
-          App del propietario
+          App del tutor
         </CardTitle>
         <CardDescription>
           Generá un enlace privado y reenvialo por WhatsApp o email. Al reenviar, el enlace
@@ -97,7 +97,7 @@ export function OwnerAppInviteCard({
         )}
         {portalStatus === 'pending_approval' && (
           <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-            El propietario ya creó la cuenta. Activá el acceso en la tarjeta Portal del tutor.
+            El tutor ya creó la cuenta. Activá el acceso en la tarjeta Portal del tutor.
           </p>
         )}
 

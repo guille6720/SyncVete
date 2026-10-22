@@ -4,11 +4,11 @@ import { listOwners, canManageOwners, canReadOwners } from '@/actions/owners';
 import { OwnersList } from '@/components/owners/owners-list';
 import { moduleTourTargets } from '@sincvete/shared';
 
-interface PropietariosPageProps {
+interface TutoresPageProps {
   searchParams: Promise<{ page?: string; search?: string }>;
 }
 
-export default async function PropietariosPage({ searchParams }: PropietariosPageProps) {
+export default async function TutoresPage({ searchParams }: TutoresPageProps) {
   const canRead = await canReadOwners();
   if (!canRead) redirect('/dashboard');
 
@@ -21,11 +21,11 @@ export default async function PropietariosPage({ searchParams }: PropietariosPag
     canManageOwners(),
   ]);
 
-  const tour = moduleTourTargets('propietarios');
+  const tour = moduleTourTargets('tutores');
   return (
     <div className="space-y-6" data-tour={tour.root}>
       <div data-tour={tour.header}>
-        <h1 className="text-2xl font-bold tracking-tight">Propietarios</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Tutores</h1>
         <p className="text-muted-foreground">Tutores y clientes de la clínica</p>
       </div>
 

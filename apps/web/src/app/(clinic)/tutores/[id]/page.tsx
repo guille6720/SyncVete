@@ -14,7 +14,7 @@ interface OwnerPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function PropietarioDetailPage({ params }: OwnerPageProps) {
+export default async function TutorDetailPage({ params }: OwnerPageProps) {
   const canRead = await canReadOwners();
   if (!canRead) redirect('/dashboard');
 

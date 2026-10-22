@@ -64,7 +64,7 @@ export function WhatsAppOwnerPicker({
 
   return (
     <div className="space-y-2" ref={containerRef}>
-      <Label htmlFor="ownerSearch">Propietario *</Label>
+      <Label htmlFor="ownerSearch">Tutor *</Label>
       <div className="relative">
         <Input
           id="ownerSearch"
@@ -76,7 +76,7 @@ export function WhatsAppOwnerPicker({
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Buscar propietario..."
+          placeholder="Buscar tutor..."
           autoComplete="off"
         />
         {open && (results.length > 0 || loading) && (

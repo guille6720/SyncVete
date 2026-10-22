@@ -42,7 +42,7 @@ function rpcMessage(error: { message?: string } | null): string {
     message.includes('permisos') ||
     message.includes('teléfono') ||
     message.includes('mensaje') ||
-    message.includes('Propietario') ||
+    message.includes('Tutor') ||
     message.includes('Paciente')
   ) {
     return message;

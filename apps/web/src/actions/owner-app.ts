@@ -41,7 +41,7 @@ import { z } from 'zod';
 
 function requireStaging() {
   if (!ownerAppEnabled())
-    throw new Error('La app de propietarios no esta habilitada en este entorno');
+    throw new Error('La app de tutores no esta habilitada en este entorno');
 }
 
 export async function getOwnerAppBrand(organizationId: string) {
@@ -274,9 +274,9 @@ export async function sendOwnerAppInvite(
     if (!brand?.enabled)
       return { success: false, error: 'Habilita la app en la configuracion de la clinica.' };
     const owner = await getOwner(ownerId);
-    if (!owner) return { success: false, error: 'Propietario no encontrado' };
+    if (!owner) return { success: false, error: 'Tutor no encontrado' };
     if (!owner.is_active)
-      return { success: false, error: 'Activa al propietario en su ficha antes de enviar la app.' };
+      return { success: false, error: 'Activa al tutor en su ficha antes de enviar la app.' };
 
     const phone = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
     const email = owner.email?.trim() || '';
@@ -284,7 +284,7 @@ export async function sendOwnerAppInvite(
       return { success: false, error: 'Carga un telefono de WhatsApp valido.' };
     }
     if (channel === 'email' && !email) {
-      return { success: false, error: 'Carga un email en la ficha del propietario.' };
+      return { success: false, error: 'Carga un email en la ficha del tutor.' };
     }
 
     const origin = ownerAppOrigin();
@@ -320,13 +320,13 @@ export async function sendOwnerAppInvite(
     if (error)
       return {
         success: false,
-        error: 'No se pudo crear la invitacion. Revisa el email del propietario.',
+        error: 'No se pudo crear la invitacion. Revisa el email del tutor.',
       };
     const invite = parsePortalInviteCreated(data);
     if (!invite) return { success: false, error: 'No se pudo crear la invitacion' };
     const activateUrl = `${origin}${buildPortalActivatePath(invite.token)}`;
     const text = `Hola ${owner.full_name}, activá tu acceso a ${brand.appName}.\n\n${activateUrl}\n\nHecho por OpusOrg`;
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath(`/tutores/${ownerId}`);
 
     if (channel === 'email') {
       const sent = await sendOwnerAppEmail(

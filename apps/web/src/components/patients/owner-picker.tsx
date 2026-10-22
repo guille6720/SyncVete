@@ -65,7 +65,7 @@ export function OwnerPicker({ defaultOwnerId, defaultOwnerName, error }: OwnerPi
 
   return (
     <div className="space-y-2" ref={containerRef}>
-      <Label htmlFor="ownerSearch">Propietario *</Label>
+      <Label htmlFor="ownerSearch">Tutor *</Label>
       <input type="hidden" name="ownerId" value={ownerId} />
       <div className="relative">
         <Input
@@ -77,7 +77,7 @@ export function OwnerPicker({ defaultOwnerId, defaultOwnerName, error }: OwnerPi
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
-          placeholder="Buscar propietario por nombre..."
+          placeholder="Buscar tutor por nombre..."
           autoComplete="off"
         />
         {open && (results.length > 0 || loading) && (
@@ -104,7 +104,7 @@ export function OwnerPicker({ defaultOwnerId, defaultOwnerName, error }: OwnerPi
       </div>
       {error && <p className="text-sm text-destructive">{error}</p>}
       {!ownerId && query && !loading && (
-        <p className="text-xs text-muted-foreground">Seleccioná un propietario de la lista</p>
+        <p className="text-xs text-muted-foreground">Seleccioná un tutor de la lista</p>
       )}
     </div>
   );

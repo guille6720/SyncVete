@@ -19,7 +19,7 @@ export function OwnerAppSettings({
   const [slotState, slotAction, slotPending] = useActionState(publishOwnerAppSlot, null);
   return (
     <section className="space-y-5 border-t pt-6">
-      <h2 className="text-lg font-semibold">App de propietarios</h2>
+      <h2 className="text-lg font-semibold">App de tutores</h2>
       <form action={action} className="grid max-w-xl gap-4">
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" name="enabled" defaultChecked={brand.enabled} /> Habilitar app

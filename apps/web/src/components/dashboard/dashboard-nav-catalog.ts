@@ -208,8 +208,8 @@ export const DASHBOARD_NAV_ACTIONS: DashboardNavAction[] = [
   },
   {
     id: 'new-owner',
-    label: 'Nuevo propietario',
-    href: '/propietarios/nuevo',
+    label: 'Nuevo tutor',
+    href: '/tutores/nuevo',
     icon: UserPlus,
     requiresWrite: true,
     tone: 'bg-sky-100 text-sky-800 ring-sky-200 hover:bg-sky-200/80 dark:bg-sky-950 dark:text-sky-200 dark:ring-sky-800',

@@ -2,35 +2,35 @@ import { notFound, redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getOwner, canReadOwners } from '@/actions/owners';
-import { getPatient, canManagePatients } from '@/actions/patients';
+import { canManagePatients } from '@/actions/patients';
 import { getUserBranches } from '@/actions/settings';
+import { getSessionContext } from '@/actions/auth';
 import { PatientForm } from '@/components/patients/patient-form';
 import { Button } from '@/components/ui/button';
 
-interface EditarPacienteDesdePropietarioPageProps {
-  params: Promise<{ id: string; patientId: string }>;
+interface NuevoPacienteDesdeTutorPageProps {
+  params: Promise<{ id: string }>;
 }
 
-export default async function EditarPacienteDesdePropietarioPage({
+export default async function NuevoPacienteDesdeTutorPage({
   params,
-}: EditarPacienteDesdePropietarioPageProps) {
+}: NuevoPacienteDesdeTutorPageProps) {
   const canWrite = await canManagePatients();
-  if (!canWrite) redirect('/propietarios');
+  if (!canWrite) redirect('/tutores');
 
   const canRead = await canReadOwners();
   if (!canRead) redirect('/dashboard');
 
-  const { id: ownerId, patientId } = await params;
-  const [owner, patient, branches] = await Promise.all([
+  const { id: ownerId } = await params;
+  const [owner, session, branches] = await Promise.all([
     getOwner(ownerId),
-    getPatient(patientId),
+    getSessionContext(),
     getUserBranches(),
   ]);
 
-  if (!owner || !patient) notFound();
-  if (patient.owner_id !== owner.id) notFound();
+  if (!owner) notFound();
 
-  const returnTo = `/propietarios/${ownerId}`;
+  const returnTo = `/tutores/${ownerId}`;
 
   return (
     <div className="space-y-4">
@@ -41,9 +41,10 @@ export default async function EditarPacienteDesdePropietarioPage({
         </Link>
       </Button>
       <PatientForm
-        patient={patient}
-        ownerName={owner.full_name}
         branches={branches}
+        defaultBranchId={session?.branchId}
+        defaultOwnerId={owner.id}
+        ownerName={owner.full_name}
         returnTo={returnTo}
       />
     </div>

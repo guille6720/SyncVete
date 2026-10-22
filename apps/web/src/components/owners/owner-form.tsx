@@ -31,13 +31,13 @@ export function OwnerForm({ owner, branches, defaultBranchId }: OwnerFormProps) 
 
   useEffect(() => {
     if (!state?.success || !state.data?.id || owner) return;
-    router.push(`/propietarios/${state.data.id}`);
+    router.push(`/tutores/${state.data.id}`);
   }, [state, owner, router]);
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{owner ? 'Editar propietario' : 'Nuevo propietario'}</CardTitle>
+        <CardTitle>{owner ? 'Editar tutor' : 'Nuevo tutor'}</CardTitle>
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid max-w-2xl gap-4">
@@ -155,21 +155,21 @@ export function OwnerForm({ owner, branches, defaultBranchId }: OwnerFormProps) 
             <div className="flex items-center gap-2 text-sm">
               <input type="hidden" name="isActive" value="false" />
               <input type="checkbox" name="isActive" value="true" defaultChecked={owner.is_active} />
-              Propietario activo
+              Tutor activo
             </div>
           )}
 
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
           {state?.success && owner && (
-            <p className="text-sm text-emerald-600">Propietario actualizado correctamente</p>
+            <p className="text-sm text-emerald-600">Tutor actualizado correctamente</p>
           )}
 
           <div className="flex gap-2">
             <Button type="submit" disabled={pending}>
-              {pending ? 'Guardando...' : owner ? 'Guardar cambios' : 'Crear propietario'}
+              {pending ? 'Guardando...' : owner ? 'Guardar cambios' : 'Crear tutor'}
             </Button>
             <Button variant="outline" asChild>
-              <Link href={owner ? `/propietarios/${owner.id}` : '/propietarios'}>Cancelar</Link>
+              <Link href={owner ? `/tutores/${owner.id}` : '/tutores'}>Cancelar</Link>
             </Button>
           </div>
         </form>

@@ -110,7 +110,7 @@ export function InterconsultationDetailClient({
             {detail.patientBreed ? ` · ${detail.patientBreed}` : ''}
           </p>
           <p className="text-sm">
-            <span className="text-muted-foreground">Propietario:</span> {detail.ownerName}
+            <span className="text-muted-foreground">Tutor:</span> {detail.ownerName}
           </p>
           <p className="whitespace-pre-wrap text-sm">{detail.clinicalQuestion}</p>
           {detail.clinicalSummary ? (

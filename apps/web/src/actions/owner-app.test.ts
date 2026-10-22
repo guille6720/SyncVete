@@ -45,7 +45,7 @@ describe('integrated WhatsApp invitations', () => {
     mocks.owner.mockResolvedValue({ is_active: false });
     const result = await sendOwnerAppInvite('11111111-1111-4111-8111-111111111111');
     expect(result.success).toBe(false);
-    expect(result.error).toContain('Activa al propietario');
+    expect(result.error).toContain('Activa al tutor');
     expect(mocks.rpc.mock.calls.some(([name]) => name === 'create_owner_portal_invite')).toBe(false);
   });
   beforeEach(() => {

@@ -184,9 +184,9 @@ export function InvoiceDetail({
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${invoice.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${invoice.owner_id}`} className="text-primary hover:underline">
                 {invoice.owner_full_name}
               </Link>
             }

@@ -71,7 +71,7 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
               {
                 label: 'Pacientes nuevos',
                 value: String(operations.newPatients),
-                description: `${operations.newOwners} propietarios`,
+                description: `${operations.newOwners} tutores`,
                 icon: PawPrint,
               },
               {
@@ -111,7 +111,7 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
                 icon: FlaskConical,
               },
               {
-                label: 'Propietarios nuevos',
+                label: 'Tutores nuevos',
                 value: String(operations.newOwners),
                 icon: Users,
               },

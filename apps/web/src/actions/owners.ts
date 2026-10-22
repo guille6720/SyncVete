@@ -139,10 +139,10 @@ export async function createOwner(
 
     if (error) {
       console.error('[createOwner]', error);
-      return { success: false, error: error.message || 'No se pudo crear el propietario' };
+      return { success: false, error: error.message || 'No se pudo crear el tutor' };
     }
 
-    revalidatePath('/propietarios');
+    revalidatePath('/tutores');
     return { success: true, data: { id: data.id } };
   } catch (error) {
     return actionError<{ id: string }>(error);
@@ -187,11 +187,11 @@ export async function updateOwner(
       .eq('id', ownerId);
 
     if (error) {
-      return { success: false, error: 'No se pudo actualizar el propietario' };
+      return { success: false, error: 'No se pudo actualizar el tutor' };
     }
 
-    revalidatePath('/propietarios');
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath('/tutores');
+    revalidatePath(`/tutores/${ownerId}`);
     return { success: true, data: { id: ownerId } };
   } catch (error) {
     return actionError(error);
@@ -215,13 +215,13 @@ export async function deleteOwner(ownerId: string): Promise<ActionResult> {
       if (await getOwner(ownerId)) {
         return {
           success: false,
-          error: 'No se pudo eliminar el propietario. Seguía en la lista porque la baja no se guardó.',
+          error: 'No se pudo eliminar el tutor. Seguía en la lista porque la baja no se guardó.',
         };
       }
     }
 
-    revalidatePath('/propietarios');
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath('/tutores');
+    revalidatePath(`/tutores/${ownerId}`);
     return { success: true };
   } catch (error) {
     return actionError(error);

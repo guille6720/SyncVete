@@ -55,7 +55,7 @@ BEGIN
   FROM auth.users
   WHERE id = v_user_id;
 
-  v_hash := encode(digest(p_token, 'sha256'), 'hex');
+  v_hash := encode(extensions.digest(p_token, 'sha256'::text), 'hex');
 
   SELECT * INTO v_invite
   FROM public.owner_portal_invites
@@ -81,11 +81,11 @@ BEGIN
   FOR UPDATE;
 
   IF v_owner.id IS NULL THEN
-    RAISE EXCEPTION 'Propietario no encontrado';
+    RAISE EXCEPTION 'Tutor no encontrado';
   END IF;
 
   IF v_owner.portal_user_id IS NOT NULL AND v_owner.portal_user_id <> v_user_id THEN
-    RAISE EXCEPTION 'El propietario ya tiene acceso al portal';
+    RAISE EXCEPTION 'El tutor ya tiene acceso al portal';
   END IF;
 
   IF EXISTS (
@@ -94,7 +94,7 @@ BEGIN
       AND id <> v_owner.id
       AND deleted_at IS NULL
   ) THEN
-    RAISE EXCEPTION 'Esta cuenta ya está vinculada a otro propietario';
+    RAISE EXCEPTION 'Esta cuenta ya está vinculada a otro tutor';
   END IF;
 
   IF public.is_clinic_staff() THEN
@@ -303,15 +303,15 @@ BEGIN
     AND deleted_at IS NULL;
 
   IF v_owner.id IS NULL THEN
-    RAISE EXCEPTION 'Propietario no encontrado';
+    RAISE EXCEPTION 'Tutor no encontrado';
   END IF;
 
   IF v_owner.portal_user_id IS NOT NULL THEN
-    RAISE EXCEPTION 'El propietario ya tiene acceso al portal';
+    RAISE EXCEPTION 'El tutor ya tiene acceso al portal';
   END IF;
 
   IF v_owner.email IS NULL OR btrim(v_owner.email) = '' THEN
-    RAISE EXCEPTION 'El propietario no tiene email';
+    RAISE EXCEPTION 'El tutor no tiene email';
   END IF;
 
   -- New invite replaces a previous pending registration.
@@ -325,8 +325,8 @@ BEGIN
     AND accepted_at IS NULL
     AND revoked_at IS NULL;
 
-  v_token := encode(gen_random_bytes(32), 'hex');
-  v_hash := encode(digest(v_token, 'sha256'), 'hex');
+  v_token := encode(extensions.gen_random_bytes(32), 'hex');
+  v_hash := encode(extensions.digest(v_token, 'sha256'::text), 'hex');
   v_expires := now() + interval '7 days';
 
   INSERT INTO public.owner_portal_invites (

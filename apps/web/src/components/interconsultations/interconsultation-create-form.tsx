@@ -183,7 +183,7 @@ export function InterconsultationCreateForm({
         <h2 className="text-lg font-semibold">Paciente</h2>
         <PatientPicker defaultBranchId={defaultBranchId} />
         <p className="text-sm text-muted-foreground">
-          El propietario se deriva automáticamente del paciente seleccionado.
+          El tutor se deriva automáticamente del paciente seleccionado.
         </p>
       </div>
 

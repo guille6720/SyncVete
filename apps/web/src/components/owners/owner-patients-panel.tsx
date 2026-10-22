@@ -24,7 +24,7 @@ export function OwnerPatientsPanel({
 }: OwnerPatientsPanelProps) {
   if (!patientsEnabled) return null;
 
-  const newPatientHref = `/propietarios/${ownerId}/pacientes/nuevo`;
+  const newPatientHref = `/tutores/${ownerId}/pacientes/nuevo`;
 
   return (
     <Card>
@@ -59,7 +59,7 @@ export function OwnerPatientsPanel({
         ) : (
           <ul className="divide-y rounded-md border">
             {patients.map((patient) => {
-              const editHref = `/propietarios/${ownerId}/pacientes/${patient.id}/editar`;
+              const editHref = `/tutores/${ownerId}/pacientes/${patient.id}/editar`;
               const viewHref = `/pacientes/${patient.id}`;
 
               return (

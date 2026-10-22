@@ -39,7 +39,7 @@ export default async function OwnerAppInstallPage({ params }: Props) {
       ) : session ? (
         <p className="rounded-2xl bg-white p-5 text-sm">
           Esta sesión pertenece a otra cuenta. Cerrá la sesión antes de ingresar con tu acceso de
-          propietario.
+          tutor.
         </p>
       ) : (
         <LoginForm brand={brand} redirectTo={ownerAppUrl(organizationId)} />

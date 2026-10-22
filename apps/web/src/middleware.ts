@@ -35,6 +35,16 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url, 308);
   }
 
+  // Module renamed Propietarios → Tutores; keep old bookmarks working.
+  if (
+    request.nextUrl.pathname === '/propietarios' ||
+    request.nextUrl.pathname.startsWith('/propietarios/')
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = request.nextUrl.pathname.replace(/^\/propietarios/, '/tutores');
+    return NextResponse.redirect(url, 308);
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(

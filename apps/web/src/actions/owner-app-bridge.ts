@@ -33,9 +33,9 @@ interface BridgeResponse {
 }
 
 const BRIDGE_ERRORS: Record<string, string> = {
-  CLINIC_NOT_LINKED: 'La clínica todavía no está vinculada con la app de propietarios.',
-  CLINIC_INACTIVE: 'La app de propietarios de esta clínica está desactivada.',
-  unauthorized: 'La conexión con la app de propietarios no está bien configurada.',
+  CLINIC_NOT_LINKED: 'La clínica todavía no está vinculada con la app de tutores.',
+  CLINIC_INACTIVE: 'La app de tutores de esta clínica está desactivada.',
+  unauthorized: 'La conexión con la app de tutores no está bien configurada.',
 };
 
 function bridgeConfig(): { url: string; secret: string } | null {
@@ -53,15 +53,15 @@ export async function sendOwnerAppInvite(ownerId: string): Promise<ActionResult<
     const session = await requirePermission('patients:write');
     const config = bridgeConfig();
     if (!config) {
-      return { success: false, error: 'La app de propietarios no está configurada en este entorno.' };
+      return { success: false, error: 'La app de tutores no está configurada en este entorno.' };
     }
 
     const owner = await getOwner(ownerId);
-    if (!owner) return { success: false, error: 'Propietario no encontrado' };
+    if (!owner) return { success: false, error: 'Tutor no encontrado' };
 
     const phoneE164 = pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone);
     if (!phoneE164) {
-      return { success: false, error: 'Cargá un teléfono o WhatsApp válido en la ficha del propietario.' };
+      return { success: false, error: 'Cargá un teléfono o WhatsApp válido en la ficha del tutor.' };
     }
 
     const supabase = await createServerClient();

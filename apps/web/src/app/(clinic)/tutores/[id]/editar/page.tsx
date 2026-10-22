@@ -10,9 +10,9 @@ interface EditOwnerPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function EditarPropietarioPage({ params }: EditOwnerPageProps) {
+export default async function EditarTutorPage({ params }: EditOwnerPageProps) {
   const canWrite = await canManageOwners();
-  if (!canWrite) redirect('/propietarios');
+  if (!canWrite) redirect('/tutores');
 
   const { id } = await params;
   const [owner, branches] = await Promise.all([getOwner(id), getUserBranches()]);
@@ -22,9 +22,9 @@ export default async function EditarPropietarioPage({ params }: EditOwnerPagePro
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" asChild>
-        <Link href={`/propietarios/${id}`}>
+        <Link href={`/tutores/${id}`}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver al propietario
+          Volver al tutor
         </Link>
       </Button>
       <OwnerForm owner={owner} branches={branches} />

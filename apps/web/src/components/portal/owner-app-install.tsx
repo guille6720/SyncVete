@@ -134,7 +134,7 @@ export function OwnerAppInstall({
         {activationRequired && installed ? (
           <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-950">
             Si esta pantalla se abrió dentro de la app de la clínica, cerrala y volvé a abrir el
-            enlace en Chrome o Safari para usar la app del propietario.
+            enlace en Chrome o Safari para usar la app del tutor.
           </p>
         ) : null}
 

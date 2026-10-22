@@ -180,10 +180,10 @@ export function ConsultationDetail({
               }
             />
             <DetailField
-              label="Propietario"
+              label="Tutor"
               value={
                 <Link
-                  href={`/propietarios/${consultation.owner_id}`}
+                  href={`/tutores/${consultation.owner_id}`}
                   className="text-primary hover:underline"
                 >
                   {consultation.owner_full_name}

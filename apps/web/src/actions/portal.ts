@@ -102,7 +102,7 @@ export async function inviteOwnerToPortal(
     if (!invite) {
       return { success: false, error: 'No se pudo crear la invitación' };
     }
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath(`/tutores/${ownerId}`);
     if (ownerAppEnabled() && (await getOwnerAppBrand(session.organizationId))?.enabled) {
       try {
         const sent = await sendOwnerAppEmail(
@@ -132,7 +132,7 @@ export async function revokeOwnerPortalAccess(ownerId: string): Promise<ActionRe
     if (error) {
       return { success: false, error: rpcMessage(error) };
     }
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath(`/tutores/${ownerId}`);
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -150,9 +150,9 @@ export async function approveOwnerPortalAccess(ownerId: string): Promise<ActionR
       return { success: false, error: rpcMessage(error) };
     }
     if (data !== ownerId) {
-      return { success: false, error: 'No se pudo activar el acceso del propietario' };
+      return { success: false, error: 'No se pudo activar el acceso del tutor' };
     }
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath(`/tutores/${ownerId}`);
     revalidatePath('/portal', 'layout');
     return { success: true };
   } catch (error) {

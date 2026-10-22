@@ -994,7 +994,7 @@ function WaitingRoomBoardFiltersBar({
           <Input
             value={filters.query ?? ''}
             onChange={(event) => onChange({ ...filters, query: event.target.value })}
-            placeholder="Paciente o propietario"
+            placeholder="Paciente o tutor"
             className="pl-9"
           />
         </div>

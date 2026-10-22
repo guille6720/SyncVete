@@ -151,7 +151,7 @@ export function WhatsAppComposeForm({
           </div>
 
           <p className="text-sm text-muted-foreground">
-            Teléfono: {phone || 'Seleccioná un propietario con WhatsApp o teléfono'}
+            Teléfono: {phone || 'Seleccioná un tutor con WhatsApp o teléfono'}
           </p>
 
           {usage ? (
