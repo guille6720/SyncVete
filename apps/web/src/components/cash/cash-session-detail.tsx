@@ -23,12 +23,14 @@ interface CashSessionDetailProps {
   session: CashSessionListRow;
   movements: CashMovementListRow[];
   currency?: string;
+  listHref?: string;
 }
 
 export function CashSessionDetail({
   session,
   movements,
   currency = 'ARS',
+  listHref = '/caja',
 }: CashSessionDetailProps) {
   const expected =
     session.expected_cash ?? computeExpectedCash(session.opening_amount, movements);
@@ -37,7 +39,7 @@ export function CashSessionDetail({
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" asChild>
-        <Link href="/caja">
+        <Link href={listHref}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver a caja
         </Link>

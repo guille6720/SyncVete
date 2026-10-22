@@ -22,6 +22,7 @@ interface InvoiceFormProps {
   defaultOwnerName?: string;
   defaultConsultationId?: string;
   currency?: string;
+  listHref?: string;
 }
 
 interface LineItem {
@@ -39,6 +40,7 @@ export function InvoiceForm({
   defaultOwnerName,
   defaultConsultationId,
   currency = 'ARS',
+  listHref = '/facturacion',
 }: InvoiceFormProps) {
   const [state, formAction, pending] = useActionState(createInvoice, null);
   const [items, setItems] = useState<LineItem[]>([
@@ -224,7 +226,7 @@ export function InvoiceForm({
               {pending ? 'Creando...' : 'Guardar borrador'}
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/facturacion">Cancelar</Link>
+              <Link href={listHref}>Cancelar</Link>
             </Button>
           </div>
         </form>

@@ -73,24 +73,26 @@ export function ClinicalImagesGallery({
   const newHref = patientId ? `/imagenes/nueva?patientId=${patientId}` : '/imagenes/nueva';
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="imagenes-list">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Galería</h2>
           <p className="text-sm text-muted-foreground">Fotos, estudios y documentos del paciente</p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href={newHref}>
-              <Plus className="mr-2 h-4 w-4" />
-              Subir
-            </Link>
-          </Button>
+          <div data-tour="imagenes-new">
+            <Button asChild>
+              <Link href={newHref}>
+                <Plus className="mr-2 h-4 w-4" />
+                Subir
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative max-w-md flex-1">
+        <div className="relative max-w-md flex-1" data-tour="imagenes-search">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por paciente, título..."

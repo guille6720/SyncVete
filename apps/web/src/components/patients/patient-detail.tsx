@@ -379,11 +379,11 @@ export function PatientDetail({
         </CardHeader>
         <CardContent className="grid gap-5 p-6 sm:grid-cols-2 sm:gap-x-8 sm:gap-y-5">
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
               owner ? (
                 <Link
-                  href={`/propietarios/${owner.id}`}
+                  href={`/tutores/${owner.id}`}
                   className="font-medium text-teal-800 underline-offset-2 hover:underline dark:text-teal-200"
                 >
                   {owner.full_name}

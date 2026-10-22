@@ -1,52 +1,78 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft, Hourglass, MessageCircle, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Hourglass, MessageCircle, PawPrint, Pencil, Trash2 } from 'lucide-react';
 import { deleteOwner } from '@/actions/owners';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DOCUMENT_TYPE_LABELS, buildWhatsAppComposePath, isClinicPathEntitled, type Owner, type OwnerPortalStatus, type OwnerWaitingRoomHistoryRow } from '@sincvete/shared';
+import {
+  DOCUMENT_TYPE_LABELS,
+  buildWhatsAppComposePath,
+  isClinicPathEntitled,
+  pickOwnerWhatsAppPhone,
+  type Owner,
+  type OwnerPortalStatus,
+  type OwnerWaitingRoomHistoryRow,
+  type PatientListRow,
+} from '@sincvete/shared';
 import { OwnerPortalCard } from '@/components/owners/owner-portal-card';
+import { OwnerAppInviteCard } from '@/components/owners/owner-app-invite-card';
+import { OwnerPatientsPanel } from '@/components/owners/owner-patients-panel';
 import { OwnerWaitingRoomHistory } from '@/components/owners/owner-waiting-room-history';
 
 interface OwnerDetailProps {
   owner: Owner;
   canWrite: boolean;
+  canManagePatients?: boolean;
   canSendWhatsApp?: boolean;
+  canSendOwnerApp?: boolean;
   portalEnabled?: boolean;
   portalStatus: OwnerPortalStatus | null;
   entitledHrefs?: string[] | null;
   waitingRoomHistory?: OwnerWaitingRoomHistoryRow[];
+  patients?: PatientListRow[];
+  patientsTotal?: number;
 }
 
 export function OwnerDetail({
   owner,
   canWrite,
+  canManagePatients = false,
   canSendWhatsApp = false,
+  canSendOwnerApp = false,
   portalEnabled = true,
   portalStatus,
   entitledHrefs = null,
   waitingRoomHistory = [],
+  patients = [],
+  patientsTotal = 0,
 }: OwnerDetailProps) {
   const router = useRouter();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const entitled = (href: string) => isClinicPathEntitled(href, entitledHrefs);
   const queueHref = `/sala-espera?q=${encodeURIComponent(owner.full_name)}`;
+  const patientsEnabled = entitled('/pacientes');
+  const newPatientHref = `/tutores/${owner.id}/pacientes/nuevo`;
 
   const handleDelete = async () => {
-    if (!confirm('¿Eliminar este propietario? Esta acción no se puede deshacer.')) return;
+    if (!confirm('¿Eliminar este tutor? Esta acción no se puede deshacer.')) return;
+    setDeleteError(null);
     const result = await deleteOwner(owner.id);
     if (result.success) {
-      router.push('/propietarios');
+      router.push('/tutores');
+      return;
     }
+    setDeleteError(result.error ?? 'No se pudo eliminar el tutor');
   };
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Button variant="ghost" size="sm" asChild>
-          <Link href="/propietarios">
+          <Link href="/tutores">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver
           </Link>
@@ -68,15 +94,23 @@ export function OwnerDetail({
               </Link>
             </Button>
           )}
+          {canManagePatients && patientsEnabled && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={newPatientHref}>
+                <PawPrint className="mr-2 h-4 w-4" />
+                Agregar paciente
+              </Link>
+            </Button>
+          )}
           {canWrite && (
             <>
               <Button variant="outline" size="sm" asChild>
-                <Link href={`/propietarios/${owner.id}/editar`}>
+                <Link href={`/tutores/${owner.id}/editar`}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Editar
                 </Link>
               </Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete}>
+              <Button variant="destructive" size="sm" onClick={() => void handleDelete()}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Eliminar
               </Button>
@@ -84,6 +118,7 @@ export function OwnerDetail({
           )}
         </div>
       </div>
+      {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
 
       <Card>
         <CardHeader>
@@ -118,8 +153,25 @@ export function OwnerDetail({
         </CardContent>
       </Card>
 
+      <OwnerPatientsPanel
+        ownerId={owner.id}
+        patients={patients}
+        total={patientsTotal}
+        canWrite={canManagePatients}
+        patientsEnabled={patientsEnabled}
+      />
+
       {entitled('/sala-espera') && waitingRoomHistory.length > 0 && (
         <OwnerWaitingRoomHistory history={waitingRoomHistory} ownerName={owner.full_name} />
+      )}
+
+      {canSendOwnerApp && (
+        <OwnerAppInviteCard
+          ownerId={owner.id}
+          hasWhatsAppPhone={pickOwnerWhatsAppPhone(owner.phone_whatsapp, owner.phone) !== null}
+          hasEmail={Boolean(owner.email?.trim())}
+          portalStatus={portalStatus?.status ?? null}
+        />
       )}
 
       <OwnerPortalCard
@@ -128,6 +180,7 @@ export function OwnerDetail({
         canWrite={canWrite}
         portalEnabled={portalEnabled}
         status={portalStatus}
+        hideInviteActions={canSendOwnerApp}
       />
     </div>
   );

@@ -1,14 +1,9 @@
 import { redirect } from 'next/navigation';
-import { Suspense } from 'react';
-import { listAppointments, getAssignableStaff } from '@/actions/appointments';
-import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
+import { getAgendaBootstrap } from '@/actions/agenda-data';
 import { AppointmentsAgenda } from '@/components/appointments/appointments-agenda';
-import { getSessionContext } from '@/lib/session';
 import {
   APPOINTMENT_STATUSES,
-  getWeekStartDate,
-  mapWaitingRoomByAppointmentId,
-  parseDateParam,
+  resolveAgendaCalendarRange,
   type AppointmentStatus,
 } from '@sincvete/shared';
 
@@ -16,56 +11,63 @@ interface AgendaPageProps {
   searchParams: Promise<{
     date?: string;
     week?: string;
+    month?: string;
+    view?: string;
     status?: string;
     assigned?: string;
+    branch?: string;
+    q?: string;
   }>;
 }
 
 export default async function AgendaPage({ searchParams }: AgendaPageProps) {
-  const [session, params] = await Promise.all([getSessionContext(), searchParams]);
-  if (!session?.permissions.includes('appointments:read')) redirect('/dashboard');
+  const params = await searchParams;
+  const range = resolveAgendaCalendarRange({
+    date: params.date,
+    week: params.week,
+    month: params.month,
+    view: params.view,
+  });
 
-  const selectedDate = parseDateParam(params.date);
-  const weekStart = params.week ?? getWeekStartDate(selectedDate);
   const statusParam = params.status?.trim() ?? '';
   const status = APPOINTMENT_STATUSES.includes(statusParam as AppointmentStatus)
-    ? (statusParam as AppointmentStatus)
+    ? statusParam
     : undefined;
+  const branchId = params.branch?.trim() || undefined;
+  const assignedUserId = params.assigned?.trim() || undefined;
+  const query = params.q?.trim() || undefined;
 
-  const [appointments, staff, canReadWr] = await Promise.all([
-    listAppointments({
-      weekStart,
-      status,
-      assignedUserId: params.assigned,
-    }),
-    getAssignableStaff(),
-    canReadWaitingRoom(),
-  ]);
-
-  const waitingRoomByAppointment =
-    canReadWr && selectedDate
-      ? mapWaitingRoomByAppointmentId(await listWaitingRoom({ date: selectedDate }))
-      : undefined;
+  const bootstrap = await getAgendaBootstrap({
+    from: range.from,
+    to: range.to,
+    weekStart: range.weekStart,
+    selectedDate: range.selectedDate,
+    branchId,
+    status,
+    assignedUserId,
+    query,
+  });
+  if (!bootstrap) redirect('/dashboard');
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Agenda</h1>
-        <p className="text-muted-foreground">Calendario semanal de citas</p>
+        <p className="text-muted-foreground">Calendario de turnos para recepción</p>
       </div>
 
-      <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando...</div>}>
-        <AppointmentsAgenda
-          appointments={appointments}
-          weekStart={weekStart}
-          selectedDate={selectedDate}
-          canWrite={session.permissions.includes('appointments:write')}
-          staff={staff}
-          initialStatus={status ?? ''}
-          initialAssignedUserId={params.assigned ?? ''}
-          waitingRoomByAppointment={waitingRoomByAppointment}
-        />
-      </Suspense>
+      <AppointmentsAgenda
+        shell={bootstrap.shell}
+        initialDynamic={bootstrap.dynamic}
+        initialSelectedDate={range.selectedDate}
+        initialWeekStart={range.weekStart}
+        initialMonth={range.month}
+        initialView={range.view}
+        initialStatus={status ?? ''}
+        initialAssignedUserId={assignedUserId ?? ''}
+        initialBranchId={branchId ?? ''}
+        initialQuery={query ?? ''}
+      />
     </div>
   );
 }

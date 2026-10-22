@@ -18,7 +18,7 @@ interface ReportsStatGridProps {
 
 export function ReportsStatGrid({ title, description, stats, action }: ReportsStatGridProps) {
   return (
-    <section className="space-y-3">
+    <section className="space-y-3" data-tour="reportes-stats">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">{title}</h2>

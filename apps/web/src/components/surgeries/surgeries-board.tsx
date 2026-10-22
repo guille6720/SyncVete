@@ -25,7 +25,7 @@ export function SurgeriesBoard({ items, canWrite }: SurgeriesBoardProps) {
   const scheduled = items.filter((item) => item.status === 'programada');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="cirugias-list">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Quirófano</h2>
@@ -35,12 +35,14 @@ export function SurgeriesBoard({ items, canWrite }: SurgeriesBoardProps) {
           </p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/cirugias/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Programar
-            </Link>
-          </Button>
+          <div data-tour="cirugias-new">
+            <Button asChild>
+              <Link href="/cirugias/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Programar
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

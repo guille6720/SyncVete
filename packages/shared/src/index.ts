@@ -26,6 +26,8 @@ export * from './constants/cash';
 export * from './constants/images';
 export * from './constants/notifications';
 export * from './constants/audit';
+export * from './constants/professionals';
+export * from './constants/interconsultations';
 export * from './types';
 export * from './types/dashboard';
 export * from './types/appointments';
@@ -48,9 +50,12 @@ export * from './types/cash';
 export * from './types/images';
 export * from './types/notifications';
 export * from './types/audit';
+export * from './types/professionals';
+export * from './types/interconsultations';
 export * from './schemas';
 export * from './entitlements';
 export * from './billing';
+export * from './tutorials';
 
 export function getPermissionsForRole(role: Role, custom?: Permission[] | null): Permission[] {
   if (custom && custom.length > 0) {
@@ -110,3 +115,5 @@ export * from './utils/cash';
 export * from './utils/images';
 export * from './utils/notifications';
 export * from './utils/audit';
+export * from './utils/professionals';
+export * from './utils/interconsultations';

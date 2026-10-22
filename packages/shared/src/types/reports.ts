@@ -103,5 +103,21 @@ export interface ClinicReport {
   billing: ReportBilling | null;
   inventory: ReportInventory | null;
   waitingRoom: ReportWaitingRoom | null;
+  professionalsSettlements: ReportProfessionalsSettlements | null;
   daily: ReportDailyRow[];
+}
+
+export interface ReportProfessionalsSettlements {
+  settlementsInPeriod: number;
+  totalCalculated: number;
+  totalPaidInPeriod: number;
+  totalBalanceDue: number;
+  byStatus: Array<{ status: string; count: number; totalAmount: number }>;
+  byProfessional: Array<{
+    professionalId: string;
+    professionalName: string;
+    count: number;
+    totalAmount: number;
+    balanceDue: number;
+  }>;
 }

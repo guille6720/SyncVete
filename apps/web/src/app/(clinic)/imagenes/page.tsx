@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { canManageImages, canReadImages, listClinicalImages } from '@/actions/images';
 import { ClinicalImagesGallery } from '@/components/images/clinical-images-gallery';
 import { CLINICAL_IMAGE_KINDS, type ClinicalImageKind } from '@sincvete/shared';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface ImagenesPageProps {
   searchParams: Promise<{ page?: string; search?: string; kind?: string; patientId?: string }>;
@@ -31,9 +32,10 @@ export default async function ImagenesPage({ searchParams }: ImagenesPageProps) 
     canManageImages(),
   ]);
 
+  const tour = moduleTourTargets('imagenes');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">Imágenes</h1>
         <p className="text-muted-foreground">Fotos clínicas, radiografías, ecografías y documentos</p>
       </div>

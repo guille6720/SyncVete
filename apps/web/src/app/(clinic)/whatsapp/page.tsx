@@ -25,6 +25,7 @@ import {
   type WhatsAppTemplateKey,
   type WhatsAppTemplateVars,
 } from '@sincvete/shared';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface WhatsAppPageProps {
   searchParams: Promise<{
@@ -164,9 +165,10 @@ export default async function WhatsAppPage({ searchParams }: WhatsAppPageProps) 
       )
     : null;
 
+  const tour = moduleTourTargets('whatsapp');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">WhatsApp</h1>
         <p className="text-muted-foreground">
           Plantillas y click-to-chat con tutores. No requiere API de Meta.

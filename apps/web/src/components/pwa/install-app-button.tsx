@@ -8,6 +8,7 @@ import { usePwaInstall } from '@/hooks/use-pwa-install';
 import { cn } from '@/lib/utils';
 
 type InstallAppButtonProps = {
+  appName?: string;
   variant?: 'default' | 'outline' | 'ghost';
   size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
@@ -16,6 +17,7 @@ type InstallAppButtonProps = {
 };
 
 export function InstallAppButton({
+  appName = APP_NAME,
   variant = 'outline',
   size = 'sm',
   className,
@@ -48,7 +50,7 @@ export function InstallAppButton({
             'rounded-none border-[var(--land-ink)]/20 bg-transparent text-[var(--land-ink)] hover:bg-[var(--land-surface)]',
           className
         )}
-        aria-label={`Instalar ${APP_NAME}`}
+        aria-label={`Instalar ${appName}`}
         onClick={() => void handleClick()}
       >
         {canShowIosHint && !canInstallNative ? (
@@ -56,7 +58,11 @@ export function InstallAppButton({
         ) : (
           <Download className="h-4 w-4" />
         )}
-        {size === 'icon' ? <span className="sr-only">Instalar {APP_NAME}</span> : `Instalar ${APP_NAME}`}
+        {size === 'icon' ? (
+          <span className="sr-only">Instalar {appName}</span>
+        ) : (
+          `Instalar ${appName}`
+        )}
       </Button>
       {showIosSteps && iosOpen && canShowIosHint && !canInstallNative ? (
         <div className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border bg-card p-3 text-left text-xs shadow-lg">

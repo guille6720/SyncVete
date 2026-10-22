@@ -8,6 +8,13 @@ import {
 import { getDashboardActivity, getDashboardContext, getDashboardSummary } from '@/actions/dashboard';
 import { listAppointments } from '@/actions/appointments';
 import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
+import {
+  canReadProfessionalSettlements,
+  getSettlementsSummary,
+} from '@/actions/professional-settlements';
+import { getOrganization } from '@/actions/settings';
+import { parseOrganizationSettings } from '@sincvete/shared';
+import { DashboardSettlementsSnapshot } from '@/components/dashboard/dashboard-settlements-snapshot';
 import { getSessionContext } from '@/lib/session';
 import { getClinicCommercialShell } from '@/lib/entitlements';
 import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity-feed';
@@ -56,6 +63,38 @@ function DashboardWaitingRoomSkeleton() {
       aria-label="Cargando sala de espera"
     />
   );
+}
+
+function DashboardSettlementsSkeleton() {
+  return (
+    <div
+      className="h-44 animate-pulse rounded-xl border border-violet-200/70 bg-muted/40"
+      aria-busy="true"
+      aria-label="Cargando liquidaciones"
+    />
+  );
+}
+
+/** Settlements snapshot when feature + permission allow. */
+async function DashboardSettlementsSection({
+  entitledHrefs,
+}: {
+  entitledHrefs: string[] | null;
+}) {
+  if (!isClinicPathEntitled('/liquidaciones', entitledHrefs)) return null;
+  try {
+    const canRead = await canReadProfessionalSettlements();
+    if (!canRead) return null;
+
+    const organization = await getOrganization();
+    const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
+    const summary = await getSettlementsSummary(currency);
+
+    return <DashboardSettlementsSnapshot summary={summary} />;
+  } catch (error) {
+    console.error('[dashboard] settlements snapshot unavailable', error);
+    return null;
+  }
 }
 
 /** Live waiting-room snapshot — only when feature + permission allow. */
@@ -178,6 +217,9 @@ export async function DashboardView() {
       </Suspense>
       <Suspense fallback={<DashboardWaitingRoomSkeleton />}>
         <DashboardWaitingRoomSection entitledHrefs={commercial.entitledHrefs} />
+      </Suspense>
+      <Suspense fallback={<DashboardSettlementsSkeleton />}>
+        <DashboardSettlementsSection entitledHrefs={commercial.entitledHrefs} />
       </Suspense>
       <Suspense fallback={<DashboardSecondarySkeleton />}>
         <DashboardSecondarySection

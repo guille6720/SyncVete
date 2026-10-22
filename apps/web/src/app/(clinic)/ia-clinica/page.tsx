@@ -15,6 +15,7 @@ import {
   FEATURES,
   type ClinicalAiKind,
 } from '@sincvete/shared';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface IaClinicaPageProps {
   searchParams: Promise<{
@@ -55,9 +56,10 @@ export default async function IaClinicaPage({ searchParams }: IaClinicaPageProps
       )
     : null;
 
+  const tour = moduleTourTargets('ia-clinica');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">IA clínica</h1>
         <p className="text-muted-foreground">
           Resumen del paciente, asistencia SOAP e indicaciones para el tutor.

@@ -1,5 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import { getHospitalization, canReadHospitalizations, canManageHospitalizations } from '@/actions/hospitalizations';
+import {
+  canReadSettlementSourceClaims,
+  getSettlementClaimsForSources,
+} from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { HospitalizationStay } from '@/components/hospitalizations/hospitalization-stay';
 
 interface InternacionDetailPageProps {
@@ -11,12 +16,30 @@ export default async function InternacionDetailPage({ params }: InternacionDetai
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [result, canWrite] = await Promise.all([
+  const [result, canWrite, settlementAccess] = await Promise.all([
     getHospitalization(id),
     canManageHospitalizations(),
+    canReadSettlementSourceClaims(),
   ]);
 
   if (!result) notFound();
 
-  return <HospitalizationStay stay={result.stay} notes={result.notes} canWrite={canWrite} />;
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
+  const settlementClaimsByNoteId =
+    settlementAccess && result.notes.length > 0
+      ? await getSettlementClaimsForSources(
+          'shift',
+          result.notes.map((note) => note.id)
+        )
+      : {};
+
+  return (
+    <HospitalizationStay
+      stay={result.stay}
+      notes={result.notes}
+      canWrite={canWrite}
+      settlementClaimsByNoteId={settlementClaimsByNoteId}
+      settlementDetailBasePath={settlementDetailBasePath}
+    />
+  );
 }

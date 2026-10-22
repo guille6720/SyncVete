@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState } from 'react';
 import { inviteTeamMember, revokeInvitation, updateTeamMember } from '@/actions/settings';
 import { Button } from '@/components/ui/button';
@@ -25,9 +26,16 @@ interface TeamPanelProps {
   invitations: OrganizationInvitation[];
   branches: Branch[];
   seatMeters?: SeatUsageMeter[];
+  showProfessionalsLink?: boolean;
 }
 
-export function TeamPanel({ members, invitations, branches, seatMeters = [] }: TeamPanelProps) {
+export function TeamPanel({
+  members,
+  invitations,
+  branches,
+  seatMeters = [],
+  showProfessionalsLink = false,
+}: TeamPanelProps) {
   const [inviteState, inviteAction, invitePending] = useActionState(inviteTeamMember, null);
 
   return (
@@ -43,6 +51,21 @@ export function TeamPanel({ members, invitations, branches, seatMeters = [] }: T
             </span>
           ))}
         </p>
+      ) : null}
+      {showProfessionalsLink ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Profesionales y liquidaciones</CardTitle>
+            <CardDescription>
+              Registro operativo de compensación (independiente del equipo de usuarios)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button variant="outline" asChild>
+              <Link href="/profesionales">Ir a profesionales</Link>
+            </Button>
+          </CardContent>
+        </Card>
       ) : null}
       <Card>
         <CardHeader>

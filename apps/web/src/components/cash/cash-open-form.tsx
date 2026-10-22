@@ -16,18 +16,26 @@ interface CashOpenFormProps {
 
 export function CashOpenForm({ branches, defaultBranchId }: CashOpenFormProps) {
   const [state, formAction, pending] = useActionState(openCashSessionAction, null);
+  const sessionBranch = branches.find((branch) => branch.id === defaultBranchId);
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Abrir caja</CardTitle>
+        {sessionBranch ? (
+          <p className="text-sm text-muted-foreground">
+            Se abre en la sucursal de tu sesión: {sessionBranch.name}
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid max-w-xl gap-4">
-          {branches.length > 0 && (
+          {sessionBranch ? (
+            <input type="hidden" name="branchId" value={sessionBranch.id} />
+          ) : branches.length > 0 ? (
             <div className="space-y-2">
               <Label htmlFor="branchId">Sucursal *</Label>
-              <Select id="branchId" name="branchId" required defaultValue={defaultBranchId ?? ''}>
+              <Select id="branchId" name="branchId" required defaultValue="">
                 <option value="">—</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
@@ -36,7 +44,7 @@ export function CashOpenForm({ branches, defaultBranchId }: CashOpenFormProps) {
                 ))}
               </Select>
             </div>
-          )}
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="openingAmount">Fondo inicial *</Label>
             <Input

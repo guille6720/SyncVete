@@ -14,6 +14,8 @@ import { hasPermission } from '@sincvete/shared';
 import { canPermissionAndFeature } from '@/lib/permissions';
 import { FEATURES } from '@/lib/entitlements';
 import type { Branch, SeatUsageMeter } from '@sincvete/shared';
+import { getOwnerAppBrand } from '@/actions/owner-app';
+import { ownerAppEnabled, parseOwnerAppBrand } from '@/lib/owner-app';
 
 interface PageProps {
   searchParams: Promise<{ tab?: string; checkout?: string }>;
@@ -82,6 +84,7 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
   }
 
   let teamData;
+  let showProfessionalsLink = false;
   if (hasPermission(session.permissions, 'users:manage')) {
     const [members, invitations, branches] = await Promise.all([
       listTeamMembers({ page: 1, pageSize: 50 }),
@@ -96,8 +99,25 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
     };
   }
 
+  showProfessionalsLink = await canPermissionAndFeature(
+    'professionals:read',
+    FEATURES.PROFESSIONALS_SETTLEMENTS
+  );
+
   return (
     <SettingsPageClient
+      ownerApp={
+        ownerAppEnabled() && hasPermission(session.permissions, 'org:manage')
+          ? {
+              brand:
+                (await getOwnerAppBrand(session.organizationId)) ??
+                parseOwnerAppBrand(null, clinicData?.organizationName),
+              branchId: hasPermission(session.permissions, 'appointments:write')
+                ? session.branchId
+                : null,
+            }
+          : undefined
+      }
       availableTabs={availableTabs}
       defaultTab={defaultTab}
       canImportData={canImportData}
@@ -106,6 +126,7 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
       branches={branchesData}
       team={teamData}
       seats={seats}
+      showProfessionalsLink={showProfessionalsLink}
       planBilling={planBilling}
       checkoutBanner={params.checkout ?? null}
     />

@@ -20,16 +20,19 @@ import {
 interface InventoryProductFormProps {
   branches: Array<{ id: string; name: string }>;
   defaultBranchId?: string | null;
+  listHref?: string;
 }
 
 export function InventoryProductForm({
   branches,
   defaultBranchId,
+  listHref = '/inventario',
 }: InventoryProductFormProps) {
   const [state, formAction, pending] = useActionState(createInventoryProduct, null);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<string>('medicamento');
   const [unit, setUnit] = useState<string>('unidad');
+  const sessionBranch = branches.find((branch) => branch.id === defaultBranchId);
 
   const applyPreset = (presetName: string) => {
     const preset = INVENTORY_PRODUCT_PRESETS.find((item) => item.name === presetName);
@@ -43,6 +46,11 @@ export function InventoryProductForm({
     <Card>
       <CardHeader>
         <CardTitle>Nuevo producto</CardTitle>
+        {sessionBranch ? (
+          <p className="text-sm text-muted-foreground">
+            Se crea en la sucursal de tu sesión: {sessionBranch.name}
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid max-w-2xl gap-4">
@@ -58,10 +66,12 @@ export function InventoryProductForm({
             </Select>
           </div>
 
-          {branches.length > 0 && (
+          {sessionBranch ? (
+            <input type="hidden" name="branchId" value={sessionBranch.id} />
+          ) : branches.length > 0 ? (
             <div className="space-y-2">
               <Label htmlFor="branchId">Sucursal *</Label>
-              <Select id="branchId" name="branchId" required defaultValue={defaultBranchId ?? ''}>
+              <Select id="branchId" name="branchId" required defaultValue="">
                 <option value="">—</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
@@ -70,7 +80,7 @@ export function InventoryProductForm({
                 ))}
               </Select>
             </div>
-          )}
+          ) : null}
 
           <div className="space-y-2">
             <Label htmlFor="name">Nombre *</Label>
@@ -168,7 +178,7 @@ export function InventoryProductForm({
               {pending ? 'Creando...' : 'Crear producto'}
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/inventario">Cancelar</Link>
+              <Link href={listHref}>Cancelar</Link>
             </Button>
           </div>
         </form>

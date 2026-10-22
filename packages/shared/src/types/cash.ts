@@ -33,6 +33,8 @@ export interface CashMovement {
   organization_id: string;
   cash_session_id: string;
   payment_id: string | null;
+  professional_payment_id?: string | null;
+  professional_settlement_id?: string | null;
   recorded_by: string | null;
   kind: CashMovementKind;
   method: PaymentMethod;

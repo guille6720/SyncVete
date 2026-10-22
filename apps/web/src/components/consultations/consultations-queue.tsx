@@ -35,7 +35,7 @@ export function ConsultationsQueue({ items, canWrite, canReadHistory }: Consulta
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="consultas-queue">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Cola de hoy</h2>
@@ -45,17 +45,19 @@ export function ConsultationsQueue({ items, canWrite, canReadHistory }: Consulta
           </p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/consultas/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Consulta walk-in
-            </Link>
-          </Button>
+          <div data-tour="consultas-new">
+            <Button asChild>
+              <Link href="/consultas/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Consulta walk-in
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
       {pending.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-10 text-center">
+        <div className="rounded-lg border border-dashed p-10 text-center" data-tour="consultas-list">
           <p className="text-muted-foreground">No hay consultas pendientes para hoy.</p>
           {canWrite && (
             <Button asChild className="mt-4">
@@ -64,7 +66,7 @@ export function ConsultationsQueue({ items, canWrite, canReadHistory }: Consulta
           )}
         </div>
       ) : (
-        <div className="space-y-2">
+        <div className="space-y-2" data-tour="consultas-list">
           {pending.map((item) => (
             <QueueRow
               key={`${item.queue_kind}-${item.appointment_id ?? item.consultation_id}`}

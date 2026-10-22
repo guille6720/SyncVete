@@ -22,6 +22,8 @@ describe('parseOrganizationSettings', () => {
         phone: '123',
         waitingRoomRooms: ['Consultorio 1', 'Box A', 'Consultorio 1'],
         waitingRoomMinutesPerPatient: 12,
+        settlementPeriodPreset: 'biweekly',
+        settlementPeriodDays: 14,
       })
     ).toEqual({
       timezone: 'America/Argentina/Buenos_Aires',
@@ -29,6 +31,8 @@ describe('parseOrganizationSettings', () => {
       phone: '123',
       waitingRoomRooms: ['Consultorio 1', 'Box A'],
       waitingRoomMinutesPerPatient: 12,
+      settlementPeriodPreset: 'biweekly',
+      settlementPeriodDays: 14,
     });
   });
 });
@@ -37,6 +41,15 @@ describe('mergeOrganizationSettings', () => {
   it('merges settings without dropping unknown keys', () => {
     const result = mergeOrganizationSettings({ custom: true }, { currency: 'USD' });
     expect(result).toEqual({ custom: true, currency: 'USD' });
+  });
+
+  it('clears default month settlement preset on merge', () => {
+    const result = mergeOrganizationSettings(
+      { settlementPeriodPreset: 'biweekly', settlementPeriodDays: 14 },
+      { settlementPeriodPreset: 'month' }
+    );
+    expect(result.settlementPeriodPreset).toBeUndefined();
+    expect(result.settlementPeriodDays).toBe(14);
   });
 
   it('clears waiting-room overrides with null or empty rooms', () => {

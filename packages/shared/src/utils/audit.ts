@@ -4,6 +4,7 @@ import {
   AUDIT_DEFAULT_RANGE_DAYS,
   AUDIT_DIFF_SKIP_KEYS,
   AUDIT_ENTITY_LABELS,
+  AUDIT_LIQUIDACIONES_FAMILY,
   AUDIT_MAX_RANGE_DAYS,
   type AuditAction,
   type AuditEntityType,
@@ -20,6 +21,7 @@ export function isAuditAction(value: string): value is AuditAction {
 }
 
 export function auditEntityLabel(entityType: string): string {
+  if (entityType === AUDIT_LIQUIDACIONES_FAMILY) return 'Liquidaciones (familia)';
   return AUDIT_ENTITY_LABELS[entityType as AuditEntityType] ?? entityType.replace(/_/g, ' ');
 }
 
@@ -60,7 +62,7 @@ export function buildAuditEntityHref(
     case 'patients':
       return entityId ? `/pacientes/${entityId}` : null;
     case 'owners':
-      return entityId ? `/propietarios/${entityId}` : null;
+      return entityId ? `/tutores/${entityId}` : null;
     case 'appointments':
       return entityId ? `/agenda/${entityId}` : null;
     case 'clinical_entries':
@@ -98,6 +100,24 @@ export function buildAuditEntityHref(
       return related('cash_session_id') ? `/caja/${related('cash_session_id')}` : '/caja';
     case 'clinical_images':
       return entityId ? `/imagenes/${entityId}` : '/imagenes';
+    case 'professionals':
+      return entityId ? `/profesionales/${entityId}` : '/profesionales';
+    case 'professional_settlements':
+      return entityId ? `/liquidaciones/${entityId}` : '/liquidaciones';
+    case 'professional_payments':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
+    case 'professional_compensation_schemes':
+      return related('professional_id')
+        ? `/profesionales/${related('professional_id')}`
+        : '/profesionales';
+    case 'professional_compensation_rules':
+      return '/profesionales';
+    case 'professional_settlement_items':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
+    case 'professional_settlement_item_omissions':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
+    case 'professional_settlement_adjustments':
+      return related('settlement_id') ? `/liquidaciones/${related('settlement_id')}` : '/liquidaciones';
     case 'whatsapp_messages':
       return '/whatsapp';
     case 'reminder_logs':
@@ -111,7 +131,7 @@ export function buildAuditEntityHref(
     case 'organization_invitations':
       return '/configuracion';
     case 'owner_portal_invites':
-      return related('owner_id') ? `/propietarios/${related('owner_id')}` : '/propietarios';
+      return related('owner_id') ? `/tutores/${related('owner_id')}` : '/tutores';
     default:
       return null;
   }

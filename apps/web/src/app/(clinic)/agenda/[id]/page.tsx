@@ -1,9 +1,18 @@
 import { notFound, redirect } from 'next/navigation';
-import { formatDateParam } from '@sincvete/shared';
-import { getAppointment, canReadAppointments, canManageAppointments } from '@/actions/appointments';
+import { formatDateParam, buildSettlementDetailBasePath } from '@sincvete/shared';
+import {
+  getAppointment,
+  canReadAppointments,
+  canManageAppointments,
+  listAppointmentStatusEvents,
+} from '@/actions/appointments';
 import { canManageConsultations, getConsultationByAppointment } from '@/actions/consultations';
 import { canSendWhatsApp } from '@/actions/whatsapp';
 import { canManageWaitingRoom, canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
+import {
+  canReadSettlementSourceClaims,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
 import { AppointmentDetail } from '@/components/appointments/appointment-detail';
 
 interface CitaPageProps {
@@ -15,7 +24,7 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp, canCheckIn, canReadWr] =
+  const [appointment, canWrite, canStart, existingConsultation, canWhatsApp, canCheckIn, canReadWr, settlementAccess] =
     await Promise.all([
       getAppointment(id),
       canManageAppointments(),
@@ -24,9 +33,18 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       canSendWhatsApp(),
       canManageWaitingRoom(),
       canReadWaitingRoom(),
+      canReadSettlementSourceClaims(),
     ]);
 
   if (!appointment) notFound();
+
+  const [settlementClaim, statusEvents] = await Promise.all([
+    settlementAccess && appointment.status === 'completada'
+      ? getSettlementClaimForSource('appointment', appointment.id)
+      : Promise.resolve(null),
+    listAppointmentStatusEvents(id).catch(() => []),
+  ]);
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   let waitingRoomStatus = null;
   if (canReadWr) {
@@ -45,6 +63,9 @@ export default async function CitaDetailPage({ params }: CitaPageProps) {
       canCheckInWaitingRoom={canCheckIn}
       consultationId={existingConsultation?.id ?? null}
       waitingRoomStatus={waitingRoomStatus}
+      settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
+      statusEvents={statusEvents}
     />
   );
 }

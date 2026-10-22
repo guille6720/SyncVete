@@ -16,6 +16,7 @@ import {
   isSeatFeatureKey,
   isPublicPricingPlanKey,
   parseSuperadminEmails,
+  resolvePlatformAdminAccess,
   validateUsageIncrementAmount,
   bytesToStorageMb,
   clinicalAiKindFeature,
@@ -481,6 +482,30 @@ describe('onboarding / legacy safeguards', () => {
     ]);
     expect(parseSuperadminEmails('')).toEqual([]);
     expect(parseSuperadminEmails(undefined)).toEqual([]);
+  });
+
+  it('treats SUPERADMIN_EMAILS as exclusive when set', () => {
+    expect(
+      resolvePlatformAdminAccess({
+        email: 'organizacioncgm@gmail.com',
+        allowlistRaw: 'organizacioncgm@gmail.com',
+        isDbPlatformAdmin: false,
+      })
+    ).toBe(true);
+    expect(
+      resolvePlatformAdminAccess({
+        email: 'other@example.com',
+        allowlistRaw: 'organizacioncgm@gmail.com',
+        isDbPlatformAdmin: true,
+      })
+    ).toBe(false);
+    expect(
+      resolvePlatformAdminAccess({
+        email: 'other@example.com',
+        allowlistRaw: '',
+        isDbPlatformAdmin: true,
+      })
+    ).toBe(true);
   });
 
   it('existing organization on legacy keeps currently available modules', () => {

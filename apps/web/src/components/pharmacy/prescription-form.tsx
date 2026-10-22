@@ -27,6 +27,7 @@ interface PrescriptionFormProps {
   defaultOwnerId?: string;
   defaultOwnerName?: string;
   defaultConsultationId?: string;
+  listHref?: string;
 }
 
 interface LineItem {
@@ -61,9 +62,11 @@ export function PrescriptionForm({
   defaultOwnerId,
   defaultOwnerName,
   defaultConsultationId,
+  listHref = '/farmacia',
 }: PrescriptionFormProps) {
   const [state, formAction, pending] = useActionState(createPrescription, null);
   const [items, setItems] = useState<LineItem[]>([{ ...EMPTY_ITEM }]);
+  const sessionBranch = branches.find((branch) => branch.id === defaultBranchId);
 
   const applyPreset = (index: number, presetId: string) => {
     const preset = MEDICATION_PRESETS.find((item) => item.id === presetId);
@@ -92,6 +95,11 @@ export function PrescriptionForm({
     <Card>
       <CardHeader>
         <CardTitle>Nueva receta</CardTitle>
+        {sessionBranch ? (
+          <p className="text-sm text-muted-foreground">
+            Se crea en la sucursal de tu sesión: {sessionBranch.name}
+          </p>
+        ) : null}
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid max-w-3xl gap-4">
@@ -107,10 +115,12 @@ export function PrescriptionForm({
             error={state?.fieldErrors?.patientId?.[0] ?? state?.fieldErrors?.ownerId?.[0]}
           />
 
-          {branches.length > 0 && (
+          {sessionBranch ? (
+            <input type="hidden" name="branchId" value={sessionBranch.id} />
+          ) : branches.length > 0 ? (
             <div className="space-y-2">
               <Label htmlFor="branchId">Sucursal *</Label>
-              <Select id="branchId" name="branchId" required defaultValue={defaultBranchId ?? ''}>
+              <Select id="branchId" name="branchId" required defaultValue="">
                 <option value="">—</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
@@ -119,7 +129,7 @@ export function PrescriptionForm({
                 ))}
               </Select>
             </div>
-          )}
+          ) : null}
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -286,7 +296,7 @@ export function PrescriptionForm({
               {pending ? 'Creando...' : 'Crear receta'}
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/farmacia">Cancelar</Link>
+              <Link href={listHref}>Cancelar</Link>
             </Button>
           </div>
         </form>

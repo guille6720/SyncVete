@@ -5,6 +5,7 @@ import { AuditLogList } from '@/components/audit/audit-log-list';
 import {
   AUDIT_ACTIONS,
   AUDIT_ENTITY_TYPES,
+  AUDIT_LIQUIDACIONES_FAMILY,
   defaultAuditRange,
   isValidAuditRange,
   type AuditAction,
@@ -39,9 +40,11 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
     ? (actionParam as AuditAction)
     : undefined;
   const entityParam = params.entityType?.trim() ?? '';
-  const entityType = AUDIT_ENTITY_TYPES.includes(entityParam as AuditEntityType)
-    ? entityParam
-    : undefined;
+  const entityType =
+    entityParam === AUDIT_LIQUIDACIONES_FAMILY ||
+    AUDIT_ENTITY_TYPES.includes(entityParam as AuditEntityType)
+      ? entityParam
+      : undefined;
 
   const data = await listAuditLogs({
     page,

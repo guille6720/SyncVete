@@ -78,6 +78,23 @@ export function parseOrganizationSettings(
     waitingRoomBoardSoundEnabled = false;
   }
 
+  let settlementPeriodPreset: OrganizationSettings['settlementPeriodPreset'];
+  const rawPreset = settings.settlementPeriodPreset;
+  if (rawPreset === 'month' || rawPreset === 'biweekly' || rawPreset === 'custom') {
+    settlementPeriodPreset = rawPreset;
+  }
+
+  let settlementPeriodDays: number | null | undefined;
+  const rawPeriodDays = settings.settlementPeriodDays;
+  if (rawPeriodDays == null) {
+    settlementPeriodDays = undefined;
+  } else if (typeof rawPeriodDays === 'number' && Number.isFinite(rawPeriodDays) && rawPeriodDays > 0) {
+    settlementPeriodDays = Math.min(366, Math.round(rawPeriodDays));
+  } else if (typeof rawPeriodDays === 'string' && /^\d+$/.test(rawPeriodDays.trim())) {
+    const parsed = Number(rawPeriodDays.trim());
+    settlementPeriodDays = parsed > 0 ? Math.min(366, parsed) : undefined;
+  }
+
   return {
     timezone: typeof settings.timezone === 'string' ? settings.timezone : undefined,
     currency: typeof settings.currency === 'string' ? settings.currency : undefined,
@@ -89,6 +106,8 @@ export function parseOrganizationSettings(
     waitingRoomPortalAlertsEnabled,
     waitingRoomWhatsAppAutoEnabled,
     waitingRoomBoardSoundEnabled,
+    settlementPeriodPreset,
+    settlementPeriodDays,
   };
 }
 
@@ -130,6 +149,10 @@ export function mergeOrganizationSettings(
       continue;
     }
     if (key === 'waitingRoomBoardSoundEnabled' && value === false) {
+      delete next[key];
+      continue;
+    }
+    if (key === 'settlementPeriodPreset' && value === 'month') {
       delete next[key];
       continue;
     }

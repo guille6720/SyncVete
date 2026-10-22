@@ -1,5 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
 import { getSurgery, canReadSurgeries, canManageSurgeries } from '@/actions/surgeries';
+import {
+  canReadSettlementSourceClaims,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 import { SurgeryStay } from '@/components/surgeries/surgery-stay';
 
 interface CirugiaDetailPageProps {
@@ -11,9 +16,26 @@ export default async function CirugiaDetailPage({ params }: CirugiaDetailPagePro
   if (!canRead) redirect('/dashboard');
 
   const { id } = await params;
-  const [surgery, canWrite] = await Promise.all([getSurgery(id), canManageSurgeries()]);
+  const [surgery, canWrite, settlementAccess] = await Promise.all([
+    getSurgery(id),
+    canManageSurgeries(),
+    canReadSettlementSourceClaims(),
+  ]);
 
   if (!surgery) notFound();
 
-  return <SurgeryStay surgery={surgery} canWrite={canWrite} />;
+  const settlementClaim =
+    settlementAccess && surgery.status === 'completada'
+      ? await getSettlementClaimForSource('surgery', surgery.id)
+      : null;
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
+
+  return (
+    <SurgeryStay
+      surgery={surgery}
+      canWrite={canWrite}
+      settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
+    />
+  );
 }

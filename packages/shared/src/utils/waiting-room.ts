@@ -42,7 +42,7 @@ export interface WaitingRoomBoardFilters {
 }
 
 function normalizeWaitingRoomSearch(text: string): string {
-  return text
+  return String(text ?? '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()

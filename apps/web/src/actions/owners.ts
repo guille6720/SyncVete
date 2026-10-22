@@ -50,7 +50,7 @@ function parseOwnerForm(formData: FormData) {
     notes: formData.get('notes'),
     branchId: formData.get('branchId'),
     isActive: formData.has('isActive')
-      ? formData.get('isActive') === 'true'
+      ? formData.getAll('isActive').includes('true')
       : true,
   });
 }
@@ -58,7 +58,12 @@ function parseOwnerForm(formData: FormData) {
 function toOwnerRow(row: Owner & { total_count?: number }): Owner {
   const { total_count: _total, ...owner } = row;
   void _total;
-  return { ...owner, deleted_at: owner.deleted_at ?? null, portal_user_id: owner.portal_user_id ?? null };
+  return {
+    ...owner,
+    deleted_at: owner.deleted_at ?? null,
+    portal_user_id: owner.portal_user_id ?? null,
+    portal_pending_user_id: owner.portal_pending_user_id ?? null,
+  };
 }
 
 export async function listOwners(
@@ -139,10 +144,10 @@ export async function createOwner(
 
     if (error) {
       console.error('[createOwner]', error);
-      return { success: false, error: error.message || 'No se pudo crear el propietario' };
+      return { success: false, error: error.message || 'No se pudo crear el tutor' };
     }
 
-    revalidatePath('/propietarios');
+    revalidatePath('/tutores');
     return { success: true, data: { id: data.id } };
   } catch (error) {
     return actionError<{ id: string }>(error);
@@ -187,11 +192,11 @@ export async function updateOwner(
       .eq('id', ownerId);
 
     if (error) {
-      return { success: false, error: 'No se pudo actualizar el propietario' };
+      return { success: false, error: 'No se pudo actualizar el tutor' };
     }
 
-    revalidatePath('/propietarios');
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath('/tutores');
+    revalidatePath(`/tutores/${ownerId}`);
     return { success: true, data: { id: ownerId } };
   } catch (error) {
     return actionError(error);
@@ -203,16 +208,25 @@ export async function deleteOwner(ownerId: string): Promise<ActionResult> {
     await requirePermissionAndFeature('patients:write', FEATURES.OWNERS);
     const supabase = await createServerClient();
 
-    const { error } = await supabase
-      .from('owners')
-      .update({ deleted_at: new Date().toISOString(), is_active: false })
-      .eq('id', ownerId);
-
-    if (error) {
-      return { success: false, error: 'No se pudo eliminar el propietario' };
+    const deleted = await supabase.rpc('soft_delete_owner', { p_owner_id: ownerId });
+    if (deleted.error || deleted.data !== ownerId) {
+      if (deleted.error) console.error('[deleteOwner]', deleted.error.message);
+      const fallback = await supabase
+        .from('owners')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', ownerId)
+        .is('deleted_at', null);
+      if (fallback.error) console.error('[deleteOwner]', fallback.error.message);
+      if (await getOwner(ownerId)) {
+        return {
+          success: false,
+          error: 'No se pudo eliminar el tutor. Seguía en la lista porque la baja no se guardó.',
+        };
+      }
     }
 
-    revalidatePath('/propietarios');
+    revalidatePath('/tutores');
+    revalidatePath(`/tutores/${ownerId}`);
     return { success: true };
   } catch (error) {
     return actionError(error);

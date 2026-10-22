@@ -113,7 +113,7 @@ describe('buildWaitingRoomReportEntriesCsv', () => {
       },
     ];
     const detail = buildWaitingRoomReportEntriesCsv(entries);
-    expect(detail).toContain('Check-in,Paciente,Propietario');
+    expect(detail).toContain('Check-in,Paciente,Tutor');
     expect(detail).toContain('Luna');
     expect(detail).toContain('Completado');
 

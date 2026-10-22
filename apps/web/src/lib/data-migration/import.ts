@@ -1411,7 +1411,7 @@ export async function rollbackImportBatch(batchId: string) {
         .is('deleted_at', null)
         .neq('import_batch_id', batchId);
       if ((count ?? 0) > 0) {
-        throw new Error('Rollback bloqueado: hay propietarios con pacientes posteriores');
+        throw new Error('Rollback bloqueado: hay tutores con pacientes posteriores');
       }
       await supabase
         .from('owners')

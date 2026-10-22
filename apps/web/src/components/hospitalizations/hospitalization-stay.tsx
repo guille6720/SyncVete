@@ -17,15 +17,24 @@ import {
   formatHospitalizationStayDays,
   type HospitalizationListRow,
   type HospitalizationNote,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
 
 interface HospitalizationStayProps {
   stay: HospitalizationListRow;
   notes: HospitalizationNote[];
   canWrite: boolean;
+  settlementClaimsByNoteId?: Record<string, SettlementSourceClaimInfo>;
+  settlementDetailBasePath?: string;
 }
 
-export function HospitalizationStay({ stay, notes, canWrite }: HospitalizationStayProps) {
+export function HospitalizationStay({
+  stay,
+  notes,
+  canWrite,
+  settlementClaimsByNoteId = {},
+  settlementDetailBasePath = '/liquidaciones',
+}: HospitalizationStayProps) {
   const isActive = stay.status === 'internado' || stay.status === 'observacion';
 
   return (
@@ -78,9 +87,9 @@ export function HospitalizationStay({ stay, notes, canWrite }: HospitalizationSt
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${stay.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${stay.owner_id}`} className="text-primary hover:underline">
                 {stay.owner_full_name}
               </Link>
             }
@@ -135,6 +144,8 @@ export function HospitalizationStay({ stay, notes, canWrite }: HospitalizationSt
             notes={notes}
             canWrite={canWrite}
             isActive={isActive}
+            settlementClaimsByNoteId={settlementClaimsByNoteId}
+            settlementDetailBasePath={settlementDetailBasePath}
           />
         </CardContent>
       </Card>

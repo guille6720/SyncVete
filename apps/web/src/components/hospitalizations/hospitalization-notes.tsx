@@ -15,13 +15,17 @@ import {
   formatClinicalEntryDateTime,
   type ActionResult,
   type HospitalizationNote,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface HospitalizationNotesProps {
   hospitalizationId: string;
   notes: HospitalizationNote[];
   canWrite: boolean;
   isActive: boolean;
+  settlementClaimsByNoteId?: Record<string, SettlementSourceClaimInfo>;
+  settlementDetailBasePath?: string;
 }
 
 export function HospitalizationNotes({
@@ -29,6 +33,8 @@ export function HospitalizationNotes({
   notes,
   canWrite,
   isActive,
+  settlementClaimsByNoteId = {},
+  settlementDetailBasePath = '/liquidaciones',
 }: HospitalizationNotesProps) {
   return (
     <div className="space-y-4">
@@ -39,7 +45,7 @@ export function HospitalizationNotes({
       ) : (
         <div className="space-y-3">
           {notes.map((note) => (
-            <div key={note.id} className="rounded-lg border p-3">
+            <div key={note.id} id={`note-${note.id}`} className="scroll-mt-24 rounded-lg border p-3">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="default">{HOSPITALIZATION_NOTE_TYPE_LABELS[note.note_type]}</Badge>
                 <p className="text-sm text-muted-foreground">
@@ -57,6 +63,13 @@ export function HospitalizationNotes({
                     : ''}
                 </p>
               )}
+              {settlementClaimsByNoteId[note.id] ? (
+                <SettlementSourceBadge
+                  claim={settlementClaimsByNoteId[note.id]}
+                  compact
+                  detailHref={`${settlementDetailBasePath}/${settlementClaimsByNoteId[note.id].settlementId}`}
+                />
+              ) : null}
             </div>
           ))}
         </div>

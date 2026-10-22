@@ -1,6 +1,9 @@
 import { APP_TIMEZONE } from '../constants';
+import type { AppointmentStatus } from '../constants/appointments';
+import type { AppointmentDashboardMetrics, AssignableStaffMember } from '../types/appointments';
 
 const DATE_PARAM_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const INACTIVE_APPOINTMENT_STATUSES = new Set<AppointmentStatus>(['cancelada', 'ausente']);
 
 export function parseDateParam(dateStr?: string): string {
   if (dateStr && DATE_PARAM_REGEX.test(dateStr)) {
@@ -124,4 +127,189 @@ export function getDurationMinutes(startIso: string, endIso: string): number {
     return 30;
   }
   return Math.round((end - start) / 60_000);
+}
+
+export function isActiveAppointmentStatus(status: AppointmentStatus | string): boolean {
+  return !INACTIVE_APPOINTMENT_STATUSES.has(status as AppointmentStatus);
+}
+
+type AppointmentMetricEntry = {
+  status: AppointmentStatus | string;
+  starts_at: string;
+  assigned_user_id?: string | null;
+};
+
+export function buildAppointmentDayMetrics(
+  entries: AppointmentMetricEntry[]
+): AppointmentDashboardMetrics {
+  const metrics: AppointmentDashboardMetrics = {
+    total: entries.length,
+    active: 0,
+    programada: 0,
+    confirmada: 0,
+    enCurso: 0,
+    completada: 0,
+    cancelada: 0,
+    ausente: 0,
+  };
+
+  for (const entry of entries) {
+    if (isActiveAppointmentStatus(entry.status)) {
+      metrics.active += 1;
+    }
+    switch (entry.status) {
+      case 'programada':
+        metrics.programada += 1;
+        break;
+      case 'confirmada':
+        metrics.confirmada += 1;
+        break;
+      case 'en_curso':
+        metrics.enCurso += 1;
+        break;
+      case 'completada':
+        metrics.completada += 1;
+        break;
+      case 'cancelada':
+        metrics.cancelada += 1;
+        break;
+      case 'ausente':
+        metrics.ausente += 1;
+        break;
+      default:
+        break;
+    }
+  }
+
+  return metrics;
+}
+
+export function groupAppointmentsByDay<T extends { starts_at: string }>(
+  entries: T[]
+): Record<string, T[]> {
+  const grouped: Record<string, T[]> = {};
+  for (const entry of entries) {
+    const day = formatDateParam(new Date(entry.starts_at));
+    if (!grouped[day]) grouped[day] = [];
+    grouped[day].push(entry);
+  }
+  return grouped;
+}
+
+export function groupAppointmentsByAssignee<
+  T extends { assigned_user_id?: string | null },
+>(entries: T[]): Record<string, T[]> {
+  const grouped: Record<string, T[]> = {};
+  for (const entry of entries) {
+    const key = entry.assigned_user_id ?? 'unassigned';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(entry);
+  }
+  return grouped;
+}
+
+export type AgendaViewMode = 'day' | 'week' | 'month';
+
+export function parseAgendaViewMode(value?: string | null): AgendaViewMode {
+  if (value === 'week' || value === 'month' || value === 'day') return value;
+  return 'day';
+}
+
+/** Shift a YYYY-MM-DD calendar day by N days (UTC noon anchor). */
+export function shiftAgendaDay(dateStr: string, days: number): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day, 12));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+export function shiftAgendaWeek(weekStart: string, weeks: number): string {
+  return shiftAgendaDay(weekStart, weeks * 7);
+}
+
+export function shiftAgendaMonth(month: string, delta: number): string {
+  const [year, m] = month.split('-').map(Number);
+  const date = new Date(Date.UTC(year, m - 1 + delta, 1, 12));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function agendaMonthBounds(month: string): { from: string; to: string } {
+  const [year, m] = month.split('-').map(Number);
+  const lastDay = new Date(Date.UTC(year, m, 0)).getUTCDate();
+  return {
+    from: `${month}-01`,
+    to: `${month}-${String(lastDay).padStart(2, '0')}`,
+  };
+}
+
+export interface AgendaQueryState {
+  selectedDate: string;
+  weekStart: string;
+  month: string;
+  view: AgendaViewMode;
+  status?: string;
+  assignedUserId?: string;
+  branchId?: string;
+  query?: string;
+}
+
+export interface AgendaCalendarRange {
+  from: string;
+  to: string;
+  weekStart: string;
+  selectedDate: string;
+  month: string;
+  view: AgendaViewMode;
+}
+
+/** Resolve the appointment fetch window for day / week / month views. */
+export function resolveAgendaCalendarRange(input: {
+  date?: string | null;
+  week?: string | null;
+  month?: string | null;
+  view?: string | null;
+}): AgendaCalendarRange {
+  const selectedDate = parseDateParam(input.date ?? undefined);
+  const weekStart = input.week && DATE_PARAM_REGEX.test(input.week)
+    ? input.week
+    : getWeekStartDate(selectedDate);
+  const month =
+    input.month && /^\d{4}-\d{2}$/.test(input.month)
+      ? input.month
+      : selectedDate.slice(0, 7);
+  const view = parseAgendaViewMode(input.view);
+
+  if (view === 'day') {
+    return { from: selectedDate, to: selectedDate, weekStart, selectedDate, month, view };
+  }
+  if (view === 'month') {
+    const bounds = agendaMonthBounds(month);
+    return {
+      from: bounds.from,
+      to: bounds.to,
+      weekStart,
+      selectedDate,
+      month,
+      view,
+    };
+  }
+  return {
+    from: weekStart,
+    to: shiftAgendaDay(weekStart, 6),
+    weekStart,
+    selectedDate,
+    month,
+    view,
+  };
+}
+
+/** Filter assignable staff to a branch; members without branchIds apply to all branches. */
+export function filterAssignableStaffByBranch(
+  staff: AssignableStaffMember[],
+  branchId?: string | null
+): AssignableStaffMember[] {
+  if (!branchId) return staff;
+  return staff.filter(
+    (member) => member.branchIds.length === 0 || member.branchIds.includes(branchId)
+  );
 }

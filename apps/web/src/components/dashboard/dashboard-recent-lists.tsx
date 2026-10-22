@@ -17,7 +17,7 @@ export function DashboardRecentLists({
   recentOwners,
 }: DashboardRecentListsProps) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2" data-tour="dashboard-activity">
       <Card className="border-teal-200/70 bg-card/95 text-card-foreground shadow-sm backdrop-blur-sm dark:border-teal-800">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -60,11 +60,11 @@ export function DashboardRecentLists({
       <Card className="border-sky-200/70 bg-card/95 text-card-foreground shadow-sm backdrop-blur-sm dark:border-sky-800">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle className="text-lg">Últimos propietarios</CardTitle>
+            <CardTitle className="text-lg">Últimos tutores</CardTitle>
             <CardDescription>Registros recientes</CardDescription>
           </div>
           <Link
-            href="/propietarios"
+            href="/tutores"
             className="text-sm font-medium text-sky-700 hover:underline dark:text-sky-300"
           >
             Ver todos
@@ -72,13 +72,13 @@ export function DashboardRecentLists({
         </CardHeader>
         <CardContent>
           {recentOwners.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Sin propietarios registrados.</p>
+            <p className="text-sm text-muted-foreground">Sin tutores registrados.</p>
           ) : (
             <ul className="divide-y divide-border">
               {recentOwners.map((owner) => (
                 <li key={owner.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                   <Link
-                    href={`/propietarios/${owner.id}`}
+                    href={`/tutores/${owner.id}`}
                     className="font-medium text-foreground hover:text-sky-700 hover:underline dark:hover:text-sky-300"
                   >
                     {owner.full_name}

@@ -9,6 +9,7 @@ import {
   isAuditAction,
   isValidAuditRange,
 } from '../utils/audit';
+import { AUDIT_LIQUIDACIONES_FAMILY } from '../constants/audit';
 
 describe('auditLogListSchema', () => {
   it('accepts filters', () => {
@@ -33,6 +34,7 @@ describe('auditLogListSchema', () => {
 describe('audit helpers', () => {
   it('labels known entities and actions', () => {
     expect(auditEntityLabel('invoices')).toBe('Facturas');
+    expect(auditEntityLabel(AUDIT_LIQUIDACIONES_FAMILY)).toBe('Liquidaciones (familia)');
     expect(isAuditAction('create')).toBe(true);
     expect(isAuditAction('INSERT')).toBe(false);
   });
@@ -42,6 +44,15 @@ describe('audit helpers', () => {
     expect(buildAuditEntityHref('payments', 'pay1', { invoice_id: 'inv1' })).toBe(
       '/facturacion/inv1'
     );
+    expect(buildAuditEntityHref('professional_settlements', 'set1')).toBe('/liquidaciones/set1');
+    expect(buildAuditEntityHref('professional_payments', 'pay1', { settlement_id: 'set1' })).toBe(
+      '/liquidaciones/set1'
+    );
+    expect(
+      buildAuditEntityHref('professional_settlement_item_omissions', 'o1', {
+        settlement_id: 'set1',
+      })
+    ).toBe('/liquidaciones/set1');
     expect(buildAuditEntityHref('whatsapp_messages', 'm1')).toBe('/whatsapp');
   });
 

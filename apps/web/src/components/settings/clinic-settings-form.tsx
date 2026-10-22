@@ -10,6 +10,8 @@ import { Select } from '@/components/ui/select';
 import {
   CURRENCIES,
   TIMEZONES,
+  SETTLEMENT_PERIOD_PRESETS,
+  SETTLEMENT_PERIOD_PRESET_LABELS,
   formatWaitingRoomRoomsText,
   type OrganizationSettings,
 } from '@sincvete/shared';
@@ -76,6 +78,50 @@ export function ClinicSettingsForm({ organizationName, settings }: ClinicSetting
             <Label htmlFor="taxId">CUIT / Identificación fiscal</Label>
             <Input id="taxId" name="taxId" defaultValue={settings.taxId ?? ''} />
           </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <p className="text-sm font-medium">Liquidaciones a profesionales</p>
+            <p className="text-xs text-muted-foreground">
+              Período por defecto al calcular liquidaciones (no es nómina legal).
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="settlementPeriodPreset">Período por defecto</Label>
+              <Select
+                id="settlementPeriodPreset"
+                name="settlementPeriodPreset"
+                defaultValue={settings.settlementPeriodPreset ?? 'month'}
+              >
+                {SETTLEMENT_PERIOD_PRESETS.map((preset) => (
+                  <option key={preset} value={preset}>
+                    {SETTLEMENT_PERIOD_PRESET_LABELS[preset]}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="settlementPeriodDays">Días (si usás “últimos N días”)</Label>
+              <Input
+                id="settlementPeriodDays"
+                name="settlementPeriodDays"
+                type="number"
+                min={1}
+                max={366}
+                inputMode="numeric"
+                defaultValue={
+                  settings.settlementPeriodDays != null ? String(settings.settlementPeriodDays) : '14'
+                }
+                placeholder="14"
+              />
+            </div>
+          </div>
+          {state?.fieldErrors?.settlementPeriodDays && (
+            <p className="text-sm text-destructive">
+              {state.fieldErrors.settlementPeriodDays[0]}
+            </p>
+          )}
 
           <div className="space-y-2 border-t pt-4">
             <p className="text-sm font-medium">Sala de espera</p>

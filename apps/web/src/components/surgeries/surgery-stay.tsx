@@ -28,14 +28,23 @@ import {
   SURGERY_STATUS_VARIANT,
   formatClinicalEntryDateTime,
   type SurgeryListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface SurgeryStayProps {
   surgery: SurgeryListRow;
   canWrite: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
-export function SurgeryStay({ surgery, canWrite }: SurgeryStayProps) {
+export function SurgeryStay({
+  surgery,
+  canWrite,
+  settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
+}: SurgeryStayProps) {
   const router = useRouter();
   const isOpen =
     surgery.status === 'programada' ||
@@ -95,6 +104,13 @@ export function SurgeryStay({ surgery, canWrite }: SurgeryStayProps) {
         </div>
       </div>
 
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
@@ -122,9 +138,9 @@ export function SurgeryStay({ surgery, canWrite }: SurgeryStayProps) {
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${surgery.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${surgery.owner_id}`} className="text-primary hover:underline">
                 {surgery.owner_full_name}
               </Link>
             }

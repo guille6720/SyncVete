@@ -47,7 +47,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
         <a href="#inicio">1. Entrar y moverte</a>
         <a href="#dashboard">2. Dashboard</a>
         <a href="#agenda">3. Agenda</a>
-        <a href="#pacientes">4. Propietarios y pacientes</a>
+        <a href="#pacientes">4. Tutores y pacientes</a>
         <a href="#consultas">5. Consultas e historia</a>
         <a href="#clinica">6. Internación, vacunas y cirugías</a>
         <a href="#lab">7. Laboratorio e imágenes</a>
@@ -111,13 +111,31 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           <Figure src={ILLUSTRATIONS.agenda} alt="Recepción con agenda semanal y un perro en sala de espera" />
           <div>
             <p>
-              La agenda muestra la semana. Con <strong>Nueva cita</strong> elegís paciente, fecha, profesional y motivo.
-              Desde la ficha del turno podés ver el detalle o editarlo.
+              La agenda es el calendario operativo de la clínica. Podés ver el día, la semana o el mes, filtrar por
+              profesional, sucursal o estado, y abrir un turno en el panel lateral sin salir de la vista.
             </p>
             <ul className="sv-steps">
-              <li>Si el paciente no existe, cargalo antes (o crealo desde el buscador de la cita).</li>
-              <li>Los estados del turno (pendiente, en consulta, completado, cancelado) se actualizan al atender.</li>
-              <li>Los recordatorios pueden avisar al tutor según cómo esté configurada la clínica.</li>
+              <li>
+                <strong>Nueva cita:</strong> paciente (o alta rápida de tutor + mascota), fecha, duración, tipo,
+                profesional, sucursal, modalidad (clínica / domicilio / video), medio de pago esperado y
+                recordatorios.
+              </li>
+              <li>
+                Estados de la cita: programada → confirmada → en curso → completada; también cancelada o ausente
+                (no-show).
+              </li>
+              <li>
+                <strong>Llegó / sala de espera:</strong> desde el panel del turno usá el check-in. La cola del día se
+                gestiona en <em>Sala de espera</em> (no es una segunda agenda).
+              </li>
+              <li>
+                <strong>Disponibilidad:</strong> en Agenda → Disponibilidad definís horarios y bloqueos del
+                profesional. El sistema evita doble reserva del mismo profesional.
+              </li>
+              <li>
+                <strong>Lista de espera:</strong> turnos futuros sin horario fijo (preferencias de día/hora). Cuando
+                se libera un espacio, SyncVete puede identificar candidatos compatibles.
+              </li>
             </ul>
           </div>
         </div>
@@ -125,12 +143,12 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       </section>
 
       <section className="sv-section" id="pacientes">
-        <h2>4. Propietarios y pacientes</h2>
+        <h2>4. Tutores y pacientes</h2>
         <div className="sv-split">
           <Figure src={ILLUSTRATIONS.pacientes} alt="Ficha digital de mascotas con una gata y un perro" />
           <div>
             <p>
-              Primero el <strong>propietario</strong> (tutor): nombre, contacto y datos de facturación. Después el{' '}
+              Primero el <strong>tutor</strong> (tutor): nombre, contacto y datos de facturación. Después el{' '}
               <strong>paciente</strong>: especie, raza, sexo, fecha de nacimiento y vínculo con el tutor.
             </p>
             <ul className="sv-steps">
@@ -314,12 +332,12 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
       <section className="sv-section" id="import-export">
         <h2>11b. Importar / Exportar datos</h2>
         <p>
-          En <strong>Configuración → Importar / Exportar</strong> podés migrar propietarios, pacientes, historias,
+          En <strong>Configuración → Importar / Exportar</strong> podés migrar tutores, pacientes, historias,
           vacunas, laboratorio, cirugías, recetas, internaciones y adjuntos (ZIP SyncVete).
         </p>
         <ul className="sv-steps">
           <li>
-            <strong>Orden recomendado:</strong> sucursales → propietarios → pacientes → historias → vacunas → especialidades →
+            <strong>Orden recomendado:</strong> sucursales → tutores → pacientes → historias → vacunas → especialidades →
             adjuntos.
           </li>
           <li>
@@ -363,7 +381,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
             stale y podar mapas huérfanos (simulá primero).
           </li>
           <li>
-            <strong>Multi-sede:</strong> en propietarios, pacientes, historias clínicas, vacunas, laboratorio,
+            <strong>Multi-sede:</strong> en tutores, pacientes, historias clínicas, vacunas, laboratorio,
             cirugías, recetas, internaciones, agenda, consultas, inventario y facturas podés usar la columna
             opcional `external_branch_id` para asignar cada fila a una sucursal. Importá sucursales antes; cargá el
             mapa sucursales (CSV external_branch_id → internal_branch_id) o usá UUID internos del tenant en
@@ -391,7 +409,7 @@ export function UserManual({ toolbar }: { toolbar?: ReactNode }) {
           </li>
           <li>
             <strong>Checklist go-live:</strong> en el historial de importación podés correr un
-            checklist (propietarios, pacientes, citas 30d, vacunas, inventario, locks/huérfanos) y
+            checklist (tutores, pacientes, citas 30d, vacunas, inventario, locks/huérfanos) y
             descargarlo en CSV.
           </li>
           <li>

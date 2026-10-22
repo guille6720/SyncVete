@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useRef, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import {
   addCashMovementAction,
@@ -9,6 +9,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -20,6 +21,7 @@ import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_METHODS,
   computeExpectedCash,
+  extractSettlementHrefFromCashNote,
   formatClinicalEntryDateTime,
   formatMoney,
   sumMovementsByMethod,
@@ -46,10 +48,35 @@ export function CashTill({
   const closeAction = closeCashSessionAction.bind(null, session.id);
   const [addState, addFormAction, addPending] = useActionState(addAction, null);
   const [closeState, closeFormAction, closePending] = useActionState(closeAction, null);
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false);
+  const closeFormRef = useRef<HTMLFormElement>(null);
+  const skipCloseConfirmRef = useRef(false);
   const pending = addPending || closePending;
+
+  const onCloseSubmit = (event: FormEvent<HTMLFormElement>) => {
+    if (skipCloseConfirmRef.current) {
+      skipCloseConfirmRef.current = false;
+      return;
+    }
+    event.preventDefault();
+    setCloseConfirmOpen(true);
+  };
 
   return (
     <div className="space-y-6">
+      <ConfirmDialog
+        open={closeConfirmOpen}
+        title="Cerrar caja"
+        description={`¿Cerrar la caja de ${session.branch_name}? Efectivo esperado: ${formatMoney(expected, currency)}.`}
+        confirmLabel="Cerrar caja"
+        variant="destructive"
+        onClose={() => setCloseConfirmOpen(false)}
+        onConfirm={() => {
+          skipCloseConfirmRef.current = true;
+          closeFormRef.current?.requestSubmit();
+        }}
+      />
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
@@ -147,7 +174,12 @@ export function CashTill({
               <CardTitle>Cerrar caja</CardTitle>
             </CardHeader>
             <CardContent>
-              <form action={closeFormAction} className="grid gap-4">
+              <form
+                ref={closeFormRef}
+                action={closeFormAction}
+                onSubmit={onCloseSubmit}
+                className="grid gap-4"
+              >
                 <p className="text-sm text-muted-foreground">
                   Contá el efectivo del cajón. Esperado: {formatMoney(expected, currency)}
                 </p>
@@ -202,7 +234,21 @@ export function CashMovementsList({
   return (
     <div className="space-y-2">
       <h2 className="text-lg font-semibold">Movimientos</h2>
-      {movements.map((movement) => (
+      {movements.map((movement) => {
+        const settlementHref =
+          movement.professional_settlement_id
+            ? `/liquidaciones/${movement.professional_settlement_id}`
+            : extractSettlementHrefFromCashNote(movement.notes);
+        const notesWithoutHref =
+          settlementHref && movement.notes
+            ? movement.notes
+                .replace(settlementHref, '')
+                .replace(/\s*·\s*·\s*/g, ' · ')
+                .replace(/\s*·\s*$/, '')
+                .replace(/^\s*·\s*/, '')
+                .trim()
+            : movement.notes;
+        return (
         <div key={movement.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
@@ -217,8 +263,16 @@ export function CashMovementsList({
               {formatClinicalEntryDateTime(movement.created_at)}
               {movement.recorded_by_name ? ` · ${movement.recorded_by_name}` : ''}
               {movement.invoice_number ? ` · ${movement.invoice_number}` : ''}
-              {movement.notes ? ` · ${movement.notes}` : ''}
+              {notesWithoutHref ? ` · ${notesWithoutHref}` : ''}
             </p>
+            {settlementHref ? (
+              <Link
+                href={settlementHref}
+                className="mt-1 inline-block text-sm text-primary hover:underline"
+              >
+                Ver liquidación
+              </Link>
+            ) : null}
           </div>
           <div className="text-right">
             <p className="font-medium">{formatMoney(movement.amount, currency)}</p>
@@ -232,7 +286,8 @@ export function CashMovementsList({
             )}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

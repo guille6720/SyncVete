@@ -13,6 +13,7 @@ import {
   addDaysIso,
   appendWaitingRoomBoardFilterParams,
   buildWaitingRoomSurfaceHref,
+  filterAppointmentsByWaitingRoomBranch,
   formatDateParam,
   formatDashboardDate,
   getWeekStartDate,
@@ -70,10 +71,9 @@ function salaEsperaHref(opts: {
 }
 
 export default async function SalaEsperaPage({ searchParams }: SalaEsperaPageProps) {
-  const canRead = await canReadWaitingRoom();
+  const [canRead, params] = await Promise.all([canReadWaitingRoom(), searchParams]);
   if (!canRead) redirect('/dashboard');
 
-  const params = await searchParams;
   const today = formatDateParam(new Date());
   const selectedDate = parseDateParam(params.date);
   const isToday = selectedDate === today;
@@ -116,8 +116,12 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
       : entries;
 
   const checkedInIds = new Set(entries.map((row) => row.appointment_id));
+  const branchAppointments = filterAppointmentsByWaitingRoomBranch(
+    weekAppointments,
+    listBranchId
+  );
   const checkInCandidates = isToday
-    ? weekAppointments.filter((appointment) => {
+    ? branchAppointments.filter((appointment) => {
         if (checkedInIds.has(appointment.id)) return false;
         const day = formatDateParam(new Date(appointment.starts_at));
         if (day !== today) return false;
@@ -195,7 +199,7 @@ export default async function SalaEsperaPage({ searchParams }: SalaEsperaPagePro
             <ChevronLeft className="h-4 w-4" />
           </Link>
         </Button>
-        <p className="min-w-[10rem] text-center text-sm font-medium capitalize">
+        <p className="min-w-[10rem] text-center text-sm font-medium">
           {formatDashboardDate(`${selectedDate}T12:00:00-03:00`)}
           {isToday ? ' · Hoy' : ''}
         </p>

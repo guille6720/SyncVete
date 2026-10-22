@@ -12,6 +12,11 @@ import { ClinicalAiSoapPanel } from '@/components/clinical-ai/clinical-ai-soap-p
 import { Button } from '@/components/ui/button';
 import { canManageBilling } from '@/actions/billing';
 import { getClinicalAiStatus } from '@/actions/clinical-ai';
+import {
+  canReadSettlementSourceClaims,
+  getSettlementClaimForSource,
+} from '@/actions/professional-settlements';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 
 interface ConsultaPageProps {
   params: Promise<{ id: string }>;
@@ -22,14 +27,21 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
   if (!canRead) redirect('/consultas');
 
   const { id } = await params;
-  const [consultation, canWrite, canWriteBilling, aiStatus] = await Promise.all([
+  const [consultation, canWrite, canWriteBilling, aiStatus, settlementAccess] = await Promise.all([
     getConsultation(id),
     canManageConsultations(),
     canManageBilling(),
     getClinicalAiStatus(),
+    canReadSettlementSourceClaims(),
   ]);
 
   if (!consultation) notFound();
+
+  const settlementClaim =
+    settlementAccess && consultation.status === 'completada'
+      ? await getSettlementClaimForSource('consultation', consultation.id)
+      : null;
+  const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
 
   const isOpen = consultation.status === 'en_curso' || consultation.status === 'en_espera';
 
@@ -59,6 +71,8 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
       consultation={consultation}
       canWrite={canWrite}
       canWriteBilling={canWriteBilling}
+      settlementClaim={settlementClaim}
+      settlementDetailBasePath={settlementDetailBasePath}
     />
   );
 }

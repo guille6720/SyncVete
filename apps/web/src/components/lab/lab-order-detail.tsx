@@ -32,16 +32,27 @@ import {
   buildWhatsAppComposePath,
   type LabOrderItem,
   type LabOrderListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface LabOrderDetailProps {
   order: LabOrderListRow;
   items: LabOrderItem[];
   canWrite: boolean;
   canSendWhatsApp?: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
-export function LabOrderDetail({ order, items, canWrite, canSendWhatsApp = false }: LabOrderDetailProps) {
+export function LabOrderDetail({
+  order,
+  items,
+  canWrite,
+  canSendWhatsApp = false,
+  settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
+}: LabOrderDetailProps) {
   const router = useRouter();
   const isOpen = order.status === 'solicitada' || order.status === 'en_proceso';
   const canOperate = canWrite && isOpen;
@@ -103,6 +114,13 @@ export function LabOrderDetail({ order, items, canWrite, canSendWhatsApp = false
         </div>
       </div>
 
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
@@ -133,9 +151,9 @@ export function LabOrderDetail({ order, items, canWrite, canSendWhatsApp = false
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${order.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${order.owner_id}`} className="text-primary hover:underline">
                 {order.owner_full_name}
               </Link>
             }

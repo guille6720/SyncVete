@@ -14,6 +14,7 @@ import {
   AUDIT_ACTION_LABELS,
   AUDIT_ACTION_VARIANT,
   AUDIT_ENTITY_TYPES,
+  AUDIT_LIQUIDACIONES_FAMILY,
   auditEntityLabel,
   formatRelativeTime,
   isAuditAction,
@@ -103,6 +104,9 @@ export function AuditLogList({
           className="w-full sm:w-56"
         >
           <option value="">Todas las entidades</option>
+          <option value={AUDIT_LIQUIDACIONES_FAMILY}>
+            {auditEntityLabel(AUDIT_LIQUIDACIONES_FAMILY)}
+          </option>
           {AUDIT_ENTITY_TYPES.map((type) => (
             <option key={type} value={type}>
               {auditEntityLabel(type)}

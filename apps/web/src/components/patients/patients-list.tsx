@@ -81,7 +81,7 @@ export function PatientsList({
           <div className="relative max-w-md flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nombre, microchip, propietario..."
+              placeholder="Buscar por nombre, microchip, tutor..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
@@ -133,7 +133,7 @@ export function PatientsList({
               <thead className="border-b bg-muted/40">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Paciente</th>
-                  <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Propietario</th>
+                  <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Tutor</th>
                   <th className="hidden px-4 py-3 text-left font-medium lg:table-cell">Especie / Raza</th>
                   <th className="px-4 py-3 text-left font-medium">Estado</th>
                 </tr>
@@ -170,7 +170,7 @@ export function PatientsList({
                     </td>
                     <td className="hidden px-4 py-3 md:table-cell">
                       <Link
-                        href={`/propietarios/${patient.owner_id}`}
+                        href={`/tutores/${patient.owner_id}`}
                         className="hover:text-primary hover:underline"
                       >
                         {patient.owner_full_name}

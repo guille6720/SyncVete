@@ -2,10 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { inviteOwnerToPortal, revokeOwnerPortalAccess } from '@/actions/portal';
+import {
+  approveOwnerPortalAccess,
+  inviteOwnerToPortal,
+  revokeOwnerPortalAccess,
+} from '@/actions/portal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   PORTAL_ACCESS_STATUS_LABELS,
   PORTAL_ACCESS_STATUS_VARIANT,
@@ -20,6 +25,8 @@ interface OwnerPortalCardProps {
   canWrite: boolean;
   portalEnabled?: boolean;
   status: OwnerPortalStatus | null;
+  /** When true, invite/resend lives in the App del tutor card. */
+  hideInviteActions?: boolean;
 }
 
 export function OwnerPortalCard({
@@ -28,16 +35,21 @@ export function OwnerPortalCard({
   canWrite,
   portalEnabled = true,
   status,
+  hideInviteActions = false,
 }: OwnerPortalCardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [revokeOpen, setRevokeOpen] = useState(false);
+  const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [deliveryMessage, setDeliveryMessage] = useState<string | null>(null);
   const access = status?.status ?? 'inactive';
 
   const handleInvite = async () => {
     setPending(true);
     setError(null);
+    setCopyMessage(null);
     const result = await inviteOwnerToPortal(ownerId);
     setPending(false);
     if (!result.success || !result.data) {
@@ -46,16 +58,40 @@ export function OwnerPortalCard({
     }
     const path = buildPortalActivatePath(result.data.token);
     setInviteUrl(`${window.location.origin}${path}`);
+    setDeliveryMessage(
+      result.data.deliveryStatus === 'sent'
+        ? 'Invitacion enviada por email.'
+        : result.data.deliveryStatus === 'not_sent'
+          ? 'El email no se envio. Podes compartir el enlace privado.'
+          : null
+    );
+    router.refresh();
+  };
+
+  const handleApprove = async () => {
+    setPending(true);
+    setError(null);
+    const result = await approveOwnerPortalAccess(ownerId);
+    setPending(false);
+    if (!result.success) {
+      setError(result.error ?? 'No se pudo activar el acceso');
+      return;
+    }
     router.refresh();
   };
 
   const handleCopy = async () => {
     if (!inviteUrl) return;
-    await navigator.clipboard.writeText(inviteUrl);
+    setCopyMessage(null);
+    try {
+      await navigator.clipboard.writeText(inviteUrl);
+      setCopyMessage('Enlace copiado.');
+    } catch {
+      setCopyMessage('No se pudo copiar el enlace.');
+    }
   };
 
   const handleRevoke = async () => {
-    if (!confirm('¿Revocar el acceso al portal de este propietario?')) return;
     setPending(true);
     setError(null);
     const result = await revokeOwnerPortalAccess(ownerId);
@@ -65,11 +101,23 @@ export function OwnerPortalCard({
       return;
     }
     setInviteUrl(null);
+    setCopyMessage(null);
     router.refresh();
   };
 
   return (
     <Card>
+      <ConfirmDialog
+        open={revokeOpen}
+        title="Revocar acceso al portal"
+        description="¿Revocar el acceso al portal de este tutor?"
+        confirmLabel="Revocar"
+        variant="destructive"
+        onClose={() => setRevokeOpen(false)}
+        onConfirm={() => {
+          void handleRevoke();
+        }}
+      />
       <CardHeader>
         <div className="flex flex-wrap items-center gap-2">
           <CardTitle className="text-lg">Portal del tutor</CardTitle>
@@ -78,7 +126,8 @@ export function OwnerPortalCard({
           </Badge>
         </div>
         <CardDescription>
-          El propietario puede ver mascotas, turnos, vacunas y facturas emitidas.
+          El tutor crea su cuenta con el enlace. Después vos activás el acceso para que vea
+          mascotas y turnos.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -90,14 +139,36 @@ export function OwnerPortalCard({
             Invitación válida hasta {formatDashboardDateTime(status.expiresAt)}
           </p>
         )}
+        {access === 'pending_approval' && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            El tutor ya creó su cuenta. Activá el acceso para que vea la información de sus
+            mascotas y turnos.
+          </p>
+        )}
         {inviteUrl && (
           <div className="space-y-2 rounded-md border bg-muted/40 p-3">
             <p className="text-xs font-medium text-muted-foreground">Enlace de activación</p>
             <p className="break-all text-sm">{inviteUrl}</p>
-            <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
+            <Button type="button" variant="outline" size="sm" onClick={() => void handleCopy()}>
               Copiar enlace
             </Button>
+            {copyMessage && (
+              <p
+                className={
+                  copyMessage.includes('No se pudo')
+                    ? 'text-sm text-destructive'
+                    : 'text-sm text-muted-foreground'
+                }
+              >
+                {copyMessage}
+              </p>
+            )}
           </div>
+        )}
+        {deliveryMessage && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {deliveryMessage}
+          </p>
         )}
         {!portalEnabled && (
           <p className="text-sm text-muted-foreground">
@@ -107,11 +178,21 @@ export function OwnerPortalCard({
         {error && <p className="text-sm text-destructive">{error}</p>}
         {canWrite && (
           <div className="flex flex-wrap gap-2">
-            {access !== 'active' && (
+            {access === 'pending_approval' && (
               <Button
                 type="button"
                 size="sm"
-                onClick={handleInvite}
+                onClick={() => void handleApprove()}
+                disabled={pending || !portalEnabled}
+              >
+                {pending ? 'Activando…' : 'Activar acceso'}
+              </Button>
+            )}
+            {!hideInviteActions && access !== 'active' && access !== 'pending_approval' && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleInvite()}
                 disabled={pending || !ownerEmail || !portalEnabled}
               >
                 {access === 'invited' ? 'Reenviar invitación' : 'Invitar al portal'}
@@ -122,7 +203,7 @@ export function OwnerPortalCard({
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={handleRevoke}
+                onClick={() => setRevokeOpen(true)}
                 disabled={pending}
               >
                 Revocar acceso

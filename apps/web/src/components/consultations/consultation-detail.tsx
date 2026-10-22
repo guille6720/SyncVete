@@ -16,18 +16,24 @@ import {
   SPECIES_EMOJI,
   formatClinicalEntryDateTime,
   type ConsultationListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface ConsultationDetailProps {
   consultation: ConsultationListRow;
   canWrite: boolean;
   canWriteBilling?: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
 export function ConsultationDetail({
   consultation,
   canWrite,
   canWriteBilling = false,
+  settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
 }: ConsultationDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
@@ -140,6 +146,13 @@ export function ConsultationDetail({
         </div>
       </div>
 
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
+
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center gap-2">
@@ -167,10 +180,10 @@ export function ConsultationDetail({
               }
             />
             <DetailField
-              label="Propietario"
+              label="Tutor"
               value={
                 <Link
-                  href={`/propietarios/${consultation.owner_id}`}
+                  href={`/tutores/${consultation.owner_id}`}
                   className="text-primary hover:underline"
                 >
                   {consultation.owner_full_name}

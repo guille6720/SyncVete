@@ -57,6 +57,28 @@ export type AppointmentType =
   | 'emergencia'
   | 'otro';
 
+export type ConsultationMode = 'clinic' | 'home_visit' | 'video';
+
+export type TimeBlockKind = 'break' | 'vacation' | 'blocked';
+
+export type WaitlistStatus = 'open' | 'offered' | 'booked' | 'cancelled' | 'expired';
+
+export type AppointmentReminderJobKind =
+  | 'confirmation'
+  | 'remind_24h'
+  | 'remind_2h'
+  | 'cancellation'
+  | 'reschedule'
+  | 'professional_notify';
+
+export type AppointmentReminderJobStatus =
+  | 'pending'
+  | 'due'
+  | 'sent'
+  | 'skipped'
+  | 'failed'
+  | 'cancelled';
+
 export type WaitingRoomStatus =
   | 'waiting'
   | 'called'
@@ -128,7 +150,52 @@ export type PaymentMethod =
   | 'transferencia'
   | 'tarjeta'
   | 'mercadopago'
+  | 'gratuito'
   | 'otro';
+
+export type ProfessionalRelationshipType = 'employee' | 'independent' | 'partner' | 'other';
+
+export type CompensationRuleType = 'fixed' | 'activity' | 'percentage';
+
+export type CompensationFrequency =
+  | 'monthly'
+  | 'biweekly'
+  | 'weekly'
+  | 'daily'
+  | 'hourly'
+  | 'per_consultation'
+  | 'per_appointment'
+  | 'per_procedure'
+  | 'per_surgery'
+  | 'per_shift'
+  | 'per_lab_order'
+  | 'per_prescription'
+  | 'per_vaccination'
+  | 'percentage'
+  | 'mixed';
+
+export type SettlementStatus =
+  | 'draft'
+  | 'review'
+  | 'approved'
+  | 'partially_paid'
+  | 'paid'
+  | 'cancelled';
+
+export type SettlementItemSourceType =
+  | 'appointment'
+  | 'consultation'
+  | 'surgery'
+  | 'procedure'
+  | 'shift'
+  | 'lab_order'
+  | 'prescription'
+  | 'vaccination'
+  | 'interconsultation'
+  | 'manual_adjustment'
+  | 'fixed_compensation';
+
+export type SettlementAdjustmentType = 'bonus' | 'deduction' | 'correction' | 'other';
 
 export type WhatsAppRelatedType =
   | 'none'
@@ -177,7 +244,8 @@ export type NotificationKind =
   | 'factura'
   | 'receta'
   | 'plan'
-  | 'migracion';
+  | 'migracion'
+  | 'liquidacion';
 
 export interface Database {
   public: {
@@ -405,6 +473,7 @@ export interface Database {
           notes: string | null;
           is_active: boolean;
           portal_user_id: string | null;
+          portal_pending_user_id: string | null;
           import_batch_id: string | null;
           source_system: string | null;
           source_record_id: string | null;
@@ -432,6 +501,7 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          portal_pending_user_id?: string | null;
           import_batch_id?: string | null;
           source_system?: string | null;
           source_record_id?: string | null;
@@ -459,6 +529,7 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          portal_pending_user_id?: string | null;
           import_batch_id?: string | null;
           source_system?: string | null;
           source_record_id?: string | null;
@@ -753,6 +824,465 @@ export interface Database {
           },
         ];
       };
+      professionals: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string | null;
+          profile_id: string | null;
+          first_name: string;
+          last_name: string;
+          document_number: string | null;
+          tax_id: string | null;
+          professional_license: string | null;
+          professional_license_jurisdiction: string | null;
+          specialty: string | null;
+          relationship_type: ProfessionalRelationshipType;
+          start_date: string | null;
+          end_date: string | null;
+          is_active: boolean;
+          invoice_required: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id?: string | null;
+          profile_id?: string | null;
+          first_name: string;
+          last_name: string;
+          document_number?: string | null;
+          tax_id?: string | null;
+          professional_license?: string | null;
+          professional_license_jurisdiction?: string | null;
+          specialty?: string | null;
+          relationship_type: ProfessionalRelationshipType;
+          start_date?: string | null;
+          end_date?: string | null;
+          is_active?: boolean;
+          invoice_required?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          user_id?: string | null;
+          profile_id?: string | null;
+          first_name?: string;
+          last_name?: string;
+          document_number?: string | null;
+          tax_id?: string | null;
+          professional_license?: string | null;
+          professional_license_jurisdiction?: string | null;
+          specialty?: string | null;
+          relationship_type?: ProfessionalRelationshipType;
+          start_date?: string | null;
+          end_date?: string | null;
+          is_active?: boolean;
+          invoice_required?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_branches: {
+        Row: {
+          id: string;
+          organization_id: string;
+          professional_id: string;
+          branch_id: string;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          professional_id: string;
+          branch_id: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          professional_id?: string;
+          branch_id?: string;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_compensation_schemes: {
+        Row: {
+          id: string;
+          organization_id: string;
+          professional_id: string;
+          name: string;
+          valid_from: string;
+          valid_to: string | null;
+          currency: string;
+          is_active: boolean;
+          conditions: Json;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          professional_id: string;
+          name: string;
+          valid_from: string;
+          valid_to?: string | null;
+          currency?: string;
+          is_active?: boolean;
+          conditions?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          professional_id?: string;
+          name?: string;
+          valid_from?: string;
+          valid_to?: string | null;
+          currency?: string;
+          is_active?: boolean;
+          conditions?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_compensation_rules: {
+        Row: {
+          id: string;
+          organization_id: string;
+          compensation_scheme_id: string;
+          rule_type: CompensationRuleType;
+          frequency: CompensationFrequency;
+          amount: number | null;
+          percentage: number | null;
+          activity_type: string | null;
+          minimum_amount: number | null;
+          maximum_amount: number | null;
+          conditions: Json;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          compensation_scheme_id: string;
+          rule_type: CompensationRuleType;
+          frequency: CompensationFrequency;
+          amount?: number | null;
+          percentage?: number | null;
+          activity_type?: string | null;
+          minimum_amount?: number | null;
+          maximum_amount?: number | null;
+          conditions?: Json;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          compensation_scheme_id?: string;
+          rule_type?: CompensationRuleType;
+          frequency?: CompensationFrequency;
+          amount?: number | null;
+          percentage?: number | null;
+          activity_type?: string | null;
+          minimum_amount?: number | null;
+          maximum_amount?: number | null;
+          conditions?: Json;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_settlements: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string | null;
+          professional_id: string;
+          compensation_scheme_id: string;
+          period_start: string;
+          period_end: string;
+          status: SettlementStatus;
+          gross_amount: number;
+          adjustments_amount: number;
+          deductions_amount: number;
+          total_amount: number;
+          total_paid: number;
+          balance_due: number;
+          currency: string;
+          notes: string | null;
+          calculated_at: string;
+          approved_at: string | null;
+          approved_by: string | null;
+          paid_at: string | null;
+          cancelled_at: string | null;
+          cancelled_by: string | null;
+          cancellation_reason: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id?: string | null;
+          professional_id: string;
+          compensation_scheme_id: string;
+          period_start: string;
+          period_end: string;
+          status?: SettlementStatus;
+          gross_amount?: number;
+          adjustments_amount?: number;
+          deductions_amount?: number;
+          total_amount?: number;
+          total_paid?: number;
+          balance_due?: number;
+          currency?: string;
+          notes?: string | null;
+          calculated_at?: string;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          paid_at?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string | null;
+          professional_id?: string;
+          compensation_scheme_id?: string;
+          period_start?: string;
+          period_end?: string;
+          status?: SettlementStatus;
+          gross_amount?: number;
+          adjustments_amount?: number;
+          deductions_amount?: number;
+          total_amount?: number;
+          total_paid?: number;
+          balance_due?: number;
+          currency?: string;
+          notes?: string | null;
+          calculated_at?: string;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          paid_at?: string | null;
+          cancelled_at?: string | null;
+          cancelled_by?: string | null;
+          cancellation_reason?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      professional_settlement_items: {
+        Row: {
+          id: string;
+          settlement_id: string;
+          organization_id: string;
+          rule_id: string | null;
+          source_type: SettlementItemSourceType;
+          source_id: string | null;
+          description: string;
+          quantity: number;
+          unit_amount: number | null;
+          percentage: number | null;
+          base_amount: number | null;
+          calculated_amount: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          settlement_id: string;
+          organization_id: string;
+          rule_id?: string | null;
+          source_type: SettlementItemSourceType;
+          source_id?: string | null;
+          description: string;
+          quantity?: number;
+          unit_amount?: number | null;
+          percentage?: number | null;
+          base_amount?: number | null;
+          calculated_amount: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          settlement_id?: string;
+          organization_id?: string;
+          rule_id?: string | null;
+          source_type?: SettlementItemSourceType;
+          source_id?: string | null;
+          description?: string;
+          quantity?: number;
+          unit_amount?: number | null;
+          percentage?: number | null;
+          base_amount?: number | null;
+          calculated_amount?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      professional_settlement_adjustments: {
+        Row: {
+          id: string;
+          settlement_id: string;
+          organization_id: string;
+          adjustment_type: SettlementAdjustmentType;
+          amount: number;
+          reason: string;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          settlement_id: string;
+          organization_id: string;
+          adjustment_type: SettlementAdjustmentType;
+          amount: number;
+          reason: string;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          settlement_id?: string;
+          organization_id?: string;
+          adjustment_type?: SettlementAdjustmentType;
+          amount?: number;
+          reason?: string;
+          created_by?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      professional_settlement_source_claims: {
+        Row: {
+          id: string;
+          organization_id: string;
+          source_type: SettlementItemSourceType;
+          source_id: string;
+          settlement_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          source_type: SettlementItemSourceType;
+          source_id: string;
+          settlement_id: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          source_type?: SettlementItemSourceType;
+          source_id?: string;
+          settlement_id?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      professional_payments: {
+        Row: {
+          id: string;
+          organization_id: string;
+          professional_id: string;
+          settlement_id: string;
+          amount: number;
+          currency: string;
+          method: PaymentMethod;
+          paid_at: string;
+          reference: string | null;
+          notes: string | null;
+          invoice_number: string | null;
+          invoice_date: string | null;
+          invoice_amount: number | null;
+          invoice_attachment_url: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          professional_id: string;
+          settlement_id: string;
+          amount: number;
+          currency?: string;
+          method?: PaymentMethod;
+          paid_at?: string;
+          reference?: string | null;
+          notes?: string | null;
+          invoice_number?: string | null;
+          invoice_date?: string | null;
+          invoice_amount?: number | null;
+          invoice_attachment_url?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          professional_id?: string;
+          settlement_id?: string;
+          amount?: number;
+          currency?: string;
+          method?: PaymentMethod;
+          paid_at?: string;
+          reference?: string | null;
+          notes?: string | null;
+          invoice_number?: string | null;
+          invoice_date?: string | null;
+          invoice_amount?: number | null;
+          invoice_attachment_url?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
       prescriptions: {
         Row: {
           id: string;
@@ -994,6 +1524,7 @@ export interface Database {
           organization_id: string;
           cash_session_id: string;
           payment_id: string | null;
+          professional_payment_id: string | null;
           recorded_by: string | null;
           kind: CashMovementKind;
           method: PaymentMethod;
@@ -1008,6 +1539,7 @@ export interface Database {
           organization_id: string;
           cash_session_id: string;
           payment_id?: string | null;
+          professional_payment_id?: string | null;
           recorded_by?: string | null;
           kind: CashMovementKind;
           method?: PaymentMethod;
@@ -1022,6 +1554,7 @@ export interface Database {
           organization_id?: string;
           cash_session_id?: string;
           payment_id?: string | null;
+          professional_payment_id?: string | null;
           recorded_by?: string | null;
           kind?: CashMovementKind;
           method?: PaymentMethod;
@@ -1712,6 +2245,12 @@ export interface Database {
           title: string | null;
           notes: string | null;
           cancellation_reason: string | null;
+          consultation_mode: ConsultationMode | null;
+          expected_payment_method: string | null;
+          room: string | null;
+          remind_24h: boolean;
+          remind_2h: boolean;
+          remind_confirmation: boolean;
           source_system: string | null;
           source_record_id: string | null;
           import_batch_id: string | null;
@@ -1735,6 +2274,12 @@ export interface Database {
           title?: string | null;
           notes?: string | null;
           cancellation_reason?: string | null;
+          consultation_mode?: ConsultationMode | null;
+          expected_payment_method?: string | null;
+          room?: string | null;
+          remind_24h?: boolean;
+          remind_2h?: boolean;
+          remind_confirmation?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
@@ -1758,6 +2303,12 @@ export interface Database {
           title?: string | null;
           notes?: string | null;
           cancellation_reason?: string | null;
+          consultation_mode?: ConsultationMode | null;
+          expected_payment_method?: string | null;
+          room?: string | null;
+          remind_24h?: boolean;
+          remind_2h?: boolean;
+          remind_confirmation?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
@@ -1794,6 +2345,341 @@ export interface Database {
             columns: ['owner_id'];
             isOneToOne: false;
             referencedRelation: 'owners';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      professional_schedules: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          user_id: string;
+          weekday: number;
+          start_time: string;
+          end_time: string;
+          slot_duration_minutes: number;
+          allowed_appointment_types: AppointmentType[] | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          user_id: string;
+          weekday: number;
+          start_time: string;
+          end_time: string;
+          slot_duration_minutes?: number;
+          allowed_appointment_types?: AppointmentType[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          user_id?: string;
+          weekday?: number;
+          start_time?: string;
+          end_time?: string;
+          slot_duration_minutes?: number;
+          allowed_appointment_types?: AppointmentType[] | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'professional_schedules_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'professional_schedules_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      professional_time_blocks: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          user_id: string | null;
+          kind: TimeBlockKind;
+          starts_at: string;
+          ends_at: string;
+          reason: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          user_id?: string | null;
+          kind?: TimeBlockKind;
+          starts_at: string;
+          ends_at: string;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          user_id?: string | null;
+          kind?: TimeBlockKind;
+          starts_at?: string;
+          ends_at?: string;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'professional_time_blocks_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'professional_time_blocks_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      appointment_waitlist: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          owner_id: string;
+          patient_id: string;
+          preferred_user_id: string | null;
+          appointment_type: AppointmentType;
+          preferred_weekdays: number[] | null;
+          preferred_time_start: string | null;
+          preferred_time_end: string | null;
+          priority: number;
+          notes: string | null;
+          status: WaitlistStatus;
+          matched_appointment_id: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          owner_id: string;
+          patient_id: string;
+          preferred_user_id?: string | null;
+          appointment_type?: AppointmentType;
+          preferred_weekdays?: number[] | null;
+          preferred_time_start?: string | null;
+          preferred_time_end?: string | null;
+          priority?: number;
+          notes?: string | null;
+          status?: WaitlistStatus;
+          matched_appointment_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          owner_id?: string;
+          patient_id?: string;
+          preferred_user_id?: string | null;
+          appointment_type?: AppointmentType;
+          preferred_weekdays?: number[] | null;
+          preferred_time_start?: string | null;
+          preferred_time_end?: string | null;
+          priority?: number;
+          notes?: string | null;
+          status?: WaitlistStatus;
+          matched_appointment_id?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_waitlist_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_waitlist_branch_id_fkey';
+            columns: ['branch_id'];
+            isOneToOne: false;
+            referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_waitlist_owner_id_fkey';
+            columns: ['owner_id'];
+            isOneToOne: false;
+            referencedRelation: 'owners';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_waitlist_patient_id_fkey';
+            columns: ['patient_id'];
+            isOneToOne: false;
+            referencedRelation: 'patients';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      appointment_status_events: {
+        Row: {
+          id: string;
+          organization_id: string;
+          appointment_id: string;
+          from_status: AppointmentStatus | null;
+          to_status: AppointmentStatus;
+          previous_starts_at: string | null;
+          previous_ends_at: string | null;
+          new_starts_at: string | null;
+          new_ends_at: string | null;
+          changed_by: string | null;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          appointment_id: string;
+          from_status?: AppointmentStatus | null;
+          to_status: AppointmentStatus;
+          previous_starts_at?: string | null;
+          previous_ends_at?: string | null;
+          new_starts_at?: string | null;
+          new_ends_at?: string | null;
+          changed_by?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          appointment_id?: string;
+          from_status?: AppointmentStatus | null;
+          to_status?: AppointmentStatus;
+          previous_starts_at?: string | null;
+          previous_ends_at?: string | null;
+          new_starts_at?: string | null;
+          new_ends_at?: string | null;
+          changed_by?: string | null;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_status_events_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_status_events_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      appointment_reminder_jobs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          appointment_id: string;
+          kind: AppointmentReminderJobKind;
+          status: AppointmentReminderJobStatus;
+          scheduled_for: string;
+          sent_at: string | null;
+          error: string | null;
+          payload: Json;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          appointment_id: string;
+          kind: AppointmentReminderJobKind;
+          status?: AppointmentReminderJobStatus;
+          scheduled_for: string;
+          sent_at?: string | null;
+          error?: string | null;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          appointment_id?: string;
+          kind?: AppointmentReminderJobKind;
+          status?: AppointmentReminderJobStatus;
+          scheduled_for?: string;
+          sent_at?: string | null;
+          error?: string | null;
+          payload?: Json;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appointment_reminder_jobs_organization_id_fkey';
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'appointment_reminder_jobs_appointment_id_fkey';
+            columns: ['appointment_id'];
+            isOneToOne: false;
+            referencedRelation: 'appointments';
             referencedColumns: ['id'];
           },
         ];
@@ -4462,6 +5348,14 @@ export interface Database {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
       };
+      get_session_bootstrap: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      expire_due_subscriptions_job: {
+        Args: Record<PropertyKey, never>;
+        Returns: number;
+      };
       require_platform_admin: {
         Args: Record<PropertyKey, never>;
         Returns: string;
@@ -5599,6 +6493,10 @@ export interface Database {
           total_count: number;
         }[];
       };
+      soft_delete_owner: {
+        Args: { p_owner_id: string };
+        Returns: string;
+      };
       search_owners: {
         Args: {
           p_search?: string | null;
@@ -5622,8 +6520,11 @@ export interface Database {
           postal_code: string | null;
           notes: string | null;
           is_active: boolean;
+          portal_user_id: string | null;
+          portal_pending_user_id: string | null;
           created_at: string;
           updated_at: string;
+          deleted_at: string | null;
           total_count: number;
         }[];
       };
@@ -5718,6 +6619,16 @@ export interface Database {
         };
         Returns: undefined;
       };
+      approve_owner_portal_access: {
+        Args: {
+          p_owner_id: string;
+        };
+        Returns: string;
+      };
+      get_portal_pending_owner_id: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
       get_owner_portal_status: {
         Args: {
           p_owner_id: string;
@@ -5728,6 +6639,18 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Json;
       };
+      get_owner_app_brand: { Args: { p_organization_id: string }; Returns: Json };
+      get_owner_app_invite_brand: { Args: { p_token: string }; Returns: Json };
+      save_owner_app_brand: { Args: { p_brand: Json }; Returns: undefined };
+      publish_owner_app_slot: { Args: { p_branch_id: string; p_starts_at: string }; Returns: string };
+      get_owner_professional_availability: { Args: { p_date?: string | null }; Returns: Json };
+      book_owner_professional_slot: { Args: { p_schedule_id: string; p_starts_at: string; p_patient_id: string }; Returns: string };
+      book_owner_app_slot: { Args: { p_slot_id: string; p_patient_id: string }; Returns: string };
+      cancel_owner_app_booking: { Args: { p_appointment_id: string }; Returns: undefined };
+      get_owner_app_data: { Args: Record<string, never>; Returns: Json };
+      queue_owner_app_reminders: { Args: { p_now?: string }; Returns: number };
+      claim_owner_app_emails: { Args: Record<string, never>; Returns: Json };
+      complete_owner_app_email: { Args: { p_id: string }; Returns: undefined };
       get_owner_portal_patient: {
         Args: {
           p_patient_id: string;
@@ -6024,6 +6947,8 @@ export interface Database {
           organization_id: string;
           cash_session_id: string;
           payment_id: string | null;
+          professional_payment_id: string | null;
+          professional_settlement_id: string | null;
           recorded_by: string | null;
           kind: CashMovementKind;
           method: PaymentMethod;
@@ -6052,6 +6977,7 @@ export interface Database {
           p_amount: number;
           p_method?: PaymentMethod;
           p_notes?: string | null;
+          p_professional_payment_id?: string | null;
         };
         Returns: Json;
       };
@@ -6274,7 +7200,165 @@ export interface Database {
           assigned_user_name: string | null;
           created_at: string;
           updated_at: string;
+          consultation_mode: ConsultationMode | null;
+          room: string | null;
+          expected_payment_method: string | null;
+          remind_24h: boolean;
+          remind_2h: boolean;
+          remind_confirmation: boolean;
         }[];
+      };
+      list_appointments_calendar: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_branch_id?: string | null;
+          p_status?: string | null;
+          p_assigned_user_id?: string | null;
+          p_query?: string | null;
+        };
+        Returns: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          patient_id: string;
+          owner_id: string;
+          assigned_user_id: string | null;
+          starts_at: string;
+          ends_at: string;
+          status: AppointmentStatus;
+          appointment_type: AppointmentType;
+          title: string | null;
+          notes: string | null;
+          cancellation_reason: string | null;
+          patient_name: string;
+          patient_species: PatientSpecies;
+          owner_full_name: string;
+          assigned_user_name: string | null;
+          created_at: string;
+          updated_at: string;
+          consultation_mode: ConsultationMode | null;
+          room: string | null;
+          expected_payment_method: string | null;
+          remind_24h: boolean;
+          remind_2h: boolean;
+          remind_confirmation: boolean;
+        }[];
+      };
+      appointment_has_overlap: {
+        Args: {
+          p_organization_id: string;
+          p_assigned_user_id: string;
+          p_starts_at: string;
+          p_ends_at: string;
+          p_exclude_id?: string | null;
+        };
+        Returns: boolean;
+      };
+      upsert_professional_schedule: {
+        Args: {
+          p_branch_id: string;
+          p_user_id: string;
+          p_weekday: number;
+          p_start_time: string;
+          p_end_time: string;
+          p_slot_duration_minutes?: number;
+          p_allowed_appointment_types?: AppointmentType[] | null;
+          p_is_active?: boolean;
+          p_id?: string | null;
+        };
+        Returns: Json;
+      };
+      list_professional_schedules: {
+        Args: {
+          p_branch_id?: string | null;
+          p_user_id?: string | null;
+        };
+        Returns: Database['public']['Tables']['professional_schedules']['Row'][];
+      };
+      soft_delete_professional_schedule: {
+        Args: {
+          p_id: string;
+        };
+        Returns: boolean;
+      };
+      create_professional_time_block: {
+        Args: {
+          p_branch_id: string;
+          p_starts_at: string;
+          p_ends_at: string;
+          p_kind?: TimeBlockKind;
+          p_user_id?: string | null;
+          p_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      list_professional_time_blocks: {
+        Args: {
+          p_branch_id?: string | null;
+          p_user_id?: string | null;
+          p_from?: string | null;
+          p_to?: string | null;
+        };
+        Returns: Database['public']['Tables']['professional_time_blocks']['Row'][];
+      };
+      soft_delete_professional_time_block: {
+        Args: {
+          p_id: string;
+        };
+        Returns: boolean;
+      };
+      create_waitlist_entry: {
+        Args: {
+          p_branch_id: string;
+          p_owner_id: string;
+          p_patient_id: string;
+          p_appointment_type?: AppointmentType;
+          p_preferred_user_id?: string | null;
+          p_preferred_weekdays?: number[] | null;
+          p_preferred_time_start?: string | null;
+          p_preferred_time_end?: string | null;
+          p_priority?: number;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      list_waitlist: {
+        Args: {
+          p_branch_id?: string | null;
+          p_status?: WaitlistStatus | null;
+        };
+        Returns: Database['public']['Tables']['appointment_waitlist']['Row'][];
+      };
+      update_waitlist_status: {
+        Args: {
+          p_id: string;
+          p_status: WaitlistStatus;
+          p_matched_appointment_id?: string | null;
+        };
+        Returns: Json;
+      };
+      match_waitlist_for_slot: {
+        Args: {
+          p_starts_at: string;
+          p_ends_at: string;
+          p_branch_id: string;
+          p_assigned_user_id?: string | null;
+          p_appointment_type?: AppointmentType | null;
+        };
+        Returns: Database['public']['Tables']['appointment_waitlist']['Row'][];
+      };
+      enqueue_appointment_reminder_jobs: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: number;
+      };
+      list_appointment_status_events: {
+        Args: {
+          p_appointment_id: string;
+        };
+        Returns: Database['public']['Tables']['appointment_status_events']['Row'][];
       };
       check_in_appointment: {
         Args: {
@@ -7076,6 +8160,141 @@ export interface Database {
         };
         Returns: undefined;
       };
+      calculate_professional_settlement: {
+        Args: {
+          p_professional_id: string;
+          p_period_start: string;
+          p_period_end: string;
+          p_branch_id?: string | null;
+        };
+        Returns: string;
+      };
+      approve_professional_settlement: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: Json;
+      };
+      submit_professional_settlement_for_review: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: Json;
+      };
+      cancel_professional_settlement: {
+        Args: {
+          p_settlement_id: string;
+          p_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      add_professional_settlement_adjustment: {
+        Args: {
+          p_settlement_id: string;
+          p_type: SettlementAdjustmentType;
+          p_amount: number;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      delete_professional_settlement_adjustment: {
+        Args: {
+          p_adjustment_id: string;
+        };
+        Returns: Json;
+      };
+      update_professional_settlement_adjustment: {
+        Args: {
+          p_adjustment_id: string;
+          p_type: SettlementAdjustmentType;
+          p_amount: number;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      void_professional_payment: {
+        Args: {
+          p_payment_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      return_professional_settlement_to_draft: {
+        Args: {
+          p_settlement_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      omit_professional_settlement_item: {
+        Args: {
+          p_item_id: string;
+          p_reason: string;
+        };
+        Returns: Json;
+      };
+      restore_professional_settlement_omission: {
+        Args: {
+          p_omission_id: string;
+        };
+        Returns: Json;
+      };
+      apply_professional_settlement_omissions: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: undefined;
+      };
+      update_professional_settlement_notes: {
+        Args: {
+          p_settlement_id: string;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      register_professional_payment: {
+        Args: {
+          p_settlement_id: string;
+          p_amount: number;
+          p_method?: PaymentMethod;
+          p_paid_at?: string | null;
+          p_reference?: string | null;
+          p_notes?: string | null;
+          p_invoice_number?: string | null;
+          p_invoice_date?: string | null;
+          p_invoice_amount?: number | null;
+          p_invoice_attachment_url?: string | null;
+        };
+        Returns: Json;
+      };
+      get_professional_settlement: {
+        Args: {
+          p_settlement_id: string;
+        };
+        Returns: Json;
+      };
+      list_professional_settlements: {
+        Args: {
+          p_professional_id?: string | null;
+          p_status?: SettlementStatus | null;
+          p_period_start?: string | null;
+          p_period_end?: string | null;
+          p_branch_id?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: Json;
+      };
+      list_my_professional_settlements: {
+        Args: {
+          p_status?: SettlementStatus | null;
+          p_page?: number;
+          p_page_size?: number;
+          p_period_start?: string | null;
+          p_period_end?: string | null;
+        };
+        Returns: Json;
+      };
     };
     Enums: {
       user_role: UserRole;
@@ -7084,6 +8303,11 @@ export interface Database {
       patient_sex: PatientSex;
       appointment_status: AppointmentStatus;
       appointment_type: AppointmentType;
+      consultation_mode: ConsultationMode;
+      time_block_kind: TimeBlockKind;
+      waitlist_status: WaitlistStatus;
+      reminder_job_kind: AppointmentReminderJobKind;
+      reminder_job_status: AppointmentReminderJobStatus;
       waiting_room_status: WaitingRoomStatus;
       clinical_entry_type: ClinicalEntryType;
       consultation_status: ConsultationStatus;
@@ -7102,6 +8326,12 @@ export interface Database {
       inventory_movement_type: InventoryMovementType;
       invoice_status: InvoiceStatus;
       payment_method: PaymentMethod;
+      professional_relationship_type: ProfessionalRelationshipType;
+      compensation_rule_type: CompensationRuleType;
+      compensation_frequency: CompensationFrequency;
+      settlement_status: SettlementStatus;
+      settlement_item_source_type: SettlementItemSourceType;
+      settlement_adjustment_type: SettlementAdjustmentType;
       whatsapp_related_type: WhatsAppRelatedType;
       reminder_type: ReminderType;
       reminder_status: ReminderStatus;

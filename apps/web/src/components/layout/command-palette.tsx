@@ -28,6 +28,9 @@ import {
   Inbox,
   ScrollText,
   Hourglass,
+  Briefcase,
+  GraduationCap,
+  Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState, useTransition } from 'react';
@@ -43,8 +46,8 @@ const NAV_ITEMS = [
     icon: Hourglass,
     keywords: 'cola checkin llamado recepcion espera',
   },
+  { label: 'Tutores', href: '/tutores', icon: Users, keywords: 'clientes tutores' },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, keywords: 'mascotas animales' },
-  { label: 'Propietarios', href: '/propietarios', icon: Users, keywords: 'clientes tutores' },
   { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList, keywords: 'historia clinica evolucion' },
   { label: 'Imágenes', href: '/imagenes', icon: Images, keywords: 'fotos radiografia ecografia estudios galeria' },
   { label: 'Consultas', href: '/consultas', icon: Stethoscope, keywords: 'atencion clinica' },
@@ -56,19 +59,43 @@ const NAV_ITEMS = [
   { label: 'Farmacia', href: '/farmacia', icon: Pill, keywords: 'receta recetar medicamento dispensar' },
   { label: 'Facturación', href: '/facturacion', icon: Receipt, keywords: 'factura cobro caja pagos' },
   { label: 'Caja', href: '/caja', icon: Banknote, keywords: 'caja turno efectivo cierre cobros' },
+  {
+    label: 'Profesionales',
+    href: '/profesionales',
+    icon: Briefcase,
+    keywords: 'veterinarios compensacion equipo honorarios',
+  },
+  {
+    label: 'Liquidaciones',
+    href: '/liquidaciones',
+    icon: Wallet,
+    keywords: 'liquidacion pago profesional honorarios quincena',
+  },
+  {
+    label: 'Mis liquidaciones',
+    href: '/liquidaciones/mis-liquidaciones',
+    icon: Wallet,
+    keywords: 'mis liquidaciones honorarios sueldo pago',
+  },
   { label: 'Reportes', href: '/reportes', icon: BarChart3, keywords: 'estadisticas caja operacion' },
   { label: 'Auditoría', href: '/auditoria', icon: ScrollText, keywords: 'logs cambios historial actividad' },
   { label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, keywords: 'mensaje tutor whatsapp wa' },
   { label: 'Recordatorios', href: '/recordatorios', icon: Bell, keywords: 'avisos turnos vacunas saldos' },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, keywords: 'avisos campana inbox laboratorio stock' },
   { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles, keywords: 'inteligencia artificial resumen soap tutor' },
+  {
+    label: 'Tutoriales',
+    href: '/academia',
+    icon: GraduationCap,
+    keywords: 'tutorial tutoriales aprendizaje guia onboarding academia',
+  },
   { label: 'Configuración', href: '/configuracion', icon: Settings, keywords: 'ajustes settings' },
   { label: 'Manual de uso', href: '/manual', icon: BookOpen, keywords: 'ayuda guia descargar pdf instrucciones' },
 ] as const;
 
 const QUICK_ACTIONS = [
+  { label: 'Nuevo tutor', href: '/tutores/nuevo', keywords: 'crear tutor cliente' },
   { label: 'Nuevo paciente', href: '/pacientes/nuevo', keywords: 'crear mascota animal' },
-  { label: 'Nuevo propietario', href: '/propietarios/nuevo', keywords: 'crear tutor cliente' },
   { label: 'Nueva cita', href: '/agenda/nueva', keywords: 'agendar turno cita' },
   { label: 'Nueva entrada clínica', href: '/historia-clinica/nuevo', keywords: 'historia clinica evolucion' },
   { label: 'Nueva consulta', href: '/consultas/nueva', keywords: 'atencion consulta' },
@@ -89,26 +116,18 @@ const QUICK_ACTIONS = [
   { label: 'IA clínica', href: '/ia-clinica', keywords: 'resumen soap indicaciones inteligencia' },
 ] as const;
 
-const PREFETCH_ON_OPEN = [
-  '/dashboard',
-  '/agenda',
-  '/pacientes',
-  '/historia-clinica',
-  '/consultas',
-  '/farmacia',
-  '/pacientes/nuevo',
-  '/agenda/nueva',
-  '/farmacia/nueva',
-  '/consultas/nueva',
-  '/historia-clinica/nuevo',
-] as const;
+const PREFETCH_ON_OPEN = ['/dashboard', '/agenda', '/pacientes'] as const;
 
 export function CommandPalette({
   entitledHrefs = null,
   isPlatformAdmin = false,
+  showMySettlementsNav = false,
+  academiaEnabled = false,
 }: {
   entitledHrefs?: string[] | null;
   isPlatformAdmin?: boolean;
+  showMySettlementsNav?: boolean;
+  academiaEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -145,6 +164,14 @@ export function CommandPalette({
 
   if (!open) return null;
 
+  const navItems = NAV_ITEMS.filter((item) => {
+    if (item.href === '/liquidaciones/mis-liquidaciones' && !showMySettlementsNav) {
+      return false;
+    }
+    if (item.href === '/academia' && !academiaEnabled) return false;
+    return isClinicPathEntitled(item.href, entitledHrefs);
+  });
+
   return (
     <div className="fixed inset-0 z-50">
       <button
@@ -173,7 +200,7 @@ export function CommandPalette({
             </Command.Empty>
 
             <Command.Group heading="Navegación" className="px-1 py-1.5 text-xs font-medium text-muted-foreground">
-              {NAV_ITEMS.filter((item) => isClinicPathEntitled(item.href, entitledHrefs)).map((item) => (
+              {navItems.map((item) => (
                 <Command.Item
                   key={item.href}
                   value={`${item.label} ${item.keywords}`}

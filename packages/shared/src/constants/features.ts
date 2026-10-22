@@ -41,6 +41,9 @@ export const FEATURES = {
 
   DATA_IMPORT_EXPORT: 'data.import_export',
 
+  PROFESSIONALS_SETTLEMENTS: 'professionals.settlements',
+  PROFESSIONALS_INTERCONSULTATIONS: 'professionals.interconsultations',
+
   AI: 'ai.enabled',
   AI_PATIENT_SUMMARY: 'ai.patient_summary',
   AI_SOAP_ASSISTANT: 'ai.soap_assistant',
@@ -86,7 +89,7 @@ export function isLimitFeatureKey(value: string): value is LimitFeatureKey {
 /** Clinic sidebar href → commercial feature. Unmapped routes stay visible. */
 export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/dashboard': FEATURES.DASHBOARD,
-  '/propietarios': FEATURES.OWNERS,
+  '/tutores': FEATURES.OWNERS,
   '/pacientes': FEATURES.PATIENTS,
   '/agenda': FEATURES.APPOINTMENTS,
   '/sala-espera': FEATURES.WAITING_ROOM,
@@ -108,6 +111,10 @@ export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/imagenes': FEATURES.CLINICAL_IMAGES,
   '/auditoria': FEATURES.AUDIT,
   '/ia-clinica': FEATURES.AI,
+  '/profesionales': FEATURES.PROFESSIONALS_SETTLEMENTS,
+  '/interconsultas': FEATURES.PROFESSIONALS_INTERCONSULTATIONS,
+  '/liquidaciones': FEATURES.PROFESSIONALS_SETTLEMENTS,
+  '/liquidaciones/mis-liquidaciones': FEATURES.PROFESSIONALS_SETTLEMENTS,
 };
 
 /** Commercial plan keys in DB (not the legacy organizations.plan enum). */
@@ -223,6 +230,24 @@ export function parseSuperadminEmails(raw: string | undefined | null): string[] 
     .split(/[,;\s]+/)
     .map((value) => value.trim().toLowerCase())
     .filter(Boolean);
+}
+
+/**
+ * Session Superadmin gate.
+ * When SUPERADMIN_EMAILS is set, it is the exclusive allowlist (DB rows alone are not enough).
+ * When unset/empty, fall back to platform_admins membership (local/dev convenience).
+ */
+export function resolvePlatformAdminAccess(params: {
+  email: string | undefined | null;
+  allowlistRaw: string | undefined | null;
+  isDbPlatformAdmin: boolean;
+}): boolean {
+  const allow = parseSuperadminEmails(params.allowlistRaw);
+  const email = params.email?.trim().toLowerCase() ?? '';
+  if (allow.length > 0) {
+    return Boolean(email && allow.includes(email));
+  }
+  return params.isDbPlatformAdmin === true;
 }
 
 export function isMeteredFeatureKey(value: string): boolean {

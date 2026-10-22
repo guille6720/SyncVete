@@ -170,7 +170,7 @@ export function ClinicalEntriesList({
                     )}
                     {!patientId && (
                       <p className="mt-1 text-xs text-muted-foreground">
-                        Propietario: {entry.owner_full_name}
+                        Tutor: {entry.owner_full_name}
                       </p>
                     )}
                   </div>

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { notificationListSchema } from '../schemas';
 import {
+  buildLiquidacionNotificationHref,
   buildNotificationHref,
   isNotificationKind,
   isNotificationUnread,
@@ -31,6 +32,15 @@ describe('notification helpers', () => {
     expect(buildNotificationHref('plan', 'ignored')).toBe('/configuracion?tab=plan');
     expect(buildNotificationHref('migracion', 'ignored')).toBe(
       '/configuracion?tab=import-export'
+    );
+    expect(buildNotificationHref('liquidacion', 's1')).toBe('/liquidaciones/s1');
+  });
+
+  it('builds liquidacion hrefs by audience', () => {
+    expect(buildLiquidacionNotificationHref('s1')).toBe('/liquidaciones/s1');
+    expect(buildLiquidacionNotificationHref('s1', 'ops')).toBe('/liquidaciones/s1');
+    expect(buildLiquidacionNotificationHref('s1', 'portal')).toBe(
+      '/liquidaciones/mis-liquidaciones/s1'
     );
   });
 

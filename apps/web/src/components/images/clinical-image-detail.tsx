@@ -16,14 +16,23 @@ import {
   formatFileSize,
   isClinicalImagePreviewable,
   type ClinicalImageListRow,
+  type SettlementSourceClaimInfo,
 } from '@sincvete/shared';
+import { SettlementSourceBadge } from '@/components/professionals/settlement-source-badge';
 
 interface ClinicalImageDetailProps {
   image: ClinicalImageListRow;
   canWrite: boolean;
+  settlementClaim?: SettlementSourceClaimInfo | null;
+  settlementDetailBasePath?: string;
 }
 
-export function ClinicalImageDetail({ image, canWrite }: ClinicalImageDetailProps) {
+export function ClinicalImageDetail({
+  image,
+  canWrite,
+  settlementClaim = null,
+  settlementDetailBasePath = '/liquidaciones',
+}: ClinicalImageDetailProps) {
   const router = useRouter();
 
   const handleDelete = async () => {
@@ -60,6 +69,13 @@ export function ClinicalImageDetail({ image, canWrite }: ClinicalImageDetailProp
           )}
         </div>
       </div>
+
+      {settlementClaim ? (
+        <SettlementSourceBadge
+          claim={settlementClaim}
+          detailHref={`${settlementDetailBasePath}/${settlementClaim.settlementId}`}
+        />
+      ) : null}
 
       <Card>
         <CardHeader>
@@ -109,9 +125,9 @@ export function ClinicalImageDetail({ image, canWrite }: ClinicalImageDetailProp
               }
             />
             <DetailField
-              label="Propietario"
+              label="Tutor"
               value={
-                <Link href={`/propietarios/${image.owner_id}`} className="text-primary hover:underline">
+                <Link href={`/tutores/${image.owner_id}`} className="text-primary hover:underline">
                   {image.owner_full_name}
                 </Link>
               }

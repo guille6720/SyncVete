@@ -10,12 +10,15 @@ import {
   Stethoscope,
   Syringe,
   Users,
+  Wallet,
 } from 'lucide-react';
+import Link from 'next/link';
 import { ReportsPeriodFilter } from '@/components/reports/reports-period-filter';
 import { ReportsStatGrid } from '@/components/reports/reports-stat-grid';
 import { ReportsBreakdownList } from '@/components/reports/reports-breakdown-list';
 import { ReportsDailyTable } from '@/components/reports/reports-daily-table';
 import { WaitingRoomReportExportButton } from '@/components/reports/waiting-room-report-export-button';
+import { SettlementsReportExportButton } from '@/components/reports/settlements-report-export-button';
 import {
   APPOINTMENT_STATUS_LABELS,
   PAYMENT_METHOD_LABELS,
@@ -28,6 +31,10 @@ import {
   type ClinicReport,
   type PaymentMethod,
   type WaitingRoomStatus,
+  SETTLEMENT_STATUS_LABELS,
+  isSettlementStatus,
+  buildLiquidacionesHref,
+  type SettlementStatus,
 } from '@sincvete/shared';
 
 interface ReportsViewProps {
@@ -40,6 +47,8 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
   const billing = report.billing;
   const inventory = report.inventory;
   const waitingRoom = report.waitingRoom;
+  const professionalsSettlements = report.professionalsSettlements;
+  const periodQs = { periodStart: report.from, periodEnd: report.to };
 
   return (
     <div className="space-y-8">
@@ -62,7 +71,7 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
               {
                 label: 'Pacientes nuevos',
                 value: String(operations.newPatients),
-                description: `${operations.newOwners} propietarios`,
+                description: `${operations.newOwners} tutores`,
                 icon: PawPrint,
               },
               {
@@ -102,7 +111,7 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
                 icon: FlaskConical,
               },
               {
-                label: 'Propietarios nuevos',
+                label: 'Tutores nuevos',
                 value: String(operations.newOwners),
                 icon: Users,
               },
@@ -185,6 +194,83 @@ export function ReportsView({ report, currency = 'ARS' }: ReportsViewProps) {
             />
             <ReportsDailyWaitingRoomTable rows={waitingRoom.daily} />
           </div>
+        </>
+      )}
+
+      {professionalsSettlements && (
+        <>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div />
+            <SettlementsReportExportButton report={report} />
+          </div>
+          <ReportsStatGrid
+            title="Liquidaciones a profesionales"
+            description="Compensación operativa del período (no nómina legal)"
+            stats={[
+              {
+                label: 'Liquidaciones',
+                value: String(professionalsSettlements.settlementsInPeriod),
+                description: 'Períodos que intersectan el rango',
+                icon: Wallet,
+              },
+              {
+                label: 'Total calculado',
+                value: formatMoney(professionalsSettlements.totalCalculated, currency),
+                icon: Wallet,
+              },
+              {
+                label: 'Pagado en período',
+                value: formatMoney(professionalsSettlements.totalPaidInPeriod, currency),
+                icon: Wallet,
+              },
+              {
+                label: 'Saldo pendiente',
+                value: formatMoney(professionalsSettlements.totalBalanceDue, currency),
+                description: 'Ver liquidaciones con saldo',
+                icon: Wallet,
+              },
+            ]}
+          />
+          <p className="text-sm">
+            <Link
+              href={buildLiquidacionesHref({ unpaid: true, ...periodQs })}
+              className="text-primary hover:underline"
+            >
+              Abrir liquidaciones con saldo (período del reporte)
+            </Link>
+          </p>
+          <ReportsBreakdownList
+            title="Liquidaciones por estado"
+            items={professionalsSettlements.byStatus.map((item) => ({
+              label: isSettlementStatus(item.status)
+                ? SETTLEMENT_STATUS_LABELS[item.status as SettlementStatus]
+                : item.status,
+              value: formatMoney(item.totalAmount, currency),
+              count: item.count,
+              href: isSettlementStatus(item.status)
+                ? item.status === 'approved' || item.status === 'partially_paid'
+                  ? buildLiquidacionesHref({ unpaid: true, ...periodQs })
+                  : buildLiquidacionesHref({ status: item.status, ...periodQs })
+                : undefined,
+            }))}
+            emptyLabel="No hay liquidaciones en el período."
+          />
+          <ReportsBreakdownList
+            title="Liquidaciones por profesional"
+            items={professionalsSettlements.byProfessional.map((item) => ({
+              label: item.professionalName,
+              value: formatMoney(item.totalAmount, currency),
+              secondaryValue:
+                item.balanceDue > 0 ? formatMoney(item.balanceDue, currency) : undefined,
+              count: item.count,
+              href: buildLiquidacionesHref({
+                professionalId: item.professionalId,
+                unpaid: item.balanceDue > 0,
+                ...periodQs,
+              }),
+            }))}
+            emptyLabel="No hay liquidaciones por profesional en el período."
+          />
         </>
       )}
 

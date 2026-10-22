@@ -945,7 +945,7 @@ export function DataMigrationPanel({
           <CardHeader>
             <CardTitle>Importar datos</CardTitle>
             <CardDescription>
-              Hito 1.3: multi-sede también en propietarios y pacientes (vía `external_branch_id` + mapa de
+              Hito 1.3: multi-sede también en tutores y pacientes (vía `external_branch_id` + mapa de
               sucursales; importá sucursales primero). Historias, vacunas, lab, cirugías, recetas e internaciones
               ya lo soportaban. Fase 35: Agenda: `external_assigned_user_id` + mapa staff (no crea usuarios).
               Fase 36: Consultas/cirugías/internaciones: `external_assigned_user_id` con mapa staff (vacío = usuario importador).
@@ -1205,7 +1205,7 @@ export function DataMigrationPanel({
                 Plantilla sucursales
               </Button>
               <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => void onDownloadTemplate('owners')}>
-                Plantilla propietarios
+                Plantilla tutores
               </Button>
               <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => void onDownloadTemplate('patients')}>
                 Plantilla pacientes
@@ -1437,7 +1437,7 @@ export function DataMigrationPanel({
 
             {importType === 'full_migration' || importType === 'migration_zip' || importType === 'attachments' ? (
               <p className="text-xs text-muted-foreground">
-                Orden: propietarios → pacientes → clínicas/vacunas/lab/cirugías/recetas → adjuntos.
+                Orden: tutores → pacientes → clínicas/vacunas/lab/cirugías/recetas → adjuntos.
                 Los adjuntos usan attachments/ID-paciente-externo/* (jpg/png/webp/gif/pdf) y
                 requieren el mapa de pacientes del lote. Progreso por chunks reales (no %).
               </p>

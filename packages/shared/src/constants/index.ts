@@ -12,6 +12,7 @@ export const ROLES = [
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_LABELS: Record<Role, string> = {
+  // Clinic account owner (not the Tutores / pet-guardian module).
   owner: 'Propietario',
   admin: 'Administrador',
   veterinarian: 'Veterinario',
@@ -43,6 +44,17 @@ export const PERMISSIONS = [
   'data:export',
   'waiting_room:read',
   'waiting_room:write',
+  'professionals:read',
+  'professionals:write',
+  'professional_compensation:read',
+  'professional_compensation:write',
+  'professional_settlements:read',
+  'professional_settlements:approve',
+  'professional_settlements:pay',
+  'interconsultations:read',
+  'interconsultations:write',
+  'interconsultations:approve',
+  'interconsultations:billing',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -70,6 +82,17 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'data:export',
     'waiting_room:read',
     'waiting_room:write',
+    'professionals:read',
+    'professionals:write',
+    'professional_compensation:read',
+    'professional_compensation:write',
+    'professional_settlements:read',
+    'professional_settlements:approve',
+    'professional_settlements:pay',
+    'interconsultations:read',
+    'interconsultations:write',
+    'interconsultations:approve',
+    'interconsultations:billing',
   ],
   veterinarian: [
     'patients:read',
@@ -84,6 +107,8 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'data:export',
     'waiting_room:read',
     'waiting_room:write',
+    'interconsultations:read',
+    'interconsultations:write',
   ],
   nurse: [
     'patients:read',
@@ -96,6 +121,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'whatsapp:send',
     'waiting_room:read',
     'waiting_room:write',
+    'interconsultations:read',
   ],
   receptionist: [
     'patients:read',
@@ -106,6 +132,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'whatsapp:send',
     'waiting_room:read',
     'waiting_room:write',
+    'interconsultations:read',
   ],
   cashier: [
     'patients:read',
@@ -115,6 +142,10 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'whatsapp:send',
     'waiting_room:read',
     'waiting_room:write',
+    'professional_settlements:read',
+    'professional_settlements:pay',
+    'interconsultations:read',
+    'interconsultations:billing',
   ],
   lab_tech: [
     'patients:read',
@@ -130,6 +161,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'clinical:read',
     'reports:read',
     'waiting_room:read',
+    'interconsultations:read',
   ],
 };
 

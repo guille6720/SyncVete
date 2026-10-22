@@ -78,6 +78,49 @@ export async function canManageWaitingRoom(): Promise<boolean> {
   return canPermissionAndFeature('waiting_room:write', FEATURES.WAITING_ROOM);
 }
 
+/**
+ * Agenda hot path: appointment_id + waiting_room_status for one local day.
+ * Falls back to full list_waiting_room mapping if lite RPC is unavailable.
+ */
+export async function listWaitingRoomStatusesForAgenda(input: {
+  date: string;
+  branchId?: string;
+}): Promise<Array<{ appointment_id: string; waiting_room_status: WaitingRoomListRow['waiting_room_status'] }>> {
+  const allowed = await canPermissionAndFeature('waiting_room:read', FEATURES.WAITING_ROOM);
+  if (!allowed) return [];
+
+  const parsed = waitingRoomListSchema.parse(input);
+  if (!parsed.date) return [];
+
+  const session = await getSessionContext();
+  const supabase = await createServerClient();
+
+  const { data, error } = await supabase.rpc(
+    'list_waiting_room_statuses_for_date' as never,
+    {
+      p_date: parsed.date,
+      p_branch_id: parsed.branchId ?? session?.branchId ?? null,
+    } as never
+  );
+
+  if (!error) {
+    return (data ?? []) as Array<{
+      appointment_id: string;
+      waiting_room_status: WaitingRoomListRow['waiting_room_status'];
+    }>;
+  }
+
+  // Staging/prod schema drift: fall back without failing the Agenda shell.
+  const rows = await listWaitingRoom({
+    date: parsed.date,
+    branchId: parsed.branchId,
+  });
+  return rows.map((row) => ({
+    appointment_id: row.appointment_id,
+    waiting_room_status: row.waiting_room_status,
+  }));
+}
+
 export async function listWaitingRoom(input: {
   branchId?: string;
   date?: string;

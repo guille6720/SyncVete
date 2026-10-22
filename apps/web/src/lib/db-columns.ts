@@ -10,7 +10,7 @@ export const ORGANIZATION_COLUMNS =
   'id, name, slug, plan, settings, created_at, updated_at, deleted_at';
 
 export const OWNER_COLUMNS =
-  'id, organization_id, branch_id, full_name, email, phone, phone_whatsapp, document_type, document_number, address, city, province, postal_code, notes, is_active, portal_user_id, created_at, updated_at, deleted_at';
+  'id, organization_id, branch_id, full_name, email, phone, phone_whatsapp, document_type, document_number, address, city, province, postal_code, notes, is_active, portal_user_id, portal_pending_user_id, created_at, updated_at, deleted_at';
 
 export const CLINICAL_ENTRY_COLUMNS =
   'id, organization_id, branch_id, patient_id, owner_id, appointment_id, recorded_by, entry_date, entry_type, title, anamnesis, physical_exam, diagnosis, treatment, plan, weight_kg, temperature_c, notes, import_batch_id, source_system, source_record_id, original_created_at, original_professional_name, imported_at, imported_by, created_at, updated_at, deleted_at';
@@ -22,7 +22,7 @@ export const PRESCRIPTION_ITEM_COLUMNS =
   'id, organization_id, prescription_id, inventory_product_id, medication_name, dose, frequency, duration, route, quantity, instructions, sort_order, created_at, updated_at, deleted_at';
 
 export const APPOINTMENT_COLUMNS =
-  'id, organization_id, branch_id, patient_id, owner_id, assigned_user_id, starts_at, ends_at, status, appointment_type, title, notes, cancellation_reason, created_at, updated_at, deleted_at';
+  'id, organization_id, branch_id, patient_id, owner_id, assigned_user_id, starts_at, ends_at, status, appointment_type, title, notes, cancellation_reason, consultation_mode, expected_payment_method, room, remind_24h, remind_2h, remind_confirmation, created_at, updated_at, deleted_at';
 
 export const CONSULTATION_COLUMNS =
   'id, organization_id, branch_id, patient_id, owner_id, appointment_id, clinical_entry_id, veterinarian_id, status, started_at, completed_at, title, anamnesis, physical_exam, diagnosis, treatment, plan, weight_kg, temperature_c, notes, created_at, updated_at, deleted_at';

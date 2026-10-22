@@ -96,10 +96,10 @@ export function NotificationsInbox({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="notificaciones-list">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Bandeja</h2>
+          <h2 className="text-lg font-semibold" data-tour="notificaciones-read">Bandeja</h2>
           <p className="text-sm text-muted-foreground">
             {unreadCount} sin leer
           </p>
@@ -112,7 +112,7 @@ export function NotificationsInbox({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative max-w-md flex-1">
+        <div className="relative max-w-md flex-1" data-tour="notificaciones-search">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por título..."

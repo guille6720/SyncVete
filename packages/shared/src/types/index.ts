@@ -45,6 +45,10 @@ export interface OrganizationSettings {
   waitingRoomWhatsAppAutoEnabled?: boolean;
   /** Play call/payment chimes on staff board and tablero when Realtime refreshes. */
   waitingRoomBoardSoundEnabled?: boolean;
+  /** Default period for settlement calculate form. */
+  settlementPeriodPreset?: 'month' | 'biweekly' | 'custom';
+  /** Days used when settlementPeriodPreset is custom (also shown as hint for quincena setups). */
+  settlementPeriodDays?: number | null;
 }
 
 export interface Profile {
@@ -99,6 +103,8 @@ export interface SessionContext {
   permissions: Permission[];
   profile: Profile;
   ownerId: string | null;
+  /** True when the tutor created an account and waits for clinic activation. */
+  portalPendingApproval?: boolean;
   /** Platform Superadmin (commercial entitlements). Never grant via clinic roles. */
   isPlatformAdmin: boolean;
 }
@@ -150,6 +156,7 @@ export interface Owner {
   notes: string | null;
   is_active: boolean;
   portal_user_id: string | null;
+  portal_pending_user_id?: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;

@@ -8,6 +8,8 @@ import {
   listInvoices,
   listOpenInvoices,
 } from '@/actions/billing';
+import { getSessionContext } from '@/actions/auth';
+import { getUserBranches } from '@/actions/settings';
 import { InvoicesOpenBoard } from '@/components/billing/invoices-open-board';
 import { InvoicesHistory } from '@/components/billing/invoices-history';
 import { Button } from '@/components/ui/button';
@@ -29,7 +31,7 @@ export default async function FacturacionPage({ searchParams }: FacturacionPageP
     ? (statusParam as InvoiceStatus)
     : undefined;
 
-  const [open, history, canWrite] = await Promise.all([
+  const [open, history, canWrite, session, branches] = await Promise.all([
     listOpenInvoices(),
     listInvoices({
       page,
@@ -38,14 +40,22 @@ export default async function FacturacionPage({ searchParams }: FacturacionPageP
       status,
     }),
     canManageBilling(),
+    getSessionContext(),
+    getUserBranches(),
   ]);
+
+  const branchName =
+    branches.find((branch) => branch.id === session?.branchId)?.name ?? null;
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Facturación</h1>
-          <p className="text-muted-foreground">Cuentas por cobrar, emisión y cobros</p>
+          <p className="text-muted-foreground">
+            Cuentas por cobrar, emisión y cobros
+            {branchName ? ` · ${branchName}` : ''}
+          </p>
         </div>
         <Button variant="outline" asChild>
           <Link href="/caja">
@@ -58,7 +68,12 @@ export default async function FacturacionPage({ searchParams }: FacturacionPageP
       <InvoicesOpenBoard items={open} canWrite={canWrite} />
 
       <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando historial...</div>}>
-        <InvoicesHistory data={history} initialSearch={search} initialStatus={status ?? ''} />
+        <InvoicesHistory
+          data={history}
+          initialSearch={search}
+          initialStatus={status ?? ''}
+          branchName={branchName}
+        />
       </Suspense>
     </div>
   );

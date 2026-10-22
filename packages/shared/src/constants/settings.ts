@@ -33,6 +33,17 @@ export const PERMISSION_LABELS: Record<string, string> = {
   'reports:read': 'Ver reportes',
   'audit:read': 'Ver auditoría',
   'whatsapp:send': 'Enviar WhatsApp',
+  'professionals:read': 'Ver profesionales',
+  'professionals:write': 'Gestionar profesionales',
+  'professional_compensation:read': 'Ver compensación',
+  'professional_compensation:write': 'Gestionar compensación',
+  'professional_settlements:read': 'Ver liquidaciones',
+  'professional_settlements:approve': 'Aprobar liquidaciones',
+  'professional_settlements:pay': 'Registrar pagos a profesionales',
+  'interconsultations:read': 'Ver interconsultas',
+  'interconsultations:write': 'Gestionar interconsultas',
+  'interconsultations:approve': 'Aprobar presupuestos de interconsulta',
+  'interconsultations:billing': 'Facturar interconsultas',
 };
 
 export const BRANCH_COOKIE_NAME = 'sincvete_branch_id';

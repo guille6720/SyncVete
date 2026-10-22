@@ -6,16 +6,22 @@ import { getPatient } from '@/actions/patients';
 import { getUserBranches } from '@/actions/settings';
 import { PrescriptionForm } from '@/components/pharmacy/prescription-form';
 import { Button } from '@/components/ui/button';
+import { resolveListHref } from '@/lib/list-return';
 import { getSessionContext } from '@/lib/session';
 
 interface NuevaRecetaPageProps {
-  searchParams: Promise<{ patientId?: string; consultationId?: string }>;
+  searchParams: Promise<{
+    patientId?: string;
+    consultationId?: string;
+    return?: string;
+  }>;
 }
 
 export default async function NuevaRecetaPage({ searchParams }: NuevaRecetaPageProps) {
   const [session, params] = await Promise.all([getSessionContext(), searchParams]);
   if (!session?.permissions.includes('clinical:write')) redirect('/farmacia');
 
+  const listHref = resolveListHref('/farmacia', params.return);
   const [branches, patient] = await Promise.all([
     getUserBranches(),
     params.patientId ? getPatient(params.patientId) : Promise.resolve(null),
@@ -25,7 +31,7 @@ export default async function NuevaRecetaPage({ searchParams }: NuevaRecetaPageP
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" asChild>
-        <Link href="/farmacia">
+        <Link href={listHref}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Volver a farmacia
         </Link>
@@ -38,6 +44,7 @@ export default async function NuevaRecetaPage({ searchParams }: NuevaRecetaPageP
         defaultOwnerId={patient?.owner_id}
         defaultOwnerName={owner?.full_name}
         defaultConsultationId={params.consultationId}
+        listHref={listHref}
       />
     </div>
   );

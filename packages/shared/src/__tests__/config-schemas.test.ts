@@ -12,6 +12,8 @@ describe('organizationSettingsSchema', () => {
       taxId: '',
       waitingRoomRoomsText: 'Consultorio 1\nBox A',
       waitingRoomMinutesPerPatient: '12',
+      settlementPeriodPreset: 'custom',
+      settlementPeriodDays: '14',
     });
     expect(result.success).toBe(true);
   });

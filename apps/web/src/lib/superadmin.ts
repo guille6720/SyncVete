@@ -15,7 +15,7 @@ export async function ensurePlatformAdminRegistration(userId: string, email: str
   const allow = parseSuperadminEmails(readServerEnv('SUPERADMIN_EMAILS'));
   if (!(normalized && allow.includes(normalized))) {
     throw new Error(
-      'No tenés acceso de Superadmin. El email tiene que estar en SUPERADMIN_EMAILS o en platform_admins.'
+      'No tenés acceso de Superadmin. Tu email tiene que estar en SUPERADMIN_EMAILS.'
     );
   }
 
@@ -43,7 +43,7 @@ export async function ensurePlatformAdminRegistration(userId: string, email: str
     throw new Error(
       rpcError?.message
         ? `No hay acceso Superadmin en la base: ${rpcError.message}. Aplicá las migraciones y recargá.`
-        : 'No tenés acceso de Superadmin. El email tiene que estar en SUPERADMIN_EMAILS o en platform_admins.'
+        : 'No tenés acceso de Superadmin. Tu email tiene que estar en SUPERADMIN_EMAILS y en platform_admins.'
     );
   }
 }
