@@ -3,6 +3,7 @@ import { DM_Sans, Fraunces } from 'next/font/google';
 import { Providers } from '@/components/providers';
 import { PwaRegister } from '@/components/pwa-register';
 import { InstallAppPrompt } from '@/components/pwa/install-app-prompt';
+import { AppUpdateBanner } from '@/components/layout/app-update-banner';
 import { APP_NAME } from '@sincvete/shared';
 import { AUTH_RECOVERY_REDIRECT_SCRIPT } from '@/lib/auth/recovery-redirect';
 import './globals.css';
@@ -63,6 +64,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={`${dmSans.variable} ${fraunces.variable} font-sans antialiased`}>
         <Providers>
           <PwaRegister />
+          <AppUpdateBanner />
           <InstallAppPrompt />
           {children}
         </Providers>
