@@ -6490,6 +6490,10 @@ export interface Database {
           total_count: number;
         }[];
       };
+      soft_delete_owner: {
+        Args: { p_owner_id: string };
+        Returns: string;
+      };
       search_owners: {
         Args: {
           p_search?: string | null;

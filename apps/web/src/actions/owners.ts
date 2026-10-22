@@ -203,16 +203,25 @@ export async function deleteOwner(ownerId: string): Promise<ActionResult> {
     await requirePermissionAndFeature('patients:write', FEATURES.OWNERS);
     const supabase = await createServerClient();
 
-    const { error } = await supabase
-      .from('owners')
-      .update({ deleted_at: new Date().toISOString(), is_active: false })
-      .eq('id', ownerId);
-
-    if (error) {
-      return { success: false, error: 'No se pudo eliminar el propietario' };
+    const deleted = await supabase.rpc('soft_delete_owner', { p_owner_id: ownerId });
+    if (deleted.error || deleted.data !== ownerId) {
+      if (deleted.error) console.error('[deleteOwner]', deleted.error.message);
+      const fallback = await supabase
+        .from('owners')
+        .update({ deleted_at: new Date().toISOString(), is_active: false })
+        .eq('id', ownerId)
+        .is('deleted_at', null);
+      if (fallback.error) console.error('[deleteOwner]', fallback.error.message);
+      if (await getOwner(ownerId)) {
+        return {
+          success: false,
+          error: 'No se pudo eliminar el propietario. Seguía en la lista porque la baja no se guardó.',
+        };
+      }
     }
 
     revalidatePath('/propietarios');
+    revalidatePath(`/propietarios/${ownerId}`);
     return { success: true };
   } catch (error) {
     return actionError(error);

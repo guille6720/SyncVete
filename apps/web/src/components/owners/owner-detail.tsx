@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Hourglass, MessageCircle, PawPrint, Pencil, Trash2 } from 'lucide-react';
@@ -50,6 +51,7 @@ export function OwnerDetail({
   patientsTotal = 0,
 }: OwnerDetailProps) {
   const router = useRouter();
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const entitled = (href: string) => isClinicPathEntitled(href, entitledHrefs);
   const queueHref = `/sala-espera?q=${encodeURIComponent(owner.full_name)}`;
   const patientsEnabled = entitled('/pacientes');
@@ -57,10 +59,13 @@ export function OwnerDetail({
 
   const handleDelete = async () => {
     if (!confirm('¿Eliminar este propietario? Esta acción no se puede deshacer.')) return;
+    setDeleteError(null);
     const result = await deleteOwner(owner.id);
     if (result.success) {
       router.push('/propietarios');
+      return;
     }
+    setDeleteError(result.error ?? 'No se pudo eliminar el propietario');
   };
 
   return (
@@ -105,7 +110,7 @@ export function OwnerDetail({
                   Editar
                 </Link>
               </Button>
-              <Button variant="destructive" size="sm" onClick={handleDelete}>
+              <Button variant="destructive" size="sm" onClick={() => void handleDelete()}>
                 <Trash2 className="mr-2 h-4 w-4" />
                 Eliminar
               </Button>
@@ -113,6 +118,7 @@ export function OwnerDetail({
           )}
         </div>
       </div>
+      {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
 
       <Card>
         <CardHeader>
