@@ -34,9 +34,9 @@ export function OwnerProfessionalBooking({
       minute: '2-digit',
     }).format(new Date(date));
   return (
-    <section className="space-y-5 rounded-3xl border border-primary/15 bg-card p-5 shadow-sm">
-      <div className="rounded-2xl bg-primary/10 px-4 py-3">
-        <h2 className="text-lg font-semibold text-primary">Solicitar turno</h2>
+    <section className="space-y-4 rounded-2xl border border-primary/15 bg-card p-4 shadow-sm dark:border-border">
+      <div className="rounded-xl bg-primary/10 px-3 py-2.5 dark:bg-primary/15">
+        <h2 className="text-base font-semibold text-primary">Solicitar turno</h2>
         <p className="text-xs text-muted-foreground">Misma fecha que elegiste en el calendario</p>
       </div>
       {availability.professionals.length ? (

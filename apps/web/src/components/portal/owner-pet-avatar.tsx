@@ -25,6 +25,7 @@ export function OwnerPetAvatar({
   const box = SIZE[size];
   if (photoUrl) {
     return (
+      // eslint-disable-next-line @next/next/no-img-element -- pet photos from clinic storage URLs
       <img
         src={photoUrl}
         alt={name}

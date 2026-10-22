@@ -12,6 +12,7 @@ import { ownerAppTextColor, type OwnerAppBrand } from '@/lib/owner-app';
 import type { CSSProperties } from 'react';
 import { OwnerAppBrandMark } from '@/components/portal/owner-app-brand';
 import { InstallAppButton } from '@/components/pwa/install-app-button';
+import { OwnerAppThemeToggle } from '@/components/portal/owner-app-theme-toggle';
 
 interface PortalShellProps {
   showAlerts?: boolean;
@@ -37,7 +38,7 @@ export function PortalShell({
     <div
       className={
         brand?.enabled
-          ? `flex min-h-dvh flex-col bg-muted/20 ${showNav ? 'pb-20' : ''}`
+          ? `flex min-h-dvh flex-col bg-muted/20 dark:bg-background ${showNav ? 'pb-20' : ''}`
           : 'flex min-h-screen flex-col bg-background'
       }
       style={
@@ -89,6 +90,7 @@ export function PortalShell({
               </>
             )}
             <span className="hidden text-sm text-muted-foreground sm:inline">{userName}</span>
+            {brand?.enabled && <OwnerAppThemeToggle />}
             <form action={signOutAction}>
               <Button variant="ghost" size="sm" type="submit">
                 <LogOut className="h-4 w-4" />
