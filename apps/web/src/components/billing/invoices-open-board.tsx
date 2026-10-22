@@ -23,7 +23,7 @@ export function InvoicesOpenBoard({ items, canWrite }: InvoicesOpenBoardProps) {
   const currency = items[0]?.currency ?? 'ARS';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="facturacion-open">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Cuentas por cobrar</h2>
@@ -33,12 +33,14 @@ export function InvoicesOpenBoard({ items, canWrite }: InvoicesOpenBoardProps) {
           </p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/facturacion/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva factura
-            </Link>
-          </Button>
+          <div data-tour="facturacion-new">
+            <Button asChild>
+              <Link href="/facturacion/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva factura
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

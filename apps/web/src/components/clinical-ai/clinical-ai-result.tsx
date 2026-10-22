@@ -30,7 +30,7 @@ interface ClinicalAiResultProps {
 export function ClinicalAiResult({ kind, output }: ClinicalAiResultProps) {
   if (isSummary(kind, output)) {
     return (
-      <div className="space-y-3 text-sm">
+      <div data-tour="ia-clinica-review" className="space-y-3 text-sm">
         <p>{output.summary}</p>
         {output.lastDiagnoses.length > 0 && (
           <ListBlock title="Diagnósticos recientes" items={output.lastDiagnoses} />

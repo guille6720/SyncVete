@@ -243,3 +243,75 @@ html.pwa-standalone body {
     animation: none;
   }
 }
+
+/* Academia SyncVete — reusable tutorial motion */
+@keyframes sv-tutorial-intro-enter {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes sv-tutorial-cursor-ripple {
+  0% {
+    opacity: 0.7;
+    transform: scale(0.4);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+@keyframes sv-tutorial-spotlight-pulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 9999px rgba(15, 23, 42, 0.22),
+      0 0 0 0 rgba(15, 118, 110, 0.35);
+  }
+  50% {
+    box-shadow:
+      0 0 0 9999px rgba(15, 23, 42, 0.22),
+      0 0 0 10px rgba(15, 118, 110, 0);
+  }
+}
+
+@keyframes sv-tutorial-status-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.04);
+  }
+}
+
+.sv-tutorial-intro-enter {
+  animation: sv-tutorial-intro-enter 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sv-tutorial-cursor-ripple {
+  animation: sv-tutorial-cursor-ripple 0.35s ease-out both;
+}
+
+.sv-tutorial-spotlight-pulse {
+  animation: sv-tutorial-spotlight-pulse 1.8s ease-in-out infinite;
+}
+
+.sv-tutorial-status-pulse {
+  animation: sv-tutorial-status-pulse 0.9s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sv-tutorial-intro-enter,
+  .sv-tutorial-cursor-ripple,
+  .sv-tutorial-spotlight-pulse,
+  .sv-tutorial-status-pulse {
+    animation: none;
+  }
+}

@@ -17,7 +17,7 @@ export function DashboardRecentLists({
   recentOwners,
 }: DashboardRecentListsProps) {
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
+    <div className="grid gap-4 lg:grid-cols-2" data-tour="dashboard-activity">
       <Card className="border-teal-200/70 bg-card/95 text-card-foreground shadow-sm backdrop-blur-sm dark:border-teal-800">
         <CardHeader className="flex flex-row items-center justify-between">
           <div>

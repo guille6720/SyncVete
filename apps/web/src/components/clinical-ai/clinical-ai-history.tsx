@@ -16,7 +16,7 @@ interface ClinicalAiHistoryProps {
 
 export function ClinicalAiHistory({ data }: ClinicalAiHistoryProps) {
   return (
-    <Card>
+    <Card data-tour="ia-clinica-review">
       <CardHeader>
         <CardTitle>Historial</CardTitle>
         <CardDescription>

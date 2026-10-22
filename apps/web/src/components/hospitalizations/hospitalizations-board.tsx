@@ -19,21 +19,23 @@ interface HospitalizationsBoardProps {
 
 export function HospitalizationsBoard({ items, canWrite }: HospitalizationsBoardProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="internacion-list">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+        <div data-tour="internacion-detail">
           <h2 className="text-lg font-semibold">Internados ahora</h2>
           <p className="text-sm text-muted-foreground">
             {items.length} paciente{items.length !== 1 ? 's' : ''} en internación u observación
           </p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/internacion/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Admitir
-            </Link>
-          </Button>
+          <div data-tour="internacion-new">
+            <Button asChild>
+              <Link href="/internacion/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Admitir
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

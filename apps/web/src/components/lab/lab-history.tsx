@@ -75,7 +75,7 @@ export function LabHistory({
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative max-w-md flex-1">
+        <div className="relative max-w-md flex-1" data-tour="laboratorio-search">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por paciente, estudio..."

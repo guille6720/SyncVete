@@ -9,6 +9,7 @@ import {
 import { SurgeriesBoard } from '@/components/surgeries/surgeries-board';
 import { SurgeriesHistory } from '@/components/surgeries/surgeries-history';
 import { SURGERY_STATUSES, type SurgeryStatus } from '@sincvete/shared';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface CirugiasPageProps {
   searchParams: Promise<{ page?: string; search?: string; status?: string }>;
@@ -37,9 +38,10 @@ export default async function CirugiasPage({ searchParams }: CirugiasPageProps) 
     canManageSurgeries(),
   ]);
 
+  const tour = moduleTourTargets('cirugias');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">Cirugías</h1>
         <p className="text-muted-foreground">Quirófano, recuperación y registro operatorio</p>
       </div>

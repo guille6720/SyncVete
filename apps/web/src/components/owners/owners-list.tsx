@@ -50,7 +50,7 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-md flex-1">
+        <div className="relative max-w-md flex-1" data-tour="propietarios-search">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre, teléfono, DNI..."
@@ -60,17 +60,19 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
           />
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/propietarios/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo propietario
-            </Link>
-          </Button>
+          <div data-tour="propietarios-new">
+            <Button asChild>
+              <Link href="/propietarios/nuevo">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo propietario
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
       {data.data.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="rounded-lg border border-dashed p-12 text-center" data-tour="propietarios-list">
           <p className="text-muted-foreground">
             {initialSearch
               ? 'No se encontraron propietarios con esa búsqueda.'
@@ -84,7 +86,7 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-hidden rounded-lg border" data-tour="propietarios-list">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr>

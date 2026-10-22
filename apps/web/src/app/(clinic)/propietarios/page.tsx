@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 import { listOwners, canManageOwners, canReadOwners } from '@/actions/owners';
 import { OwnersList } from '@/components/owners/owners-list';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface PropietariosPageProps {
   searchParams: Promise<{ page?: string; search?: string }>;
@@ -20,9 +21,10 @@ export default async function PropietariosPage({ searchParams }: PropietariosPag
     canManageOwners(),
   ]);
 
+  const tour = moduleTourTargets('propietarios');
   return (
-    <div className="space-y-6">
-      <div>
+    <div className="space-y-6" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">Propietarios</h1>
         <p className="text-muted-foreground">Tutores y clientes de la clínica</p>
       </div>

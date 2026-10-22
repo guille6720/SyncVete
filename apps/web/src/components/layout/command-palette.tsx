@@ -29,6 +29,7 @@ import {
   ScrollText,
   Hourglass,
   Briefcase,
+  GraduationCap,
   Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -82,6 +83,12 @@ const NAV_ITEMS = [
   { label: 'Recordatorios', href: '/recordatorios', icon: Bell, keywords: 'avisos turnos vacunas saldos' },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, keywords: 'avisos campana inbox laboratorio stock' },
   { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles, keywords: 'inteligencia artificial resumen soap tutor' },
+  {
+    label: 'Tutoriales',
+    href: '/academia',
+    icon: GraduationCap,
+    keywords: 'tutorial tutoriales aprendizaje guia onboarding academia',
+  },
   { label: 'Configuración', href: '/configuracion', icon: Settings, keywords: 'ajustes settings' },
   { label: 'Manual de uso', href: '/manual', icon: BookOpen, keywords: 'ayuda guia descargar pdf instrucciones' },
 ] as const;
@@ -115,10 +122,12 @@ export function CommandPalette({
   entitledHrefs = null,
   isPlatformAdmin = false,
   showMySettlementsNav = false,
+  academiaEnabled = false,
 }: {
   entitledHrefs?: string[] | null;
   isPlatformAdmin?: boolean;
   showMySettlementsNav?: boolean;
+  academiaEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -159,6 +168,7 @@ export function CommandPalette({
     if (item.href === '/liquidaciones/mis-liquidaciones' && !showMySettlementsNav) {
       return false;
     }
+    if (item.href === '/academia' && !academiaEnabled) return false;
     return isClinicPathEntitled(item.href, entitledHrefs);
   });
 

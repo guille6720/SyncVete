@@ -32,6 +32,8 @@ interface AppShellProps {
   /** Streamed commercial banner (non-critical). Prefer over blocking layout awaits. */
   billingBannerSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
+  /** When false, Tutoriales stays out of the sidebar and command palette. */
+  academiaEnabled?: boolean;
 }
 
 export function AppShell({
@@ -46,6 +48,7 @@ export function AppShell({
   entitledHrefs = null,
   billingBannerSlot = null,
   showMySettlementsNav = false,
+  academiaEnabled = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -87,6 +90,7 @@ export function AppShell({
         entitledHrefs={entitledHrefs}
         isPlatformAdmin={isPlatformAdmin}
         showMySettlementsNav={showMySettlementsNav}
+        academiaEnabled={academiaEnabled}
       />
 
       {pendingHref ? (
@@ -174,6 +178,7 @@ export function AppShell({
         <ClinicSidebarNav
           entitledHrefs={entitledHrefs}
           showMySettlementsNav={showMySettlementsNav}
+          academiaEnabled={academiaEnabled}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           onNavigate={(href, isActive) => {

@@ -8,6 +8,7 @@ import {
 } from '@/actions/vaccinations';
 import { VaccinationsDueBoard } from '@/components/vaccinations/vaccinations-due-board';
 import { VaccinationsHistory } from '@/components/vaccinations/vaccinations-history';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface VacunacionPageProps {
   searchParams: Promise<{ page?: string; search?: string }>;
@@ -31,9 +32,10 @@ export default async function VacunacionPage({ searchParams }: VacunacionPagePro
     canManageVaccinations(),
   ]);
 
+  const tour = moduleTourTargets('vacunacion');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">Vacunación</h1>
         <p className="text-muted-foreground">Refuerzos vencidos, por vencer y registro de dosis</p>
       </div>

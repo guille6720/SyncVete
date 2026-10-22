@@ -96,7 +96,7 @@ export function WhatsAppComposeForm({
   };
 
   return (
-    <Card>
+    <Card data-tour="whatsapp-compose">
       <CardHeader>
         <CardTitle>Nuevo mensaje</CardTitle>
         <CardDescription>

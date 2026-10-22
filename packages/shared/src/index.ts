@@ -55,6 +55,7 @@ export * from './types/interconsultations';
 export * from './schemas';
 export * from './entitlements';
 export * from './billing';
+export * from './tutorials';
 
 export function getPermissionsForRole(role: Role, custom?: Permission[] | null): Permission[] {
   if (custom && custom.length > 0) {
