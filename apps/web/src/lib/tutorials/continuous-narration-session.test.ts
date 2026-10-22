@@ -66,6 +66,49 @@ describe('continuous narration session', () => {
     expect(completed).toBe(true);
   });
 
+  it('does not fall back to browser TTS when ElevenLabs is configured but a clip fails', async () => {
+    const eleven = new ElevenLabsAudioEngine();
+    vi.spyOn(eleven, 'isAvailable').mockResolvedValue(true);
+    vi.spyOn(eleven, 'prefetch').mockResolvedValue(false);
+    vi.spyOn(eleven, 'speak').mockResolvedValue(false);
+    vi.spyOn(eleven, 'subscribe').mockReturnValue(() => undefined);
+    vi.spyOn(eleven, 'stop').mockImplementation(() => undefined);
+    vi.spyOn(eleven, 'setMuted').mockImplementation(() => undefined);
+    vi.spyOn(eleven, 'setRate').mockImplementation(() => undefined);
+    vi.spyOn(eleven, 'getStatus').mockReturnValue('idle');
+
+    const browser = {
+      isSupported: () => true,
+      ensureVoices: vi.fn(async () => []),
+      setRate: vi.fn(),
+      setVoiceProfile: vi.fn(),
+      setMuted: vi.fn(),
+      subscribe: vi.fn(() => () => undefined),
+      speak: vi.fn(),
+      stop: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
+      getStatus: vi.fn(() => 'idle' as const),
+    };
+
+    const session = new ContinuousNarrationSession(eleven, browser as never);
+    const steps: number[] = [];
+
+    await session.start(
+      [{ stepIndex: 0, text: 'Paso uno de la demo con texto largo.', clipId: 'a' }],
+      { voice: 'brian', rate: 1 },
+      {
+        onStep: (stepIndex) => {
+          steps.push(stepIndex);
+        },
+        onComplete: () => undefined,
+      }
+    );
+
+    expect(steps).toEqual([0]);
+    expect(browser.speak).not.toHaveBeenCalled();
+  });
+
   it('falls back to browser TTS when ElevenLabs is not configured', async () => {
     const eleven = new ElevenLabsAudioEngine();
     vi.spyOn(eleven, 'isAvailable').mockResolvedValue(false);

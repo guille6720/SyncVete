@@ -464,7 +464,7 @@ export class SpeechNarrationEngine {
     utter.lang = options.lang ?? this.voice?.lang ?? 'es-AR';
     utter.rate = clampNarrationRate(options.rate ?? this.rate);
     utter.pitch = options.pitch ?? pitchForVoiceProfile(this.voiceProfile);
-    utter.volume = options.volume ?? 1;
+    utter.volume = options.volume ?? 0.82;
     if (this.voice) utter.voice = this.voice;
 
     utter.onstart = () => {
