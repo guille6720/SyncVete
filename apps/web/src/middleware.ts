@@ -78,6 +78,8 @@ export async function middleware(request: NextRequest) {
       (route) => pathname === route || (route !== '/' && pathname.startsWith(`${route}/`))
     ) ||
     pathname.startsWith('/portal/manifest/') ||
+    pathname === '/portal/manifest.webmanifest' ||
+    pathname === '/portal/brand.webmanifest' ||
     pathname.startsWith('/portal/icon/') ||
     pathname.startsWith('/api/cron/');
 

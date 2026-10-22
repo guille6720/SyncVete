@@ -77,6 +77,12 @@ export function OwnerAppInstall({
               </div>
             ))}
           </div>
+          {installed && activationRequired ? (
+            <p className="mb-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-950">
+              Si esta pantalla se abrió dentro de la app de la clínica, cerrala y volvé a abrir el
+              enlace en Chrome o Safari. Desde el navegador, Instalar agrega la app del propietario.
+            </p>
+          ) : null}
           {activationRequired ? (
             <Button
               className="w-full rounded-xl"

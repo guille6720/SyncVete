@@ -53,10 +53,14 @@ export async function getOwnerAppInviteBrand(token: string) {
   const db = await createServerClient();
   const { data, error } = await db.rpc('get_owner_app_invite_brand', { p_token: token });
   if (error || !data || typeof data !== 'object' || Array.isArray(data)) return null;
-  const parsed = z
-    .object({ organizationId: z.string().uuid(), brand: ownerAppBrandSchema })
-    .safeParse(data);
-  return parsed.success ? parsed.data : null;
+  const organizationId = z
+    .string()
+    .uuid()
+    .safeParse((data as { organizationId?: unknown }).organizationId);
+  if (!organizationId.success) return null;
+  const brand = parseOwnerAppBrand((data as { brand?: unknown }).brand);
+  if (!brand.enabled) return null;
+  return { organizationId: organizationId.data, brand };
 }
 
 export async function saveOwnerAppBrand(

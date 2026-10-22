@@ -39,7 +39,19 @@ export function parseOwnerAppBrand(value: unknown, clinicName = 'Mi veterinaria'
     welcomeText: '',
     enabled: false,
   };
-  const parsed = ownerAppBrandSchema.safeParse(value);
+  const raw =
+    value && typeof value === 'object' && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : null;
+  const parsed = ownerAppBrandSchema.safeParse(
+    raw
+      ? {
+          ...raw,
+          logoUrl: typeof raw.logoUrl === 'string' ? raw.logoUrl : '',
+          welcomeText: typeof raw.welcomeText === 'string' ? raw.welcomeText : '',
+        }
+      : value
+  );
   return parsed.success ? parsed.data : defaults;
 }
 

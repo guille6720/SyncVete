@@ -65,7 +65,10 @@ try {
       const manifests = await page.locator('link[rel="manifest"]').evaluateAll(
         (links) => links.map((link) => link.getAttribute('href'))
       );
-      if (manifests.length !== 1 || !manifests[0].startsWith('/portal/manifest/'))
+      if (
+        manifests.length !== 1 ||
+        !manifests[0].startsWith('/portal/brand.webmanifest?organizationId=')
+      )
         throw new Error(`Administrative manifest leaked: ${JSON.stringify(manifests)}`);
       if (view === 'activate') {
         const inviteUrl = page.url();
