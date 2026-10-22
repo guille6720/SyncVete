@@ -51,8 +51,9 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   return { success: false, error: 'Ocurrió un error inesperado' };
 }
 
-function rpcMessage(error: { message?: string } | null): string {
-  const message = error?.message ?? '';
+function rpcMessage(error: { message?: string; code?: string } | null): string {
+  const message = (error?.message ?? '').trim();
+  if (!message) return 'Ocurrió un error inesperado';
   if (message.includes('email')) return message;
   if (message.includes('permisos')) return message;
   if (message.includes('Invitación')) return message;
@@ -60,7 +61,21 @@ function rpcMessage(error: { message?: string } | null): string {
   if (message.includes('clínica') || message.includes('clinica')) return message;
   if (message.includes('cuenta')) return message;
   if (message.includes('Propietario')) return message;
-  return 'Ocurrió un error inesperado';
+  if (message.includes('Not authenticated') || message.includes('Sesión')) {
+    return 'Sesión no válida. Volvé a abrir el enlace de invitación.';
+  }
+  // Schema / migration not applied yet on this Supabase project.
+  if (
+    message.includes('does not exist') ||
+    message.includes('portal_pending_user_id') ||
+    message.includes('get_portal_pending_owner_id') ||
+    message.includes('schema cache') ||
+    error?.code === '42703' ||
+    error?.code === '42883'
+  ) {
+    return 'Falta aplicar la migración del portal en Supabase. Pedile a la clínica que corra el SQL de aprobación.';
+  }
+  return message.length <= 180 ? message : 'Ocurrió un error inesperado';
 }
 
 export async function previewPortalInvite(token: string): Promise<PortalInvitePreview | null> {
@@ -352,8 +367,12 @@ export async function activatePortalAccount(
       });
 
       if (acceptError) {
-        const service = await createServiceClient();
-        await service.auth.admin.deleteUser(authData.user.id);
+        try {
+          const service = await createServiceClient();
+          await service.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('portal activate cleanup failed', cleanupError);
+        }
         return { success: false, error: rpcMessage(acceptError) };
       }
     } else {
