@@ -15,6 +15,7 @@ export function OwnerAppInstall({
 }: {
   brand: OwnerAppBrand;
   clinicName?: string;
+  /** Invite link: show create-account form as the only primary action. */
   activationRequired?: boolean;
   children: React.ReactNode;
 }) {
@@ -35,6 +36,9 @@ export function OwnerAppInstall({
       window.removeEventListener('appinstalled', update);
     };
   }, []);
+
+  const clinicLabel = clinicName || brand.appName.replace(/^app-/i, 'Veterinaria ');
+
   return (
     <div
       className="min-h-dvh bg-[#f6f4fc] px-4 py-8 text-slate-900"
@@ -58,13 +62,16 @@ export function OwnerAppInstall({
           >
             <PawPrint size={34} />
           </div>
-          <h1 className="text-3xl font-bold leading-tight">Tu mascota, siempre en buenas manos</h1>
+          <h1 className="text-3xl font-bold leading-tight">
+            {activationRequired ? `Bienvenido a ${brand.appName}` : 'Tu mascota, siempre en buenas manos'}
+          </h1>
           <p className="mt-3 text-sm text-slate-600">
-            {brand.welcomeText || 'Toda la información de tus mascotas, cerca tuyo.'}
+            {brand.welcomeText ||
+              (activationRequired
+                ? 'Creá tu cuenta para ver mascotas, vacunas, tratamientos y turnos.'
+                : 'Toda la información de tus mascotas, cerca tuyo.')}
           </p>
-          <p className="mt-2 text-sm font-medium">
-            Solo para clientes de {clinicName || brand.appName.replace(/^app-/i, 'Veterinaria ')}.
-          </p>
+          <p className="mt-2 text-sm font-medium">Solo para clientes de {clinicLabel}.</p>
           <div className="my-6 grid grid-cols-3 gap-2 text-center text-xs">
             {[
               { Icon: Syringe, label: 'Vacunas' },
@@ -77,45 +84,37 @@ export function OwnerAppInstall({
               </div>
             ))}
           </div>
-          {installed && activationRequired ? (
-            <p className="mb-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-950">
-              Si esta pantalla se abrió dentro de la app de la clínica, cerrala y volvé a abrir el
-              enlace en Chrome o Safari. Desde el navegador, Instalar agrega la app del propietario.
-            </p>
-          ) : null}
+
           {activationRequired ? (
-            <Button
-              className="w-full rounded-xl"
-              onClick={() =>
-                document.getElementById('owner-access')?.scrollIntoView({ behavior: 'smooth' })
-              }
-            >
-              Activar mi acceso
-            </Button>
+            <div id="owner-access" className="border-t border-slate-100 pt-5">
+              {children}
+            </div>
           ) : installed ? (
             <p className="flex items-center gap-2 text-sm">
               <Check size={18} /> Estás usando la app instalada.
             </p>
           ) : (
-            <Button
-              className="w-full rounded-xl"
-              style={{
-                backgroundColor: brand.primaryColor,
-                color: ownerAppTextColor(brand.primaryColor),
-              }}
-              onClick={() => {
-                if (canInstallNative) void install();
-                else setShowSteps(true);
-              }}
-            >
-              <Download size={18} /> Instalar {brand.appName}
-            </Button>
+            <>
+              <Button
+                className="w-full rounded-xl"
+                style={{
+                  backgroundColor: brand.primaryColor,
+                  color: ownerAppTextColor(brand.primaryColor),
+                }}
+                onClick={() => {
+                  if (canInstallNative) void install();
+                  else setShowSteps(true);
+                }}
+              >
+                <Download size={18} /> Instalar {brand.appName}
+              </Button>
+              <p className="mt-3 text-xs text-slate-500">
+                También podés continuar en el navegador sin instalar.
+              </p>
+            </>
           )}
-          <p className="mt-3 text-xs text-slate-500">
-            Primero activá tu acceso con la invitación de la veterinaria. Después podrás ingresar
-            desde el ícono de tu celular.
-          </p>
-          {showSteps && (
+
+          {!activationRequired && showSteps && (
             <div className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-4 text-sm" role="status">
               <p className="font-semibold">En iPhone, abrí el enlace en Safari</p>
               <p>
@@ -124,15 +123,21 @@ export function OwnerAppInstall({
               <p className="font-semibold">En Android, abrilo en Chrome</p>
               <p>Menú ⋮ → Instalar aplicación o Agregar a pantalla de inicio → Confirmar.</p>
               <p className="text-xs text-slate-500">
-                Si lo abriste desde WhatsApp, elegí abrir en el navegador. También podés continuar
-                sin instalar.
+                Si lo abriste desde WhatsApp, elegí abrir en el navegador.
               </p>
             </div>
           )}
         </section>
-        <div id="owner-access" className="scroll-mt-6">
-          {children}
-        </div>
+
+        {!activationRequired ? <div id="owner-access">{children}</div> : null}
+
+        {activationRequired && installed ? (
+          <p className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-950">
+            Si esta pantalla se abrió dentro de la app de la clínica, cerrala y volvé a abrir el
+            enlace en Chrome o Safari para usar la app del propietario.
+          </p>
+        ) : null}
+
         <p className="pb-4 text-center text-xs text-slate-500">Hecho por OpusOrg</p>
       </div>
     </div>

@@ -37,6 +37,7 @@ export default async function PortalActivatePage({ searchParams }: PortalActivat
       isLoggedIn={Boolean(session)}
       isStaff={session?.kind === 'staff'}
       brand={app?.brand}
+      embedded={Boolean(app)}
     />
   );
   if (app)
