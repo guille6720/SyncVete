@@ -58,7 +58,12 @@ function parseOwnerForm(formData: FormData) {
 function toOwnerRow(row: Owner & { total_count?: number }): Owner {
   const { total_count: _total, ...owner } = row;
   void _total;
-  return { ...owner, deleted_at: owner.deleted_at ?? null, portal_user_id: owner.portal_user_id ?? null };
+  return {
+    ...owner,
+    deleted_at: owner.deleted_at ?? null,
+    portal_user_id: owner.portal_user_id ?? null,
+    portal_pending_user_id: owner.portal_pending_user_id ?? null,
+  };
 }
 
 export async function listOwners(

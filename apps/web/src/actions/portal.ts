@@ -132,6 +132,7 @@ export async function revokeOwnerPortalAccess(ownerId: string): Promise<ActionRe
     if (error) {
       return { success: false, error: rpcMessage(error) };
     }
+    revalidatePath('/tutores');
     revalidatePath(`/tutores/${ownerId}`);
     return { success: true };
   } catch (error) {
@@ -152,6 +153,7 @@ export async function approveOwnerPortalAccess(ownerId: string): Promise<ActionR
     if (data !== ownerId) {
       return { success: false, error: 'No se pudo activar el acceso del tutor' };
     }
+    revalidatePath('/tutores');
     revalidatePath(`/tutores/${ownerId}`);
     revalidatePath('/portal', 'layout');
     return { success: true };

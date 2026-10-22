@@ -7,6 +7,7 @@ import { Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { OwnerPortalListActions } from '@/components/owners/owner-portal-list-actions';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import type { Owner, PaginatedResult } from '@sincvete/shared';
 
@@ -93,6 +94,7 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
                   <th className="px-4 py-3 text-left font-medium">Nombre</th>
                   <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Contacto</th>
                   <th className="hidden px-4 py-3 text-left font-medium lg:table-cell">Documento</th>
+                  <th className="px-4 py-3 text-left font-medium">App</th>
                   <th className="px-4 py-3 text-left font-medium">Estado</th>
                 </tr>
               </thead>
@@ -120,6 +122,15 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
                       {owner.document_number
                         ? `${owner.document_type} ${owner.document_number}`
                         : '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <OwnerPortalListActions
+                        ownerId={owner.id}
+                        ownerName={owner.full_name}
+                        portalUserId={owner.portal_user_id}
+                        portalPendingUserId={owner.portal_pending_user_id ?? null}
+                        canWrite={canWrite}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <Badge variant={owner.is_active ? 'success' : 'destructive'}>

@@ -6520,8 +6520,11 @@ export interface Database {
           postal_code: string | null;
           notes: string | null;
           is_active: boolean;
+          portal_user_id: string | null;
+          portal_pending_user_id: string | null;
           created_at: string;
           updated_at: string;
+          deleted_at: string | null;
           total_count: number;
         }[];
       };
