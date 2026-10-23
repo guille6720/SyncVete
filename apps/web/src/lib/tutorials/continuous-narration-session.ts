@@ -249,16 +249,16 @@ export class ContinuousNarrationSession {
         },
         onError: () => {
           if (gen !== this.generation || this.paused) return;
-          // Keep the step on screen; do not race through the playlist.
-          void this.scheduleClipHold(gen);
+          // Server clip failed mid-play — prefer browser over silent skip.
+          void this.recoverWithBrowserOrHold(clip.text, gen);
         },
       });
 
       if (gen !== this.generation) return;
       if (!started) {
-        // Never fall back to browser TTS when ElevenLabs is the engine —
-        // Windows/Chrome voices sound harsh next to Brian C / Horacio.
-        void this.scheduleClipHold(gen);
+        // Neural endpoint said available but clip failed (common on Vercel
+        // when Edge WebSockets are blocked). Browser is better than silence.
+        void this.recoverWithBrowserOrHold(clip.text, gen);
       }
       return;
     }
@@ -266,6 +266,11 @@ export class ContinuousNarrationSession {
     if (!(await this.speakWithBrowser(clip.text, gen))) {
       void this.scheduleClipHold(gen);
     }
+  }
+
+  private async recoverWithBrowserOrHold(text: string, gen: number): Promise<void> {
+    if (await this.speakWithBrowser(text, gen)) return;
+    void this.scheduleClipHold(gen);
   }
 
   private async speakWithBrowser(text: string, gen: number): Promise<boolean> {

@@ -7,11 +7,10 @@
  *
  * Override with EDGE_TTS_VOICE_BRIAN / EDGE_TTS_VOICE_HORACIO if needed.
  * Disable with EDGE_TTS_ENABLED=false.
+ *
+ * Uses in-memory streamAudio (no /tmp files) for Vercel serverless.
  */
 
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { EdgeTTS } from 'node-edge-tts';
 import type { NarrationVoiceProfileId } from '@sincvete/shared';
 
@@ -52,30 +51,28 @@ export async function synthesizeEdgeNeuralSpeech(options: {
   if (text.length > 2500) throw new Error('Texto demasiado largo para narración');
 
   const resolved = resolveEdgeTtsVoice(options.voiceProfile);
-  const dir = await mkdtemp(join(tmpdir(), 'sv-edge-tts-'));
-  const filePath = join(dir, 'narration.mp3');
+  const tts = new EdgeTTS({
+    voice: resolved.voice,
+    lang: resolved.lang,
+    outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
+    rate: '-5%',
+    volume: '-5%',
+    timeout: 25_000,
+  });
 
-  try {
-    const tts = new EdgeTTS({
-      voice: resolved.voice,
-      lang: resolved.lang,
-      outputFormat: 'audio-24khz-48kbitrate-mono-mp3',
-      // Slightly calmer than default — closer to tutorial pacing.
-      rate: '-5%',
-      volume: '-5%',
-      timeout: 20_000,
-    });
-    await tts.ttsPromise(text, filePath);
-    const buffer = await readFile(filePath);
-    if (!buffer.byteLength) {
-      throw new Error('Edge TTS devolvió audio vacío');
-    }
-    return {
-      audio: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
-      contentType: 'audio/mpeg',
-      voiceLabel: resolved.label,
-    };
-  } finally {
-    await rm(dir, { recursive: true, force: true }).catch(() => undefined);
+  const chunks: Buffer[] = [];
+  for await (const piece of tts.streamAudio(text)) {
+    if (Buffer.isBuffer(piece)) chunks.push(piece);
   }
+
+  if (!chunks.length) {
+    throw new Error('Edge TTS devolvió audio vacío');
+  }
+
+  const merged = Buffer.concat(chunks);
+  return {
+    audio: merged.buffer.slice(merged.byteOffset, merged.byteOffset + merged.byteLength),
+    contentType: 'audio/mpeg',
+    voiceLabel: resolved.label,
+  };
 }

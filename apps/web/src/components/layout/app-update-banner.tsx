@@ -5,7 +5,8 @@ import { RefreshCw } from 'lucide-react';
 import { APP_NAME } from '@sincvete/shared';
 
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || 'local';
-const POLL_MS = 20_000;
+const POLL_MS = 12_000;
+const FIRST_CHECK_MS = 2_500;
 
 async function hardReload(): Promise<void> {
   try {
@@ -47,23 +48,32 @@ export function AppUpdateBanner() {
     }
 
     void checkVersion();
+    const first = window.setTimeout(() => void checkVersion(), FIRST_CHECK_MS);
     const id = window.setInterval(checkVersion, POLL_MS);
     const onFocus = () => void checkVersion();
     const onVisibility = () => {
       if (document.visibilityState === 'visible') void checkVersion();
     };
     const onSwUpdate = () => markAvailable();
+    const onControllerChange = () => markAvailable();
 
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('syncvete:app-update', onSwUpdate);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    }
 
     return () => {
       cancelled = true;
+      window.clearTimeout(first);
       window.clearInterval(id);
       window.removeEventListener('focus', onFocus);
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('syncvete:app-update', onSwUpdate);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      }
     };
   }, []);
 
