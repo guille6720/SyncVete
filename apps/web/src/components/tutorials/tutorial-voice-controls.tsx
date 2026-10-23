@@ -50,8 +50,12 @@ export function TutorialVoiceControls({
             aria-label="Voz de narración"
             disabled={narration.muted}
           >
-            <option value="brian">Brian C</option>
-            <option value="horacio">Horacio</option>
+            <option value="brian">
+              {narration.availability.elevenLabs ? 'Brian C' : 'Brian · Tomas (gratis)'}
+            </option>
+            <option value="horacio">
+              {narration.availability.elevenLabs ? 'Horacio' : 'Horacio · Jorge (gratis)'}
+            </option>
           </select>
         </label>
 
@@ -74,8 +78,8 @@ export function TutorialVoiceControls({
       </div>
 
       {!narration.availability.elevenLabs ? (
-        <p className="mb-2 text-[11px] text-amber-700" role="status">
-          Configurá ELEVENLABS_API_KEY en staging para escuchar Brian C y Horacio.
+        <p className="mb-2 text-[11px] text-emerald-700 dark:text-emerald-300" role="status">
+          Usando voces neurales gratuitas (Microsoft): Tomas ≈ Brian, Jorge ≈ Horacio.
         </p>
       ) : null}
 

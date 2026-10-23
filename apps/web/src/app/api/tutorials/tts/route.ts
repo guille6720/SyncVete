@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { isAcademiaEnabled } from '@/lib/tutorials/feature-flag';
 import {
-  isElevenLabsConfigured,
-  synthesizeElevenLabsSpeech,
-} from '@/lib/tutorials/elevenlabs-tts';
+  getTutorialTtsProvider,
+  isTutorialNeuralTtsConfigured,
+  synthesizeTutorialSpeech,
+} from '@/lib/tutorials/tutorial-tts';
 import { NARRATION_VOICE_PROFILES, type NarrationVoiceProfileId } from '@sincvete/shared';
 
 export const runtime = 'nodejs';
@@ -21,23 +22,25 @@ export async function GET() {
   if (!isAcademiaEnabled()) {
     return NextResponse.json({ configured: false }, { status: 404 });
   }
+  const provider = getTutorialTtsProvider();
   return NextResponse.json({
-    configured: isElevenLabsConfigured(),
+    configured: Boolean(provider),
+    provider,
     voices: ['brian', 'horacio'],
   });
 }
 
 /**
- * Tutoriales TTS — Brian C / Horacio via ElevenLabs.
+ * Tutoriales TTS — ElevenLabs Brian/Horacio, or free Edge neural stand-ins.
  * Only tutorial narration scripts (no patient payloads).
  */
 export async function POST(request: Request) {
   if (!isAcademiaEnabled()) {
     return NextResponse.json({ error: 'Tutoriales no habilitado' }, { status: 404 });
   }
-  if (!isElevenLabsConfigured()) {
+  if (!isTutorialNeuralTtsConfigured()) {
     return NextResponse.json(
-      { error: 'Narración ElevenLabs no configurada' },
+      { error: 'Narración neural no configurada' },
       { status: 503 }
     );
   }
@@ -69,7 +72,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { audio, contentType } = await synthesizeElevenLabsSpeech({
+    const { audio, contentType, provider } = await synthesizeTutorialSpeech({
       text,
       voiceProfile,
     });
@@ -78,6 +81,7 @@ export async function POST(request: Request) {
       headers: {
         'Content-Type': contentType,
         'Cache-Control': 'private, max-age=300',
+        'X-Syncvete-Tts-Provider': provider,
       },
     });
   } catch (error) {

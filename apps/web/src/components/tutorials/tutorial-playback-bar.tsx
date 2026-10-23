@@ -128,16 +128,19 @@ export function TutorialPlaybackBar({
               onChange={(event) =>
                 onVoiceProfileChange(event.target.value as StoredVoiceProfile)
               }
-              aria-label="Voz de narración ElevenLabs"
+              aria-label="Voz de narración"
               disabled={muted}
             >
-              <option value="brian">Brian C</option>
-              <option value="horacio">Horacio</option>
+              <option value="brian">
+                {elevenLabsAvailable ? 'Brian C' : 'Brian · Tomas (gratis)'}
+              </option>
+              <option value="horacio">
+                {elevenLabsAvailable ? 'Horacio' : 'Horacio · Jorge (gratis)'}
+              </option>
             </select>
             {!elevenLabsAvailable ? (
-              <span className="rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:text-amber-200">
-                Sin ElevenLabs en este entorno — se usa la voz del navegador (suena peor).
-                Configurá ELEVENLABS_API_KEY en Vercel Production.
+              <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-200">
+                Voz neural gratuita (Microsoft): Tomas ≈ Brian, Jorge ≈ Horacio.
               </span>
             ) : null}
           </label>
