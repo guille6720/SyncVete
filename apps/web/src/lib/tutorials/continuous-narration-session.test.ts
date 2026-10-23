@@ -66,7 +66,7 @@ describe('continuous narration session', () => {
     expect(completed).toBe(true);
   });
 
-  it('does not fall back to browser TTS when ElevenLabs is configured but a clip fails', async () => {
+  it('falls back to browser TTS when neural engine is configured but a clip fails', async () => {
     const eleven = new ElevenLabsAudioEngine();
     vi.spyOn(eleven, 'isAvailable').mockResolvedValue(true);
     vi.spyOn(eleven, 'prefetch').mockResolvedValue(false);
@@ -84,11 +84,14 @@ describe('continuous narration session', () => {
       setVoiceProfile: vi.fn(),
       setMuted: vi.fn(),
       subscribe: vi.fn(() => () => undefined),
-      speak: vi.fn(),
+      speak: vi.fn((_text: string, options?: { onEnd?: () => void }) => {
+        options?.onEnd?.();
+        return 1;
+      }),
       stop: vi.fn(),
       pause: vi.fn(),
       resume: vi.fn(),
-      getStatus: vi.fn(() => 'idle' as const),
+      getStatus: vi.fn(() => 'speaking' as const),
     };
 
     const session = new ContinuousNarrationSession(eleven, browser as never);
@@ -106,7 +109,7 @@ describe('continuous narration session', () => {
     );
 
     expect(steps).toEqual([0]);
-    expect(browser.speak).not.toHaveBeenCalled();
+    expect(browser.speak).toHaveBeenCalled();
   });
 
   it('falls back to browser TTS when ElevenLabs is not configured', async () => {

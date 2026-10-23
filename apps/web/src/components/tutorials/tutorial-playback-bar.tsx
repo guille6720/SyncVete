@@ -140,7 +140,8 @@ export function TutorialPlaybackBar({
             </select>
             {!elevenLabsAvailable ? (
               <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-200">
-                Voz neural gratuita (Microsoft): Tomas ≈ Brian, Jorge ≈ Horacio.
+                Narración gratuita (Tomas/Jorge o Google). Si no hay audio, desbloqueá el sonido del
+                navegador y recargá con Ctrl+F5.
               </span>
             ) : null}
           </label>
