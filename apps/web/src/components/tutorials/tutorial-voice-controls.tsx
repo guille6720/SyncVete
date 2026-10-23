@@ -79,7 +79,8 @@ export function TutorialVoiceControls({
 
       {!narration.availability.elevenLabs ? (
         <p className="mb-2 text-[11px] text-emerald-700 dark:text-emerald-300" role="status">
-          Usando voces neurales gratuitas (Microsoft): Tomas ≈ Brian, Jorge ≈ Horacio.
+          Tomas/Jorge (gratis). Brian C / Horacio naturales requieren ELEVENLABS_API_KEY en
+          producción.
         </p>
       ) : null}
 

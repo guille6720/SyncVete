@@ -13,7 +13,7 @@ describe('tutorial TTS provider', () => {
     expect(getTutorialTtsProvider()).toBe('elevenlabs');
   });
 
-  it('prefers Edge when ElevenLabs is absent', async () => {
+  it('uses Edge when ElevenLabs is absent', async () => {
     vi.stubEnv('ELEVENLABS_API_KEY', undefined);
     vi.stubEnv('TUTORIALS_TTS_UPSTREAM_URL', undefined);
     vi.stubEnv('EDGE_TTS_ENABLED', undefined);
@@ -24,20 +24,10 @@ describe('tutorial TTS provider', () => {
     expect(isTutorialNeuralTtsConfigured()).toBe(true);
   });
 
-  it('falls back to Google HTTP when Edge is disabled', async () => {
+  it('returns null when Edge is disabled and ElevenLabs is absent', async () => {
     vi.stubEnv('ELEVENLABS_API_KEY', undefined);
     vi.stubEnv('TUTORIALS_TTS_UPSTREAM_URL', undefined);
     vi.stubEnv('EDGE_TTS_ENABLED', 'false');
-    vi.stubEnv('GOOGLE_HTTP_TTS_ENABLED', undefined);
-    const { getTutorialTtsProvider } = await import('./tutorial-tts');
-    expect(getTutorialTtsProvider()).toBe('google');
-  });
-
-  it('can disable all free providers', async () => {
-    vi.stubEnv('ELEVENLABS_API_KEY', undefined);
-    vi.stubEnv('TUTORIALS_TTS_UPSTREAM_URL', undefined);
-    vi.stubEnv('EDGE_TTS_ENABLED', 'false');
-    vi.stubEnv('GOOGLE_HTTP_TTS_ENABLED', 'false');
     const { getTutorialTtsProvider } = await import('./tutorial-tts');
     expect(getTutorialTtsProvider()).toBeNull();
   });

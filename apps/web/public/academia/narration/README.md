@@ -1,29 +1,37 @@
-# Tutoriales narration (ElevenLabs)
+# Tutoriales narration
 
-Primary voices for Tutoriales SyncVete:
+## Best quality (recommended for Production)
 
 | Perfil UI | Voice | ElevenLabs ID (default) |
 |-----------|-------|-------------------------|
 | Brian C   | BRIAN / Brian C. Latin narration | `XgQWNZcJ8SRkxXwwhPTo` |
 | Horacio   | Horacio - Seguro & Confiable | `57D8YIbQSuE3REDPO6Vm` |
 
-Runtime path: browser → `POST /api/tutorials/tts` → ElevenLabs (server key).
-
-Required env (staging Preview only, never Production):
-
 ```
 ELEVENLABS_API_KEY=...
-# optional overrides
+# optional
 ELEVENLABS_VOICE_BRIAN_ID=
 ELEVENLABS_VOICE_HORACIO_ID=
 ELEVENLABS_MODEL_ID=eleven_multilingual_v2
+# or proxy to a deployment that already has the key:
+# TUTORIALS_TTS_UPSTREAM_URL=https://your-staging-host
 ```
 
-Optional static MP3 fallback (if present):
+## Free fallback (no API key)
+
+Microsoft Edge neural voices (no Google Translate — too robotic):
+
+| Perfil UI | Edge voice |
+|-----------|------------|
+| Brian     | `es-AR-TomasNeural` |
+| Horacio   | `es-MX-JorgeNeural` |
+
+Disable with `EDGE_TTS_ENABLED=false`.
+
+## Optional static MP3 fallback
 
 ```
 /academia/narration/{tutorialId}/{brian|horacio}/{clipId}.mp3
 ```
 
-If ElevenLabs is not configured, the app falls back to browser Speech Synthesis
-(not shown in the voice selector). Tutorial scripts never include patient data.
+Tutorial scripts never include patient data.
