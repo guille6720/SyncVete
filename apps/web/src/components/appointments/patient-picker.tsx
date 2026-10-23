@@ -197,7 +197,7 @@ export function PatientPicker({
         )}
       </div>
       {ownerName && (
-        <p className="text-xs text-muted-foreground">Propietario: {ownerName}</p>
+        <p className="text-xs text-muted-foreground">Tutor: {ownerName}</p>
       )}
       {error && <p className="text-sm text-destructive">{error}</p>}
       {!patientId && query && !loading && (

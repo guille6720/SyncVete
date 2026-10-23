@@ -526,7 +526,7 @@ export async function commitDataImport(formData: FormData): Promise<
       rowDecisions,
     });
     revalidatePath('/configuracion');
-    revalidatePath('/propietarios');
+    revalidatePath('/tutores');
     revalidatePath('/pacientes');
     revalidatePath('/historia-clinica');
     revalidatePath('/vacunacion');

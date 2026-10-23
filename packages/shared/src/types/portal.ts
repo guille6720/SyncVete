@@ -14,6 +14,7 @@ export interface PortalInvitePreview {
 }
 
 export interface PortalInviteCreated {
+  deliveryStatus?: 'sent' | 'not_sent';
   token: string;
   email: string;
   expiresAt: string;
@@ -46,6 +47,7 @@ export interface PortalPatientSummary {
   breed: string | null;
   sex: PatientSex;
   birthDate: string | null;
+  photoUrl: string | null;
   isDeceased: boolean;
 }
 

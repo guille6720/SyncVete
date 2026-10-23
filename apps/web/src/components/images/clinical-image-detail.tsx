@@ -125,9 +125,9 @@ export function ClinicalImageDetail({
               }
             />
             <DetailField
-              label="Propietario"
+              label="Tutor"
               value={
-                <Link href={`/propietarios/${image.owner_id}`} className="text-primary hover:underline">
+                <Link href={`/tutores/${image.owner_id}`} className="text-primary hover:underline">
                   {image.owner_full_name}
                 </Link>
               }

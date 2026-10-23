@@ -183,9 +183,9 @@ export function PrescriptionDetail({
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${prescription.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${prescription.owner_id}`} className="text-primary hover:underline">
                 {prescription.owner_full_name}
               </Link>
             }

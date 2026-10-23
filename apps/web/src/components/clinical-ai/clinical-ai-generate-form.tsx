@@ -47,7 +47,7 @@ export function ClinicalAiGenerateForm({
   const [state, formAction, pending] = useActionState(generateClinicalAi, null);
 
   return (
-    <Card>
+    <Card data-tour="ia-clinica-form">
       <CardHeader>
         <CardTitle>Nueva sugerencia</CardTitle>
         <CardDescription>{CLINICAL_AI_DISCLAIMER}</CardDescription>
@@ -97,7 +97,7 @@ export function ClinicalAiGenerateForm({
             </p>
           ) : null}
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
-          <Button type="submit" disabled={pending || !canGenerate || !configured}>
+          <Button type="submit" disabled={pending || !canGenerate || !configured} data-tour="ia-clinica-generate">
             {pending ? 'Generando...' : 'Generar sugerencia'}
           </Button>
         </form>

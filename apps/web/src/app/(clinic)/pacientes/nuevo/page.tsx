@@ -21,7 +21,7 @@ function safeOwnerReturnTo(raw: string | undefined): string | null {
   } catch {
     return null;
   }
-  if (!decoded.startsWith('/propietarios/')) return null;
+  if (!decoded.startsWith('/tutores/')) return null;
   if (decoded.includes('://') || decoded.includes('//') || decoded.includes('\\')) return null;
   if (decoded.includes('?') || decoded.includes('#')) return null;
   return decoded;
@@ -43,7 +43,7 @@ export default async function NuevoPacientePage({ searchParams }: NuevoPacienteP
   }
 
   const backHref = returnTo || '/pacientes';
-  const backLabel = returnTo ? 'Volver al propietario' : 'Volver a pacientes';
+  const backLabel = returnTo ? 'Volver al tutor' : 'Volver a pacientes';
 
   return (
     <div className="space-y-4">

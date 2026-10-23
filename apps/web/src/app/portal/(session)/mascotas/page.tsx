@@ -1,0 +1,44 @@
+import { ownerAppEnabled } from '@/lib/owner-app';
+import { notFound } from 'next/navigation';
+import { getOwnerPortalHome } from '@/actions/portal';
+import Link from 'next/link';
+import { OwnerPetAvatar } from '@/components/portal/owner-pet-avatar';
+import { ownerAppNeonCard, ownerAppNeonToneAt } from '@/components/portal/owner-app-neon';
+
+export default async function OwnerPetsPage() {
+  if (!ownerAppEnabled()) notFound();
+  const home = await getOwnerPortalHome();
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold">Mis mascotas</h1>
+      <p className="text-sm text-muted-foreground">
+        Los datos y el historial los actualiza tu veterinaria.
+      </p>
+      {home?.patients.map((pet, index) => (
+        <Link
+          key={pet.id}
+          href={`/portal/mascotas/${pet.id}`}
+          className={ownerAppNeonCard(
+            ownerAppNeonToneAt(index),
+            'flex items-center gap-4 rounded-2xl p-5'
+          )}
+        >
+          <OwnerPetAvatar
+            name={pet.name}
+            species={pet.species}
+            photoUrl={pet.photoUrl}
+            size="md"
+          />
+          <div>
+            <h2 className="font-semibold">{pet.name}</h2>
+            <p className="text-sm text-muted-foreground">
+              {pet.breed || pet.species}
+              {pet.isDeceased ? ' · Fallecido' : ''}
+            </p>
+          </div>
+        </Link>
+      ))}
+      {!home?.patients.length && <p>No hay mascotas vinculadas.</p>}
+    </div>
+  );
+}

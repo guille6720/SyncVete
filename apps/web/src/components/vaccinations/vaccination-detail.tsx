@@ -101,10 +101,10 @@ export function VaccinationDetail({
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
               <Link
-                href={`/propietarios/${vaccination.owner_id}`}
+                href={`/tutores/${vaccination.owner_id}`}
                 className="text-primary hover:underline"
               >
                 {vaccination.owner_full_name}

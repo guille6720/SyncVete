@@ -5,7 +5,24 @@ import { RefreshCw } from 'lucide-react';
 import { APP_NAME } from '@sincvete/shared';
 
 const BUILD_ID = process.env.NEXT_PUBLIC_BUILD_ID || 'local';
-const POLL_MS = 45_000;
+const POLL_MS = 12_000;
+const FIRST_CHECK_MS = 2_500;
+
+async function hardReload(): Promise<void> {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.update()));
+      const waiting = regs.map((reg) => reg.waiting).find(Boolean);
+      waiting?.postMessage({ type: 'SKIP_WAITING' });
+    }
+  } catch {
+    // reload anyway
+  }
+  const url = new URL(window.location.href);
+  url.searchParams.set('_sv', String(Date.now()));
+  window.location.replace(url.toString());
+}
 
 export function AppUpdateBanner() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -13,44 +30,72 @@ export function AppUpdateBanner() {
   useEffect(() => {
     let cancelled = false;
 
+    const markAvailable = () => {
+      if (!cancelled) setUpdateAvailable(true);
+    };
+
     async function checkVersion() {
       try {
         const res = await fetch(`/api/version?t=${Date.now()}`, { cache: 'no-store' });
         if (!res.ok) return;
         const data = (await res.json()) as { version?: string };
-        if (!cancelled && data.version && data.version !== BUILD_ID && BUILD_ID !== 'local') {
-          setUpdateAvailable(true);
-        }
+        const remote = data.version?.trim();
+        if (!remote || remote === 'local') return;
+        if (remote !== BUILD_ID) markAvailable();
       } catch {
         // ignore network errors
       }
     }
 
     void checkVersion();
+    const first = window.setTimeout(() => void checkVersion(), FIRST_CHECK_MS);
     const id = window.setInterval(checkVersion, POLL_MS);
     const onFocus = () => void checkVersion();
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void checkVersion();
+    };
+    const onSwUpdate = () => markAvailable();
+    const onControllerChange = () => markAvailable();
+
     window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onVisibility);
+    window.addEventListener('syncvete:app-update', onSwUpdate);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    }
 
     return () => {
       cancelled = true;
+      window.clearTimeout(first);
       window.clearInterval(id);
       window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('syncvete:app-update', onSwUpdate);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('controllerchange', onControllerChange);
+      }
     };
   }, []);
 
   if (!updateAvailable) return null;
 
   return (
-    <div className="fixed inset-x-0 top-0 z-[70] flex justify-center p-3 pointer-events-none">
-      <div className="pointer-events-auto flex max-w-lg items-center gap-3 rounded-xl border border-[color-mix(in_oklab,var(--clinic)_30%,transparent)] bg-card px-4 py-3 text-sm shadow-lg">
-        <p className="text-foreground">
+    <div className="fixed inset-x-0 top-0 z-[100] flex justify-center p-3 pointer-events-none">
+      <div
+        role="status"
+        aria-live="polite"
+        className="pointer-events-auto flex max-w-xl flex-wrap items-center gap-3 rounded-xl border-2 border-teal-500/50 bg-card px-4 py-3 text-sm shadow-2xl"
+      >
+        <p className="min-w-0 flex-1 text-foreground">
           Hay una <span className="font-semibold">actualización</span> de {APP_NAME} disponible.
         </p>
         <button
           type="button"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-white"
-          style={{ backgroundColor: 'var(--clinic)' }}
-          onClick={() => window.location.reload()}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-white"
+          style={{ backgroundColor: 'var(--clinic, #3f6b4a)' }}
+          onClick={() => {
+            void hardReload();
+          }}
         >
           <RefreshCw className="h-3.5 w-3.5" />
           Actualizar

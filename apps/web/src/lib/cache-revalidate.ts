@@ -60,7 +60,7 @@ export function revalidatePatientsList() {
 }
 
 export function revalidateOwnerPatients(ownerId: string) {
-  revalidatePath(`/propietarios/${ownerId}`);
+  revalidatePath(`/tutores/${ownerId}`);
 }
 
 /** Only when a dashboard counter truly must refresh (create/delete volume events). */

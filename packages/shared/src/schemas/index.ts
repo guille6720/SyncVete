@@ -225,7 +225,7 @@ export const patientSchema = z.object({
     .min(1, 'El nombre es requerido')
     .max(100, 'El nombre es demasiado largo')
     .transform((v) => v.trim()),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   species: z
     .enum(['Canino', 'Felino', 'Ave', 'Roedor', 'Reptil', 'Equino', 'Bovino', 'Otro'])
     .default('Canino'),
@@ -311,7 +311,7 @@ const dateParamSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Fecha inválida
 
 export const appointmentSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   assignedUserId: z
     .union([z.string().uuid('Profesional inválido'), z.literal('')])
     .optional()
@@ -425,7 +425,7 @@ export const professionalTimeBlockListSchema = z.object({
 
 export const waitlistEntrySchema = z.object({
   branchId: z.string().uuid('Sucursal inválida'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   patientId: z.string().uuid('Paciente inválido'),
   appointmentType: z.enum(APPOINTMENT_TYPES).default('consulta'),
   preferredUserId: z
@@ -507,7 +507,7 @@ const optionalClinicalNumber = z
 
 export const clinicalEntrySchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   appointmentId: z
     .union([z.string().uuid('Cita inválida'), z.literal('')])
     .optional()
@@ -637,7 +637,7 @@ export const consultationSoapSchema = z.object({
 
 export const consultationStartSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   appointmentId: z
     .union([z.string().uuid('Cita inválida'), z.literal('')])
     .optional()
@@ -673,7 +673,7 @@ const optionalClinicalText = z
 
 export const hospitalizationAdmitSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   branchId: z
     .union([z.string().uuid('Sucursal inválida'), z.literal('')])
     .optional()
@@ -777,7 +777,7 @@ const optionalShortText = (max: number) =>
 export const vaccinationRecordSchema = z
   .object({
     patientId: z.string().uuid('Paciente inválido'),
-    ownerId: z.string().uuid('Propietario inválido'),
+    ownerId: z.string().uuid('Tutor inválido'),
     branchId: z
       .union([z.string().uuid('Sucursal inválida'), z.literal('')])
       .optional()
@@ -837,7 +837,7 @@ export type VaccinationListInput = z.infer<typeof vaccinationListSchema>;
 
 export const surgeryScheduleSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   branchId: z
     .union([z.string().uuid('Sucursal inválida'), z.literal('')])
     .optional()
@@ -915,7 +915,7 @@ const labTestsFromForm = z.preprocess((value) => {
 
 export const labOrderCreateSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   branchId: z
     .union([z.string().uuid('Sucursal inválida'), z.literal('')])
     .optional()
@@ -1035,7 +1035,7 @@ const invoiceItemSchema = z.object({
 });
 
 export const invoiceCreateSchema = z.object({
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   patientId: z
     .union([z.string().uuid('Paciente inválido'), z.literal('')])
     .optional()
@@ -1115,7 +1115,7 @@ export const portalActivateSchema = z.object({
 export type PortalActivateInput = z.infer<typeof portalActivateSchema>;
 
 export const whatsappComposeSchema = z.object({
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   patientId: z.string().uuid().optional(),
   templateKey: z.enum([
     'recordatorio_cita',
@@ -1212,7 +1212,7 @@ const prescriptionItemSchema = z.object({
 
 export const prescriptionCreateSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   branchId: z
     .union([z.string().uuid('Sucursal inválida'), z.literal('')])
     .optional()
@@ -1264,7 +1264,7 @@ export type CashSessionListInput = z.infer<typeof cashSessionListSchema>;
 
 export const clinicalImageCreateSchema = z.object({
   patientId: z.string().uuid('Paciente inválido'),
-  ownerId: z.string().uuid('Propietario inválido'),
+  ownerId: z.string().uuid('Tutor inválido'),
   branchId: z
     .union([z.string().uuid('Sucursal inválida'), z.literal('')])
     .optional()

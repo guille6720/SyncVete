@@ -12,7 +12,6 @@ import { cn } from '@/lib/utils';
 import { APP_NAME, ROLE_LABELS, isClinicPathEntitled, type Role } from '@sincvete/shared';
 import { BrandLogo } from '@/components/brand/syncvete-logo';
 import { ThemeControls } from '@/components/theme/theme-controls';
-import { AppUpdateBanner } from '@/components/layout/app-update-banner';
 import { InstallAppButton } from '@/components/pwa/install-app-button';
 import { CommandPalette, CommandPaletteTrigger } from './command-palette';
 import { NotificationBell } from '@/components/notifications/notification-bell';
@@ -33,6 +32,8 @@ interface AppShellProps {
   /** Streamed commercial banner (non-critical). Prefer over blocking layout awaits. */
   billingBannerSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
+  /** When false, Tutoriales stays out of the sidebar and command palette. */
+  academiaEnabled?: boolean;
 }
 
 export function AppShell({
@@ -47,6 +48,7 @@ export function AppShell({
   entitledHrefs = null,
   billingBannerSlot = null,
   showMySettlementsNav = false,
+  academiaEnabled = false,
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -84,11 +86,11 @@ export function AppShell({
 
   return (
     <div className="flex min-h-dvh" style={{ background: 'var(--shell-bg)' }}>
-      <AppUpdateBanner />
       <CommandPalette
         entitledHrefs={entitledHrefs}
         isPlatformAdmin={isPlatformAdmin}
         showMySettlementsNav={showMySettlementsNav}
+        academiaEnabled={academiaEnabled}
       />
 
       {pendingHref ? (
@@ -176,6 +178,7 @@ export function AppShell({
         <ClinicSidebarNav
           entitledHrefs={entitledHrefs}
           showMySettlementsNav={showMySettlementsNav}
+          academiaEnabled={academiaEnabled}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           onNavigate={(href, isActive) => {

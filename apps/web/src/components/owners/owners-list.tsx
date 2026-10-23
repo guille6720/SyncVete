@@ -7,6 +7,7 @@ import { Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { OwnerPortalListActions } from '@/components/owners/owner-portal-list-actions';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import type { Owner, PaginatedResult } from '@sincvete/shared';
 
@@ -50,7 +51,7 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="relative max-w-md flex-1">
+        <div className="relative max-w-md flex-1" data-tour="tutores-search">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             placeholder="Buscar por nombre, teléfono, DNI..."
@@ -60,37 +61,40 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
           />
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/propietarios/nuevo">
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo propietario
-            </Link>
-          </Button>
+          <div data-tour="tutores-new">
+            <Button asChild>
+              <Link href="/tutores/nuevo">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo tutor
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 
       {data.data.length === 0 ? (
-        <div className="rounded-lg border border-dashed p-12 text-center">
+        <div className="rounded-lg border border-dashed p-12 text-center" data-tour="tutores-list">
           <p className="text-muted-foreground">
             {initialSearch
-              ? 'No se encontraron propietarios con esa búsqueda.'
-              : 'Todavía no hay propietarios registrados.'}
+              ? 'No se encontraron tutores con esa búsqueda.'
+              : 'Todavía no hay tutores registrados.'}
           </p>
           {canWrite && !initialSearch && (
             <Button asChild className="mt-4">
-              <Link href="/propietarios/nuevo">Registrar primer propietario</Link>
+              <Link href="/tutores/nuevo">Registrar primer tutor</Link>
             </Button>
           )}
         </div>
       ) : (
         <>
-          <div className="overflow-hidden rounded-lg border">
+          <div className="overflow-hidden rounded-lg border" data-tour="tutores-list">
             <table className="w-full text-sm">
               <thead className="border-b bg-muted/40">
                 <tr>
                   <th className="px-4 py-3 text-left font-medium">Nombre</th>
                   <th className="hidden px-4 py-3 text-left font-medium md:table-cell">Contacto</th>
                   <th className="hidden px-4 py-3 text-left font-medium lg:table-cell">Documento</th>
+                  <th className="px-4 py-3 text-left font-medium">App</th>
                   <th className="px-4 py-3 text-left font-medium">Estado</th>
                 </tr>
               </thead>
@@ -99,7 +103,7 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
                   <tr key={owner.id} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="px-4 py-3">
                       <Link
-                        href={`/propietarios/${owner.id}`}
+                        href={`/tutores/${owner.id}`}
                         className="font-medium hover:text-primary hover:underline"
                       >
                         {owner.full_name}
@@ -120,6 +124,15 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
                         : '—'}
                     </td>
                     <td className="px-4 py-3">
+                      <OwnerPortalListActions
+                        ownerId={owner.id}
+                        ownerName={owner.full_name}
+                        portalUserId={owner.portal_user_id}
+                        portalPendingUserId={owner.portal_pending_user_id ?? null}
+                        canWrite={canWrite}
+                      />
+                    </td>
+                    <td className="px-4 py-3">
                       <Badge variant={owner.is_active ? 'success' : 'destructive'}>
                         {owner.is_active ? 'Activo' : 'Inactivo'}
                       </Badge>
@@ -133,7 +146,7 @@ export function OwnersList({ data, canWrite, initialSearch = '' }: OwnersListPro
           {data.totalPages > 1 && (
             <div className="flex items-center justify-between">
               <p className="text-sm text-muted-foreground">
-                {data.total} propietario{data.total !== 1 ? 's' : ''} · Página {data.page} de{' '}
+                {data.total} tutor{data.total !== 1 ? 's' : ''} · Página {data.page} de{' '}
                 {data.totalPages}
               </p>
               <div className="flex gap-2">

@@ -48,7 +48,7 @@ export function VaccinationsHistory({ data, initialSearch = '' }: VaccinationsHi
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-tour="vacunacion-list">
       <div>
         <h2 className="text-lg font-semibold">Historial</h2>
         <p className="text-sm text-muted-foreground">Vacunas aplicadas en la clínica</p>

@@ -9,6 +9,7 @@ import {
 import { HospitalizationsBoard } from '@/components/hospitalizations/hospitalizations-board';
 import { HospitalizationsHistory } from '@/components/hospitalizations/hospitalizations-history';
 import { HOSPITALIZATION_STATUSES, type HospitalizationStatus } from '@sincvete/shared';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface InternacionPageProps {
   searchParams: Promise<{ page?: string; search?: string; status?: string }>;
@@ -37,9 +38,10 @@ export default async function InternacionPage({ searchParams }: InternacionPageP
     canManageHospitalizations(),
   ]);
 
+  const tour = moduleTourTargets('internacion');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">Internación</h1>
         <p className="text-muted-foreground">Pacientes internados, evoluciones y altas</p>
       </div>

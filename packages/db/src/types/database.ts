@@ -473,6 +473,7 @@ export interface Database {
           notes: string | null;
           is_active: boolean;
           portal_user_id: string | null;
+          portal_pending_user_id: string | null;
           import_batch_id: string | null;
           source_system: string | null;
           source_record_id: string | null;
@@ -500,6 +501,7 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          portal_pending_user_id?: string | null;
           import_batch_id?: string | null;
           source_system?: string | null;
           source_record_id?: string | null;
@@ -527,6 +529,7 @@ export interface Database {
           notes?: string | null;
           is_active?: boolean;
           portal_user_id?: string | null;
+          portal_pending_user_id?: string | null;
           import_batch_id?: string | null;
           source_system?: string | null;
           source_record_id?: string | null;
@@ -6490,6 +6493,10 @@ export interface Database {
           total_count: number;
         }[];
       };
+      soft_delete_owner: {
+        Args: { p_owner_id: string };
+        Returns: string;
+      };
       search_owners: {
         Args: {
           p_search?: string | null;
@@ -6513,8 +6520,11 @@ export interface Database {
           postal_code: string | null;
           notes: string | null;
           is_active: boolean;
+          portal_user_id: string | null;
+          portal_pending_user_id: string | null;
           created_at: string;
           updated_at: string;
+          deleted_at: string | null;
           total_count: number;
         }[];
       };
@@ -6609,6 +6619,16 @@ export interface Database {
         };
         Returns: undefined;
       };
+      approve_owner_portal_access: {
+        Args: {
+          p_owner_id: string;
+        };
+        Returns: string;
+      };
+      get_portal_pending_owner_id: {
+        Args: Record<string, never>;
+        Returns: string;
+      };
       get_owner_portal_status: {
         Args: {
           p_owner_id: string;
@@ -6619,6 +6639,18 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Json;
       };
+      get_owner_app_brand: { Args: { p_organization_id: string }; Returns: Json };
+      get_owner_app_invite_brand: { Args: { p_token: string }; Returns: Json };
+      save_owner_app_brand: { Args: { p_brand: Json }; Returns: undefined };
+      publish_owner_app_slot: { Args: { p_branch_id: string; p_starts_at: string }; Returns: string };
+      get_owner_professional_availability: { Args: { p_date?: string | null }; Returns: Json };
+      book_owner_professional_slot: { Args: { p_schedule_id: string; p_starts_at: string; p_patient_id: string }; Returns: string };
+      book_owner_app_slot: { Args: { p_slot_id: string; p_patient_id: string }; Returns: string };
+      cancel_owner_app_booking: { Args: { p_appointment_id: string }; Returns: undefined };
+      get_owner_app_data: { Args: Record<string, never>; Returns: Json };
+      queue_owner_app_reminders: { Args: { p_now?: string }; Returns: number };
+      claim_owner_app_emails: { Args: Record<string, never>; Returns: Json };
+      complete_owner_app_email: { Args: { p_id: string }; Returns: undefined };
       get_owner_portal_patient: {
         Args: {
           p_patient_id: string;

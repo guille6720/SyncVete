@@ -277,14 +277,14 @@ export const FALLBACK_PUBLIC_ADDONS: PublicAddonCatalogItem[] = [
   {
     key: 'addon.portal',
     name: 'Portal del tutor',
-    description: 'Acceso del propietario a turnos e historia desde el portal.',
+    description: 'Acceso del tutor a turnos e historia desde el portal.',
     displayOrder: 30,
     pricing: {
       ...EMPTY_PRICING,
       monthlyAmount: 5900,
       annualAmount: 59000,
       cta: 'checkout',
-      highlights: ['Portal del propietario'],
+      highlights: ['Portal del tutor'],
     },
   },
   {

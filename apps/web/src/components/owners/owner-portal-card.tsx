@@ -2,7 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { inviteOwnerToPortal, revokeOwnerPortalAccess } from '@/actions/portal';
+import {
+  approveOwnerPortalAccess,
+  inviteOwnerToPortal,
+  revokeOwnerPortalAccess,
+} from '@/actions/portal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +25,8 @@ interface OwnerPortalCardProps {
   canWrite: boolean;
   portalEnabled?: boolean;
   status: OwnerPortalStatus | null;
+  /** When true, invite/resend lives in the App del tutor card. */
+  hideInviteActions?: boolean;
 }
 
 export function OwnerPortalCard({
@@ -29,6 +35,7 @@ export function OwnerPortalCard({
   canWrite,
   portalEnabled = true,
   status,
+  hideInviteActions = false,
 }: OwnerPortalCardProps) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +43,7 @@ export function OwnerPortalCard({
   const [pending, setPending] = useState(false);
   const [revokeOpen, setRevokeOpen] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+  const [deliveryMessage, setDeliveryMessage] = useState<string | null>(null);
   const access = status?.status ?? 'inactive';
 
   const handleInvite = async () => {
@@ -50,6 +58,25 @@ export function OwnerPortalCard({
     }
     const path = buildPortalActivatePath(result.data.token);
     setInviteUrl(`${window.location.origin}${path}`);
+    setDeliveryMessage(
+      result.data.deliveryStatus === 'sent'
+        ? 'Invitacion enviada por email.'
+        : result.data.deliveryStatus === 'not_sent'
+          ? 'El email no se envio. Podes compartir el enlace privado.'
+          : null
+    );
+    router.refresh();
+  };
+
+  const handleApprove = async () => {
+    setPending(true);
+    setError(null);
+    const result = await approveOwnerPortalAccess(ownerId);
+    setPending(false);
+    if (!result.success) {
+      setError(result.error ?? 'No se pudo activar el acceso');
+      return;
+    }
     router.refresh();
   };
 
@@ -83,7 +110,7 @@ export function OwnerPortalCard({
       <ConfirmDialog
         open={revokeOpen}
         title="Revocar acceso al portal"
-        description="¿Revocar el acceso al portal de este propietario?"
+        description="¿Revocar el acceso al portal de este tutor?"
         confirmLabel="Revocar"
         variant="destructive"
         onClose={() => setRevokeOpen(false)}
@@ -99,7 +126,8 @@ export function OwnerPortalCard({
           </Badge>
         </div>
         <CardDescription>
-          El propietario puede ver mascotas, turnos, vacunas y facturas emitidas.
+          El tutor crea su cuenta con el enlace. Después vos activás el acceso para que vea
+          mascotas y turnos.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -109,6 +137,12 @@ export function OwnerPortalCard({
         {status?.status === 'invited' && status.expiresAt && (
           <p className="text-sm text-muted-foreground">
             Invitación válida hasta {formatDashboardDateTime(status.expiresAt)}
+          </p>
+        )}
+        {access === 'pending_approval' && (
+          <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+            El tutor ya creó su cuenta. Activá el acceso para que vea la información de sus
+            mascotas y turnos.
           </p>
         )}
         {inviteUrl && (
@@ -131,6 +165,11 @@ export function OwnerPortalCard({
             )}
           </div>
         )}
+        {deliveryMessage && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {deliveryMessage}
+          </p>
+        )}
         {!portalEnabled && (
           <p className="text-sm text-muted-foreground">
             El portal del tutor no está incluido en el plan actual.
@@ -139,7 +178,17 @@ export function OwnerPortalCard({
         {error && <p className="text-sm text-destructive">{error}</p>}
         {canWrite && (
           <div className="flex flex-wrap gap-2">
-            {access !== 'active' && (
+            {access === 'pending_approval' && (
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void handleApprove()}
+                disabled={pending || !portalEnabled}
+              >
+                {pending ? 'Activando…' : 'Activar acceso'}
+              </Button>
+            )}
+            {!hideInviteActions && access !== 'active' && access !== 'pending_approval' && (
               <Button
                 type="button"
                 size="sm"

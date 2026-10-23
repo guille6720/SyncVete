@@ -1216,7 +1216,7 @@ export async function attachInterconsultationToInvoice(
         return { success: false, error: 'Solo se puede agregar a facturas en borrador' };
       }
       if (String(invoice.owner_id) !== detail.ownerId) {
-        return { success: false, error: 'La factura debe ser del mismo propietario' };
+        return { success: false, error: 'La factura debe ser del mismo tutor' };
       }
     } else if (parsed.data.createDraft) {
       const organization = await getOrganization();

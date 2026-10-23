@@ -151,9 +151,9 @@ export function LabOrderDetail({
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${order.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${order.owner_id}`} className="text-primary hover:underline">
                 {order.owner_full_name}
               </Link>
             }

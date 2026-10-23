@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { portalActivateSchema } from '../schemas';
-import { buildPortalActivatePath } from '../constants/portal';
+import { buildPortalActivatePath, normalizePortalInviteToken } from '../constants/portal';
 import {
   isNonEmptyPortalPayload,
   parseOwnerPortalHome,
@@ -34,6 +34,18 @@ describe('portalActivateSchema', () => {
 describe('buildPortalActivatePath', () => {
   it('encodes the invite token', () => {
     expect(buildPortalActivatePath('abc+def')).toBe('/portal/activar?token=abc%2Bdef');
+  });
+});
+
+describe('normalizePortalInviteToken', () => {
+  it('recovers hex tokens mangled by messengers', () => {
+    const token = `${'ab'.repeat(32)}`;
+    expect(normalizePortalInviteToken(`${token.slice(0, 3)}/${token.slice(3)}/`)).toBe(token);
+  });
+
+  it('returns empty for missing values', () => {
+    expect(normalizePortalInviteToken(null)).toBe('');
+    expect(normalizePortalInviteToken('***')).toBe('');
   });
 });
 

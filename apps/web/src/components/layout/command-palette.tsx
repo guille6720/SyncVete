@@ -29,6 +29,7 @@ import {
   ScrollText,
   Hourglass,
   Briefcase,
+  GraduationCap,
   Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -45,7 +46,7 @@ const NAV_ITEMS = [
     icon: Hourglass,
     keywords: 'cola checkin llamado recepcion espera',
   },
-  { label: 'Propietarios', href: '/propietarios', icon: Users, keywords: 'clientes tutores' },
+  { label: 'Tutores', href: '/tutores', icon: Users, keywords: 'clientes tutores' },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, keywords: 'mascotas animales' },
   { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList, keywords: 'historia clinica evolucion' },
   { label: 'Imágenes', href: '/imagenes', icon: Images, keywords: 'fotos radiografia ecografia estudios galeria' },
@@ -82,12 +83,18 @@ const NAV_ITEMS = [
   { label: 'Recordatorios', href: '/recordatorios', icon: Bell, keywords: 'avisos turnos vacunas saldos' },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, keywords: 'avisos campana inbox laboratorio stock' },
   { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles, keywords: 'inteligencia artificial resumen soap tutor' },
+  {
+    label: 'Tutoriales',
+    href: '/academia',
+    icon: GraduationCap,
+    keywords: 'tutorial tutoriales aprendizaje guia onboarding academia',
+  },
   { label: 'Configuración', href: '/configuracion', icon: Settings, keywords: 'ajustes settings' },
   { label: 'Manual de uso', href: '/manual', icon: BookOpen, keywords: 'ayuda guia descargar pdf instrucciones' },
 ] as const;
 
 const QUICK_ACTIONS = [
-  { label: 'Nuevo propietario', href: '/propietarios/nuevo', keywords: 'crear tutor cliente' },
+  { label: 'Nuevo tutor', href: '/tutores/nuevo', keywords: 'crear tutor cliente' },
   { label: 'Nuevo paciente', href: '/pacientes/nuevo', keywords: 'crear mascota animal' },
   { label: 'Nueva cita', href: '/agenda/nueva', keywords: 'agendar turno cita' },
   { label: 'Nueva entrada clínica', href: '/historia-clinica/nuevo', keywords: 'historia clinica evolucion' },
@@ -115,10 +122,12 @@ export function CommandPalette({
   entitledHrefs = null,
   isPlatformAdmin = false,
   showMySettlementsNav = false,
+  academiaEnabled = false,
 }: {
   entitledHrefs?: string[] | null;
   isPlatformAdmin?: boolean;
   showMySettlementsNav?: boolean;
+  academiaEnabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -159,6 +168,7 @@ export function CommandPalette({
     if (item.href === '/liquidaciones/mis-liquidaciones' && !showMySettlementsNav) {
       return false;
     }
+    if (item.href === '/academia' && !academiaEnabled) return false;
     return isClinicPathEntitled(item.href, entitledHrefs);
   });
 

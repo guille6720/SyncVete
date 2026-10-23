@@ -2,15 +2,17 @@
 
 import { Download, Share2, X } from 'lucide-react';
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { APP_NAME } from '@sincvete/shared';
 import { Button } from '@/components/ui/button';
 import { usePwaInstall } from '@/hooks/use-pwa-install';
 
 export function InstallAppPrompt() {
+  const pathname = usePathname();
   const { visible, canInstallNative, canShowIosHint, dismiss, install } = usePwaInstall();
   const [iosOpen, setIosOpen] = useState(false);
 
-  if (!visible) return null;
+  if (!visible || pathname.startsWith('/portal')) return null;
 
   const handlePrimary = async () => {
     if (canInstallNative) {

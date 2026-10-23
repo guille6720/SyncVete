@@ -19,6 +19,7 @@ import type { DashboardNavGroupId } from '@/components/dashboard/dashboard-nav-c
 interface ClinicSidebarNavProps {
   entitledHrefs?: string[] | null;
   showMySettlementsNav?: boolean;
+  academiaEnabled?: boolean;
   isPlatformAdmin?: boolean;
   pendingHref: string | null;
   onNavigate: (href: string, isActive: boolean) => void;
@@ -76,6 +77,7 @@ function NavLink({
 export function ClinicSidebarNav({
   entitledHrefs = null,
   showMySettlementsNav = false,
+  academiaEnabled = false,
   isPlatformAdmin = false,
   pendingHref,
   onNavigate,
@@ -87,9 +89,10 @@ export function ClinicSidebarNav({
       filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, {
         entitledHrefs,
         showMySettlementsNav,
+        academiaEnabled,
         isEntitled: (href) => isClinicPathEntitled(href, entitledHrefs),
       }),
-    [entitledHrefs, showMySettlementsNav]
+    [entitledHrefs, showMySettlementsNav, academiaEnabled]
   );
 
   const { topLevel, groups } = useMemo(() => groupClinicSidebarNavItems(visible), [visible]);

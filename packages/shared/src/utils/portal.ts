@@ -98,6 +98,8 @@ function parsePatientSummary(raw: unknown): PortalPatientSummary | null {
     breed: strOrNull(data.breed),
     sex: str(data.sex) as PatientSex,
     birthDate: strOrNull(data.birth_date),
+    // RPC may return snake_case; tolerate camelCase if a proxy remaps keys.
+    photoUrl: strOrNull(data.photo_url ?? data.photoUrl),
     isDeceased: bool(data.is_deceased),
   };
 }

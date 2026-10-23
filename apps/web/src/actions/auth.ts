@@ -1,5 +1,7 @@
 'use server';
 
+import { safeOwnerPortalRedirect } from '@/lib/owner-app-navigation';
+
 import { redirect } from 'next/navigation';
 import {
   requestPasswordResetSchema,
@@ -70,8 +72,8 @@ export async function signIn(
       };
     }
 
-    const redirectTo = formData.get('redirectTo');
-    if (typeof redirectTo === 'string' && redirectTo.startsWith('/portal/activar')) {
+    const redirectTo = safeOwnerPortalRedirect(formData.get('redirectTo'));
+    if (redirectTo) {
       redirect(redirectTo);
     }
 

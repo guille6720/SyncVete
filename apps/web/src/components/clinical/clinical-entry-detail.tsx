@@ -139,10 +139,10 @@ export function ClinicalEntryDetail({ entry, canWrite }: ClinicalEntryDetailProp
               }
             />
             <DetailField
-              label="Propietario"
+              label="Tutor"
               value={
                 <Link
-                  href={`/propietarios/${entry.owner_id}`}
+                  href={`/tutores/${entry.owner_id}`}
                   className="text-primary hover:underline"
                 >
                   {entry.owner_full_name}

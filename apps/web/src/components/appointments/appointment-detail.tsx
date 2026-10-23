@@ -375,9 +375,9 @@ export function AppointmentDetail({
             }
           />
           <DetailField
-            label="Propietario"
+            label="Tutor"
             value={
-              <Link href={`/propietarios/${appointment.owner_id}`} className="text-primary hover:underline">
+              <Link href={`/tutores/${appointment.owner_id}`} className="text-primary hover:underline">
                 {appointment.owner_full_name}
               </Link>
             }

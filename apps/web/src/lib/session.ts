@@ -33,6 +33,7 @@ type SessionBootstrap = {
   profile: BootstrapProfile;
   memberships: BootstrapMembership[];
   portal_owner_id: string | null;
+  portal_pending_owner_id?: string | null;
 };
 
 function profileToSession(profile: BootstrapProfile): SessionContext['profile'] {
@@ -100,7 +101,11 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
 
     const portalOwnerId =
       typeof bootstrap.portal_owner_id === 'string' ? bootstrap.portal_owner_id : null;
-    if (!portalOwnerId) return null;
+    const portalPendingOwnerId =
+      typeof bootstrap.portal_pending_owner_id === 'string'
+        ? bootstrap.portal_pending_owner_id
+        : null;
+    if (!portalOwnerId && !portalPendingOwnerId) return null;
 
     return {
       userId: user.id,
@@ -110,7 +115,8 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
       role: null,
       permissions: [],
       profile: profileToSession(profile),
-      ownerId: portalOwnerId,
+      ownerId: portalOwnerId ?? portalPendingOwnerId,
+      portalPendingApproval: !portalOwnerId && Boolean(portalPendingOwnerId),
       isPlatformAdmin,
     };
   }
@@ -172,7 +178,13 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
   }
 
   const { data: portalOwnerId } = await supabase.rpc('get_portal_owner_id');
-  if (!portalOwnerId) return null;
+  let portalPendingOwnerId: string | null = null;
+  if (!portalOwnerId) {
+    const pending = await supabase.rpc('get_portal_pending_owner_id');
+    portalPendingOwnerId =
+      typeof pending.data === 'string' ? pending.data : null;
+  }
+  if (!portalOwnerId && !portalPendingOwnerId) return null;
 
   return {
     userId: user.id,
@@ -182,7 +194,8 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
     role: null,
     permissions: [],
     profile: profileToSession(profile),
-    ownerId: portalOwnerId,
+    ownerId: portalOwnerId ?? portalPendingOwnerId,
+    portalPendingApproval: !portalOwnerId && Boolean(portalPendingOwnerId),
     isPlatformAdmin,
   };
 });

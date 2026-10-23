@@ -4,6 +4,7 @@ import { listLabQueue, listLabOrders, canManageLab, canReadLab } from '@/actions
 import { LabQueue } from '@/components/lab/lab-queue';
 import { LabHistory } from '@/components/lab/lab-history';
 import { LAB_ORDER_STATUSES, type LabOrderStatus } from '@sincvete/shared';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface LaboratorioPageProps {
   searchParams: Promise<{ page?: string; search?: string; status?: string }>;
@@ -32,9 +33,10 @@ export default async function LaboratorioPage({ searchParams }: LaboratorioPageP
     canManageLab(),
   ]);
 
+  const tour = moduleTourTargets('laboratorio');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">Laboratorio</h1>
         <p className="text-muted-foreground">Órdenes, resultados e interpretación</p>
       </div>

@@ -26,7 +26,7 @@ export function LabQueue({ items, canWrite }: LabQueueProps) {
   const inProgress = items.filter((item) => item.status === 'en_proceso');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="laboratorio-list">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Cola de laboratorio</h2>
@@ -36,12 +36,14 @@ export function LabQueue({ items, canWrite }: LabQueueProps) {
           </p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/laboratorio/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Nueva orden
-            </Link>
-          </Button>
+          <div data-tour="laboratorio-new">
+            <Button asChild>
+              <Link href="/laboratorio/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Nueva orden
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

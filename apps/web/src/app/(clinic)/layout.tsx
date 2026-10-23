@@ -6,8 +6,10 @@ import { getUserBranches } from '@/actions/settings';
 import { AppShell } from '@/components/layout/app-shell';
 import { EntitlementRouteGate } from '@/components/entitlements/entitlement-route-gate';
 import { ClinicBillingBannerSlot } from '@/components/entitlements/clinic-billing-banner-slot';
+import { ClinicTutorialShell } from '@/components/tutorials/clinic-tutorial-shell';
 import { getClinicEntitledHrefs } from '@/lib/entitlements';
 import { hasLinkedProfessionalProfile } from '@/actions/professionals';
+import { isAcademiaEnabled } from '@/lib/tutorials/feature-flag';
 
 export default async function ClinicLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionContext();
@@ -35,6 +37,8 @@ export default async function ClinicLayout({ children }: { children: React.React
     branches.find((b) => b.is_main)?.name ??
     branches[0]?.name;
 
+  const academiaEnabled = isAcademiaEnabled();
+
   return (
     <AppShell
       userName={session.profile.full_name}
@@ -46,13 +50,21 @@ export default async function ClinicLayout({ children }: { children: React.React
       isPlatformAdmin={session.isPlatformAdmin}
       entitledHrefs={entitledHrefs}
       showMySettlementsNav={showMySettlementsNav}
+      academiaEnabled={academiaEnabled}
       billingBannerSlot={
         <Suspense fallback={null}>
           <ClinicBillingBannerSlot organizationId={session.organizationId} />
         </Suspense>
       }
     >
-      <EntitlementRouteGate entitledHrefs={entitledHrefs}>{children}</EntitlementRouteGate>
+      <ClinicTutorialShell
+        enabled={academiaEnabled}
+        organizationId={session.organizationId}
+        userId={session.userId}
+        permissions={session.permissions ?? []}
+      >
+        <EntitlementRouteGate entitledHrefs={entitledHrefs}>{children}</EntitlementRouteGate>
+      </ClinicTutorialShell>
     </AppShell>
   );
 }

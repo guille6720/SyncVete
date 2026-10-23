@@ -14,6 +14,8 @@ import { hasPermission } from '@sincvete/shared';
 import { canPermissionAndFeature } from '@/lib/permissions';
 import { FEATURES } from '@/lib/entitlements';
 import type { Branch, SeatUsageMeter } from '@sincvete/shared';
+import { getOwnerAppBrand } from '@/actions/owner-app';
+import { ownerAppEnabled, parseOwnerAppBrand } from '@/lib/owner-app';
 
 interface PageProps {
   searchParams: Promise<{ tab?: string; checkout?: string }>;
@@ -104,6 +106,18 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
 
   return (
     <SettingsPageClient
+      ownerApp={
+        ownerAppEnabled() && hasPermission(session.permissions, 'org:manage')
+          ? {
+              brand:
+                (await getOwnerAppBrand(session.organizationId)) ??
+                parseOwnerAppBrand(null, clinicData?.organizationName),
+              branchId: hasPermission(session.permissions, 'appointments:write')
+                ? session.branchId
+                : null,
+            }
+          : undefined
+      }
       availableTabs={availableTabs}
       defaultTab={defaultTab}
       canImportData={canImportData}

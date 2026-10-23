@@ -23,6 +23,11 @@ import {
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { PermissionError, requirePermission, requirePortalSession } from '@/lib/permissions';
 import { getSessionContext } from '@/actions/auth';
+import { createHash } from 'node:crypto';
+import { ownerAppEnabled } from '@/lib/owner-app';
+import { ownerAppOrigin, sendOwnerAppEmail } from '@/lib/owner-app-email';
+import { getOwnerAppBrand } from '@/actions/owner-app';
+import { buildPortalActivatePath, normalizePortalInviteToken } from '@sincvete/shared';
 import { FEATURES, planRestrictionResult, requireFeature, canUseFeature } from '@/lib/entitlements';
 
 function isNextRedirect(error: unknown): boolean {
@@ -46,23 +51,25 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   return { success: false, error: 'Ocurrió un error inesperado' };
 }
 
-function rpcMessage(error: { message?: string } | null): string {
-  const message = error?.message ?? '';
-  if (message.includes('email')) return message;
-  if (message.includes('permisos')) return message;
-  if (message.includes('Invitación')) return message;
-  if (message.includes('portal')) return message;
-  if (message.includes('clínica') || message.includes('clinica')) return message;
-  if (message.includes('cuenta')) return message;
-  if (message.includes('Propietario')) return message;
-  return 'Ocurrió un error inesperado';
+function rpcMessage(error: { message?: string; code?: string; details?: string; hint?: string } | null): string {
+  const message = (error?.message ?? '').trim();
+  const details = (error?.details ?? '').trim();
+  const hint = (error?.hint ?? '').trim();
+  const combined = [message, details, hint].filter(Boolean).join(' — ');
+  if (!combined) return 'Ocurrió un error inesperado';
+  if (combined.includes('Not authenticated')) {
+    return 'Sesión no válida. Volvé a abrir el enlace de invitación.';
+  }
+  // Always surface the DB/PostgREST text so staging SQL issues are actionable.
+  return combined.length <= 280 ? combined : `${combined.slice(0, 277)}...`;
 }
 
 export async function previewPortalInvite(token: string): Promise<PortalInvitePreview | null> {
-  if (!token.trim()) return null;
+  const inviteToken = normalizePortalInviteToken(token);
+  if (!inviteToken) return null;
   const supabase = await createServerClient();
   const { data, error } = await supabase.rpc('preview_owner_portal_invite', {
-    p_token: token.trim(),
+    p_token: inviteToken,
   });
   if (error) return null;
   return parsePortalInvitePreview(data);
@@ -78,7 +85,9 @@ export async function getOwnerPortalStatus(ownerId: string): Promise<OwnerPortal
   return parseOwnerPortalStatus(data);
 }
 
-export async function inviteOwnerToPortal(ownerId: string): Promise<ActionResult<PortalInviteCreated>> {
+export async function inviteOwnerToPortal(
+  ownerId: string
+): Promise<ActionResult<PortalInviteCreated>> {
   try {
     const session = await requirePermission('patients:write');
     await requireFeature(session.organizationId, FEATURES.OWNER_PORTAL);
@@ -93,7 +102,20 @@ export async function inviteOwnerToPortal(ownerId: string): Promise<ActionResult
     if (!invite) {
       return { success: false, error: 'No se pudo crear la invitación' };
     }
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath(`/tutores/${ownerId}`);
+    if (ownerAppEnabled() && (await getOwnerAppBrand(session.organizationId))?.enabled) {
+      try {
+        const sent = await sendOwnerAppEmail(
+          invite.email,
+          'Invitacion a la app de tu veterinaria',
+          `Activa tu acceso e instala la app desde este enlace privado:\n\n${ownerAppOrigin()}${buildPortalActivatePath(invite.token)}\n\nEl enlace vence el ${invite.expiresAt}.\n\nHecho por OpusOrg`,
+          `owner-app-invite-${createHash('sha256').update(invite.token).digest('hex')}`
+        );
+        return { success: true, data: { ...invite, deliveryStatus: sent ? 'sent' : 'not_sent' } };
+      } catch {
+        return { success: true, data: { ...invite, deliveryStatus: 'not_sent' } };
+      }
+    }
     return { success: true, data: invite };
   } catch (error) {
     return actionError(error);
@@ -110,7 +132,30 @@ export async function revokeOwnerPortalAccess(ownerId: string): Promise<ActionRe
     if (error) {
       return { success: false, error: rpcMessage(error) };
     }
-    revalidatePath(`/propietarios/${ownerId}`);
+    revalidatePath('/tutores');
+    revalidatePath(`/tutores/${ownerId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function approveOwnerPortalAccess(ownerId: string): Promise<ActionResult> {
+  try {
+    await requirePermission('patients:write');
+    const supabase = await createServerClient();
+    const { data, error } = await supabase.rpc('approve_owner_portal_access', {
+      p_owner_id: ownerId,
+    });
+    if (error) {
+      return { success: false, error: rpcMessage(error) };
+    }
+    if (data !== ownerId) {
+      return { success: false, error: 'No se pudo activar el acceso del tutor' };
+    }
+    revalidatePath('/tutores');
+    revalidatePath(`/tutores/${ownerId}`);
+    revalidatePath('/portal', 'layout');
     return { success: true };
   } catch (error) {
     return actionError(error);
@@ -170,9 +215,7 @@ export async function getOwnerPortalWaitingRoom(date?: string): Promise<PortalWa
   return parsePortalWaitingRoomRows(data);
 }
 
-export async function listOwnerPortalAlerts(
-  unreadOnly = true
-): Promise<OwnerPortalAlert[]> {
+export async function listOwnerPortalAlerts(unreadOnly = true): Promise<OwnerPortalAlert[]> {
   const session = await requirePortalSession();
   const portalAllowed = await canUseFeature({
     organizationId: session.organizationId,
@@ -214,7 +257,7 @@ export async function acceptPortalInviteForm(
   _prevState: ActionResult | null,
   formData: FormData
 ): Promise<ActionResult> {
-  const token = String(formData.get('token') ?? '').trim();
+  const token = normalizePortalInviteToken(String(formData.get('token') ?? ''));
   if (!token) {
     return { success: false, error: 'Invitación inválida o vencida' };
   }
@@ -223,6 +266,10 @@ export async function acceptPortalInviteForm(
 
 export async function acceptPortalInvite(token: string): Promise<ActionResult> {
   try {
+    const inviteToken = normalizePortalInviteToken(token);
+    if (!inviteToken) {
+      return { success: false, error: 'Invitación inválida o vencida' };
+    }
     const supabase = await createServerClient();
     const {
       data: { user },
@@ -232,7 +279,7 @@ export async function acceptPortalInvite(token: string): Promise<ActionResult> {
     }
 
     const { error } = await supabase.rpc('accept_owner_portal_invite', {
-      p_token: token.trim(),
+      p_token: inviteToken,
       p_full_name: user.user_metadata?.full_name ?? null,
     });
     if (error) {
@@ -250,7 +297,7 @@ export async function activatePortalAccount(
   formData: FormData
 ): Promise<ActionResult> {
   const parsed = portalActivateSchema.safeParse({
-    token: formData.get('token'),
+    token: normalizePortalInviteToken(String(formData.get('token') ?? '')),
     fullName: formData.get('fullName'),
     password: formData.get('password'),
   });
@@ -294,14 +341,26 @@ export async function activatePortalAccount(
         };
       }
 
+      if (!authData.session) {
+        return {
+          success: false,
+          error:
+            'Revisa tu email para confirmar la cuenta. Luego ingresa y abre nuevamente esta invitacion.',
+        };
+      }
+
       const { error: acceptError } = await supabase.rpc('accept_owner_portal_invite', {
         p_token: parsed.data.token,
         p_full_name: parsed.data.fullName,
       });
 
       if (acceptError) {
-        const service = await createServiceClient();
-        await service.auth.admin.deleteUser(authData.user.id);
+        try {
+          const service = await createServiceClient();
+          await service.auth.admin.deleteUser(authData.user.id);
+        } catch (cleanupError) {
+          console.error('portal activate cleanup failed', cleanupError);
+        }
         return { success: false, error: rpcMessage(acceptError) };
       }
     } else {

@@ -10,6 +10,8 @@ const PUBLIC_ROUTES = [
   '/register',
   '/auth/callback',
   '/portal/activar',
+  '/portal/instalar',
+  '/portal/offline.html',
   '/check-in',
   '/interconsulta/responder',
   '/recuperar-contrasena',
@@ -18,6 +20,8 @@ const PUBLIC_ROUTES = [
   '/sw.js',
   '/manual',
   '/api/manual',
+  '/api/version',
+  '/api/billing/webhook',
   '/legal',
 ];
 
@@ -28,6 +32,16 @@ export async function middleware(request: NextRequest) {
     url.hostname = APP_CANONICAL_HOST;
     url.protocol = 'https:';
     url.port = '';
+    return NextResponse.redirect(url, 308);
+  }
+
+  // Module renamed Propietarios → Tutores; keep old bookmarks working.
+  if (
+    request.nextUrl.pathname === '/propietarios' ||
+    request.nextUrl.pathname.startsWith('/propietarios/')
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = request.nextUrl.pathname.replace(/^\/propietarios/, '/tutores');
     return NextResponse.redirect(url, 308);
   }
 
@@ -69,7 +83,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const isPublicRoute = PUBLIC_ROUTES.some((route) => pathname.startsWith(route));
+  const isPublicRoute =
+    PUBLIC_ROUTES.some(
+      (route) => pathname === route || (route !== '/' && pathname.startsWith(`${route}/`))
+    ) ||
+    pathname.startsWith('/portal/manifest/') ||
+    pathname === '/portal/manifest.webmanifest' ||
+    pathname === '/portal/brand.webmanifest' ||
+    pathname.startsWith('/portal/icon/') ||
+    pathname.startsWith('/api/cron/');
 
   if (!user && !isPublicRoute) {
     const url = request.nextUrl.clone();
@@ -102,10 +124,17 @@ export async function middleware(request: NextRequest) {
       `mw-auth;desc="middleware getUser";dur=${authMs.toFixed(1)}`
     );
   }
+  if (pathname.startsWith('/portal')) {
+    supabaseResponse.headers.set('Referrer-Policy', 'no-referrer');
+    supabaseResponse.headers.set('Cache-Control', 'private, no-store');
+    supabaseResponse.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  }
 
   return supabaseResponse;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest|icons/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
 };

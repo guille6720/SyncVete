@@ -19,6 +19,7 @@ import {
   Pill,
   Receipt,
   Scissors,
+  GraduationCap,
   ScrollText,
   Settings,
   Sparkles,
@@ -41,6 +42,8 @@ export interface ClinicSidebarNavItem {
   groupId: DashboardNavGroupId | null;
   /** Only show when AppShell enables my-settlements nav. */
   requiresMySettlements?: boolean;
+  /** Only show when Academia / Tutoriales is enabled for this deployment. */
+  requiresAcademia?: boolean;
 }
 
 /** Browse destinations for the clinic sidebar — same module groups as dashboard. */
@@ -55,7 +58,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Farmacia', href: '/farmacia', icon: Pill, groupId: 'clinical' },
   { label: 'IA clínica', href: '/ia-clinica', icon: Sparkles, groupId: 'clinical' },
 
-  { label: 'Propietarios', href: '/propietarios', icon: Users, groupId: 'patients' },
+  { label: 'Tutores', href: '/tutores', icon: Users, groupId: 'patients' },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, groupId: 'patients' },
 
   { label: 'Agenda', href: '/agenda', icon: Calendar, groupId: 'agenda' },
@@ -86,6 +89,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, groupId: 'communication' },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, groupId: 'communication' },
 
+  { label: 'Tutoriales', href: '/academia', icon: GraduationCap, groupId: 'settings', requiresAcademia: true },
   { label: 'Configuración', href: '/configuracion', icon: Settings, groupId: 'settings' },
 ];
 
@@ -94,11 +98,13 @@ export function filterClinicSidebarNavItems(
   opts: {
     entitledHrefs: string[] | null;
     showMySettlementsNav: boolean;
+    academiaEnabled?: boolean;
     isEntitled: (href: string) => boolean;
   }
 ): ClinicSidebarNavItem[] {
   return items.filter((item) => {
     if (item.requiresMySettlements && !opts.showMySettlementsNav) return false;
+    if (item.requiresAcademia && !opts.academiaEnabled) return false;
     return opts.isEntitled(item.href);
   });
 }

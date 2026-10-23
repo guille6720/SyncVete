@@ -7,6 +7,7 @@ import {
 } from '@/actions/notifications';
 import { NotificationsInbox } from '@/components/notifications/notifications-inbox';
 import { NOTIFICATION_KINDS, type NotificationKind } from '@sincvete/shared';
+import { moduleTourTargets } from '@sincvete/shared';
 
 interface NotificacionesPageProps {
   searchParams: Promise<{ page?: string; search?: string; kind?: string; unread?: string }>;
@@ -36,9 +37,10 @@ export default async function NotificacionesPage({ searchParams }: Notificacione
     countUnreadNotifications(),
   ]);
 
+  const tour = moduleTourTargets('notificaciones');
   return (
-    <div className="space-y-8">
-      <div>
+    <div className="space-y-8" data-tour={tour.root}>
+      <div data-tour={tour.header}>
         <h1 className="text-2xl font-bold tracking-tight">Notificaciones</h1>
         <p className="text-muted-foreground">
           Avisos de la clínica: citas, laboratorio, stock, internación, facturas y recetas

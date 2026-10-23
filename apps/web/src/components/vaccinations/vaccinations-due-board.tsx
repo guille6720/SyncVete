@@ -22,7 +22,7 @@ export function VaccinationsDueBoard({ items, canWrite }: VaccinationsDueBoardPr
   const dueSoon = items.filter((item) => item.due_status === 'por_vencer');
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="vacunacion-due">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-semibold">Vencidas y por vencer</h2>
@@ -32,12 +32,14 @@ export function VaccinationsDueBoard({ items, canWrite }: VaccinationsDueBoardPr
           </p>
         </div>
         {canWrite && (
-          <Button asChild>
-            <Link href="/vacunacion/nueva">
-              <Plus className="mr-2 h-4 w-4" />
-              Registrar vacuna
-            </Link>
-          </Button>
+          <div data-tour="vacunacion-new">
+            <Button asChild>
+              <Link href="/vacunacion/nueva">
+                <Plus className="mr-2 h-4 w-4" />
+                Registrar vacuna
+              </Link>
+            </Button>
+          </div>
         )}
       </div>
 

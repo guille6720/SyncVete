@@ -62,7 +62,7 @@ export function buildAuditEntityHref(
     case 'patients':
       return entityId ? `/pacientes/${entityId}` : null;
     case 'owners':
-      return entityId ? `/propietarios/${entityId}` : null;
+      return entityId ? `/tutores/${entityId}` : null;
     case 'appointments':
       return entityId ? `/agenda/${entityId}` : null;
     case 'clinical_entries':
@@ -131,7 +131,7 @@ export function buildAuditEntityHref(
     case 'organization_invitations':
       return '/configuracion';
     case 'owner_portal_invites':
-      return related('owner_id') ? `/propietarios/${related('owner_id')}` : '/propietarios';
+      return related('owner_id') ? `/tutores/${related('owner_id')}` : '/tutores';
     default:
       return null;
   }
