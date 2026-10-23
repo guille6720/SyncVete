@@ -132,16 +132,15 @@ export function TutorialPlaybackBar({
               disabled={muted}
             >
               <option value="brian">
-                {elevenLabsAvailable ? 'Brian C' : 'Brian · Tomas (gratis)'}
+                Alex · Kokoro
               </option>
               <option value="horacio">
-                {elevenLabsAvailable ? 'Horacio' : 'Horacio · Jorge (gratis)'}
+                Santa · Kokoro
               </option>
             </select>
             {!elevenLabsAvailable ? (
               <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-800 dark:text-emerald-200">
-                Voz gratuita Tomas/Jorge (Microsoft). Para Brian C / Horacio naturales, configurá
-                ELEVENLABS_API_KEY en Vercel Production.
+                Preparando narración gratuita Kokoro.
               </span>
             ) : null}
           </label>

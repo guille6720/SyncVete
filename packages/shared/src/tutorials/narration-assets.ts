@@ -1,8 +1,3 @@
-/**
- * Narration voice profiles for Tutoriales SyncVete.
- * Voices are ElevenLabs: Brian C and Horacio (Argentine/Latin Spanish).
- */
-
 export type NarrationVoiceProfileId = 'brian' | 'horacio';
 
 export interface NarrationClipRef {
@@ -36,8 +31,8 @@ export const NARRATION_VOICE_PROFILES: readonly NarrationVoiceProfileId[] = [
 ] as const;
 
 export const NARRATION_VOICE_LABELS: Record<NarrationVoiceProfileId, string> = {
-  brian: 'Brian C',
-  horacio: 'Horacio',
+  brian: 'Alex · Kokoro',
+  horacio: 'Santa · Kokoro',
 };
 
 /**

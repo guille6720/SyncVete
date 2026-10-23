@@ -38,7 +38,7 @@ export function TutorialVoiceControls({
     >
       <div className="mb-2 grid gap-2 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-[11px] text-muted-foreground">
-          <span>Voz (ElevenLabs)</span>
+          <span>Voz (Kokoro)</span>
           <select
             className="h-8 rounded-md border border-input bg-background px-1.5 text-xs text-foreground"
             value={narration.voiceProfile === 'horacio' ? 'horacio' : 'brian'}
@@ -51,10 +51,10 @@ export function TutorialVoiceControls({
             disabled={narration.muted}
           >
             <option value="brian">
-              {narration.availability.elevenLabs ? 'Brian C' : 'Brian · Tomas (gratis)'}
+              Alex · Kokoro
             </option>
             <option value="horacio">
-              {narration.availability.elevenLabs ? 'Horacio' : 'Horacio · Jorge (gratis)'}
+              Santa · Kokoro
             </option>
           </select>
         </label>
@@ -79,8 +79,7 @@ export function TutorialVoiceControls({
 
       {!narration.availability.elevenLabs ? (
         <p className="mb-2 text-[11px] text-emerald-700 dark:text-emerald-300" role="status">
-          Tomas/Jorge (gratis). Brian C / Horacio naturales requieren ELEVENLABS_API_KEY en
-          producción.
+          Preparando narración gratuita Kokoro.
         </p>
       ) : null}
 
@@ -139,7 +138,7 @@ export function TutorialVoiceControls({
         </Button>
         <span className="ml-auto text-[10px] text-muted-foreground">
           {narration.activeSource === 'elevenlabs'
-            ? 'ElevenLabs'
+            ? 'Kokoro · audio guardado'
             : narration.activeSource === 'prerecorded'
               ? 'Audio guardado'
               : narration.activeSource === 'browser'

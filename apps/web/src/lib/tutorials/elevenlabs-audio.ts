@@ -1,10 +1,6 @@
-/**
- * Client-side player for ElevenLabs tutorial narration (via /api/tutorials/tts).
- * Caches clips and swaps audio only when the next blob is ready (gapless steps).
- */
-
 import type { NarrationVoiceProfileId } from '@sincvete/shared';
 import { normalizeSpokenText } from '@sincvete/shared';
+import { getKokoroClipPath, hasKokoroClips } from '@/lib/tutorials/kokoro-clips';
 import type { SpeechNarrationStatus, SpeechSettledReason } from '@/lib/tutorials/speech-narration';
 
 export interface ElevenLabsSpeakOptions {
@@ -28,9 +24,9 @@ export class ElevenLabsAudioEngine {
   private objectUrl: string | null = null;
   private status: SpeechNarrationStatus = 'idle';
   private muted = false;
+  private pauseRequested = false;
   private rate = 1;
   private generation = 0;
-  private configured: boolean | null = null;
   private listeners = new Set<(status: SpeechNarrationStatus) => void>();
   private settleWaiters = new Set<{
     generation: number;
@@ -69,29 +65,8 @@ export class ElevenLabsAudioEngine {
     if (this.audio) this.audio.playbackRate = this.rate;
   }
 
-  /** Probe once whether the staging TTS endpoint is configured. */
   async isAvailable(): Promise<boolean> {
-    if (this.configured != null) return this.configured;
-    if (typeof window === 'undefined') {
-      this.configured = false;
-      return false;
-    }
-    try {
-      const response = await fetch('/api/tutorials/tts', {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      if (!response.ok) {
-        this.configured = false;
-        return false;
-      }
-      const data = (await response.json()) as { configured?: boolean };
-      this.configured = Boolean(data.configured);
-      return this.configured;
-    } catch {
-      this.configured = false;
-      return false;
-    }
+    return hasKokoroClips();
   }
 
   /** Warm the cache so the next step can start without a network gap. */
@@ -119,6 +94,7 @@ export class ElevenLabsAudioEngine {
 
     const previous = this.generation;
     const generation = ++this.generation;
+    this.pauseRequested = false;
     // New request supersedes settle waiters; keep current audio until swap.
     this.resolveWaiters(previous, 'stopped');
     // Keep "speaking" during fetch so scene advance does not race ahead,
@@ -156,9 +132,13 @@ export class ElevenLabsAudioEngine {
         if (generation !== this.generation) return;
         this.setStatus('idle');
         this.resolveWaiters(generation, 'error');
-        options.onError?.(new Error('Error de reproducción ElevenLabs'));
+        options.onError?.(new Error('Error de reproducción de narración'));
       };
 
+      if (this.pauseRequested) {
+        this.setStatus('paused');
+        return true;
+      }
       this.setStatus('speaking');
       await audio.play();
       if (generation !== this.generation) return false;
@@ -174,19 +154,34 @@ export class ElevenLabsAudioEngine {
   }
 
   pause(): void {
-    if (!this.audio || this.status !== 'speaking') return;
-    this.audio.pause();
+    if (this.status !== 'speaking') return;
+    this.pauseRequested = true;
+    this.audio?.pause();
     this.setStatus('paused');
   }
 
   resume(): void {
-    if (!this.audio || this.status !== 'paused') return;
-    void this.audio.play().then(() => this.setStatus('speaking'));
+    if (this.status !== 'paused') return;
+    this.pauseRequested = false;
+    if (!this.audio) {
+      this.setStatus('speaking');
+      return;
+    }
+    const generation = this.generation;
+    void this.audio
+      .play()
+      .then(() => {
+        if (generation === this.generation) this.setStatus('speaking');
+      })
+      .catch(() => {
+        if (generation === this.generation) this.setStatus('idle');
+      });
   }
 
   stop(): void {
     const previous = this.generation;
     this.generation += 1;
+    this.pauseRequested = false;
     this.detachCurrentAudio();
     this.revokeObjectUrl();
     this.resolveWaiters(previous, 'stopped');
@@ -205,9 +200,7 @@ export class ElevenLabsAudioEngine {
       let settled = false;
       let sawSpeak = this.status === 'speaking' || this.status === 'paused';
       let targetGeneration =
-        sawSpeak || this.status === 'speaking' || this.status === 'paused'
-          ? this.generation
-          : null;
+        sawSpeak || this.status === 'speaking' || this.status === 'paused' ? this.generation : null;
       let graceTimer: ReturnType<typeof setTimeout> | null = null;
       let timeoutTimer: ReturnType<typeof setTimeout> | null = null;
       let activeWaiter: {
@@ -280,19 +273,15 @@ export class ElevenLabsAudioEngine {
 
     const request = (async () => {
       try {
-        const response = await fetch('/api/tutorials/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: spoken, voiceProfile }),
-        });
+        const path = getKokoroClipPath(spoken, voiceProfile);
+        if (!path) return null;
+        const response = await fetch(path, { cache: 'force-cache' });
 
         if (response.status === 503 || response.status === 404) {
-          this.configured = false;
           return null;
         }
         if (!response.ok) return null;
 
-        this.configured = true;
         const blob = await response.blob();
         if (blob.size > 0) {
           this.cache.set(key, blob);

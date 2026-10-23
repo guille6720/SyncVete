@@ -1,0 +1,8 @@
+.env*
+.kokoro
+/scripts/
+/docs/
+/supabase/
+**/*.test.ts
+**/e2e/**
+apps/web/public/academia/kokoro/v1
