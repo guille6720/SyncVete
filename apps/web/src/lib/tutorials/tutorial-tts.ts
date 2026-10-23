@@ -1,8 +1,8 @@
 /**
  * Tutoriales neural TTS cascade:
- * 1) ElevenLabs (if keyed)
- * 2) Microsoft Edge neural (free, WebSocket — may fail on some hosts)
- * 3) Google Translate HTTP (free, works on Vercel)
+ * 1) ElevenLabs (Brian C / Horacio) when ELEVENLABS_API_KEY is set — best quality
+ * 2) Microsoft Edge neural (Tomas / Jorge) — free, closest stand-in
+ * 3) Browser SpeechSynthesis — last resort (never Google Translate: too robotic)
  */
 
 import type { NarrationVoiceProfileId } from '@sincvete/shared';
@@ -14,20 +14,34 @@ import {
   isEdgeNeuralTtsEnabled,
   synthesizeEdgeNeuralSpeech,
 } from '@/lib/tutorials/edge-neural-tts';
-import { synthesizeGoogleHttpSpeech } from '@/lib/tutorials/google-http-tts';
 
-export type TutorialTtsProvider = 'elevenlabs' | 'edge' | 'google';
+export type TutorialTtsProvider = 'elevenlabs' | 'edge';
 
 export function getTutorialTtsProvider(): TutorialTtsProvider | null {
   if (isElevenLabsConfigured()) return 'elevenlabs';
   if (isEdgeNeuralTtsEnabled()) return 'edge';
-  // Google HTTP is always available as last free resort unless explicitly disabled.
-  if (process.env.GOOGLE_HTTP_TTS_ENABLED === 'false') return null;
-  return 'google';
+  return null;
 }
 
 export function isTutorialNeuralTtsConfigured(): boolean {
   return getTutorialTtsProvider() != null;
+}
+
+async function synthesizeEdgeWithRetry(options: {
+  text: string;
+  voiceProfile: NarrationVoiceProfileId;
+}) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      return await synthesizeEdgeNeuralSpeech(options);
+    } catch (error) {
+      lastError = error;
+      console.warn(`[tutorials/tts] Edge intento ${attempt + 1} falló`, error);
+      await new Promise((resolve) => setTimeout(resolve, 350 * (attempt + 1)));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error('Edge TTS falló');
 }
 
 export async function synthesizeTutorialSpeech(options: {
@@ -39,23 +53,14 @@ export async function synthesizeTutorialSpeech(options: {
     return { ...result, provider: 'elevenlabs' };
   }
 
-  if (isEdgeNeuralTtsEnabled()) {
-    try {
-      const result = await synthesizeEdgeNeuralSpeech(options);
-      return {
-        audio: result.audio,
-        contentType: result.contentType,
-        provider: 'edge',
-      };
-    } catch (error) {
-      console.warn('[tutorials/tts] Edge falló, probando Google HTTP', error);
-    }
-  }
-
-  if (process.env.GOOGLE_HTTP_TTS_ENABLED === 'false') {
+  if (!isEdgeNeuralTtsEnabled()) {
     throw new Error('Narración neural no configurada');
   }
 
-  const result = await synthesizeGoogleHttpSpeech(options);
-  return { ...result, provider: 'google' };
+  const result = await synthesizeEdgeWithRetry(options);
+  return {
+    audio: result.audio,
+    contentType: result.contentType,
+    provider: 'edge',
+  };
 }

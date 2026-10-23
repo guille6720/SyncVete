@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import { OwnerPetIcon } from './owner-pet-icon';
 import { cn } from '@/lib/utils';
 
@@ -23,12 +26,17 @@ export function OwnerPetAvatar({
   ring?: boolean;
 }) {
   const box = SIZE[size];
-  if (photoUrl) {
+  const [broken, setBroken] = useState(false);
+  const showPhoto = Boolean(photoUrl) && !broken;
+
+  if (showPhoto && photoUrl) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- pet photos from clinic storage URLs
       <img
         src={photoUrl}
         alt={name}
+        referrerPolicy="no-referrer"
+        onError={() => setBroken(true)}
         className={cn(
           box,
           'shrink-0 rounded-2xl object-cover',
@@ -38,6 +46,7 @@ export function OwnerPetAvatar({
       />
     );
   }
+
   return (
     <span
       className={cn(
