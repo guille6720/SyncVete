@@ -191,7 +191,7 @@ export async function DashboardViewV2() {
   const commercial = await getClinicCommercialShell(session.organizationId);
 
   return (
-    <div className="mx-auto min-w-0 max-w-7xl space-y-4 md:space-y-5">
+    <div className="mx-auto min-w-0 max-w-[90rem] space-y-4 md:space-y-5">
       <DashboardHeaderV2 session={session} context={context} />
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">

@@ -15,7 +15,8 @@ export function AppShell(props: AppShellProps) {
   if (isUiV2Enabled()) {
     return <AppShellV2 {...props} />;
   }
-  const { organizationName, ...legacyProps } = props;
+  const { organizationName, organizationLogoUrl, ...legacyProps } = props;
   void organizationName;
+  void organizationLogoUrl;
   return <AppShellLegacy {...legacyProps} />;
 }

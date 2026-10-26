@@ -11,6 +11,7 @@ import { getClinicEntitledHrefs } from '@/lib/entitlements';
 import { hasLinkedProfessionalProfile } from '@/actions/professionals';
 import { isAcademiaEnabled } from '@/lib/tutorials/feature-flag';
 import { getOrganization } from '@/actions/settings';
+import { getOwnerAppBrand } from '@/actions/owner-app';
 
 export default async function ClinicLayout({ children }: { children: React.ReactNode }) {
   const session = await getSessionContext();
@@ -26,13 +27,14 @@ export default async function ClinicLayout({ children }: { children: React.React
 
   // Critical path only: session shell + entitled hrefs for nav gating.
   // Commercial banner (checkout/meters) streams separately and must not block modules.
-  const [branches, unreadNotifications, entitledHrefs, showMySettlementsNav, organization] =
+  const [branches, unreadNotifications, entitledHrefs, showMySettlementsNav, organization, ownerBrand] =
     await Promise.all([
       getUserBranches(),
       countUnreadNotifications(),
       getClinicEntitledHrefs(session.organizationId),
       hasLinkedProfessionalProfile(),
       getOrganization().catch(() => null),
+      getOwnerAppBrand(session.organizationId).catch(() => null),
     ]);
 
   const branchName =
@@ -41,12 +43,14 @@ export default async function ClinicLayout({ children }: { children: React.React
     branches[0]?.name;
 
   const academiaEnabled = isAcademiaEnabled();
+  const organizationLogoUrl = ownerBrand?.logoUrl?.trim() ? ownerBrand.logoUrl.trim() : null;
 
   return (
     <AppShell
       userName={session.profile.full_name}
       role={staffRole}
       organizationName={organization?.name ?? null}
+      organizationLogoUrl={organizationLogoUrl}
       branchName={branchName}
       branches={branches}
       activeBranchId={session.branchId}
