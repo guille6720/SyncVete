@@ -154,4 +154,4 @@ export const APPOINTMENT_REMINDER_JOB_STATUS_LABELS: Record<AppointmentReminderJ
 
 export const DEFAULT_APPOINTMENT_DURATION_MINUTES = 30;
 
-export const APPOINTMENT_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120] as const;
+export const APPOINTMENT_DURATION_OPTIONS = [15, 20, 30, 45, 60, 90, 120] as const;

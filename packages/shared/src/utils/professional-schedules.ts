@@ -123,6 +123,53 @@ export function buildLocalSlotsForDate(input: {
  * Whether a local datetime-local start + duration fits an active schedule window.
  * When there are no active schedules, returns `{ ok: true, enforced: false }` (DB opt-in).
  */
+/** Prefer the shortest active slot length from the ficha (e.g. 20 min). */
+export function getPreferredSlotDurationMinutes(
+  schedules: readonly ProfessionalSchedule[]
+): number | null {
+  const durations = schedules
+    .filter((row) => row.is_active && !row.deleted_at)
+    .map((row) => row.slot_duration_minutes)
+    .filter((value): value is number => Number.isFinite(value) && value > 0);
+  if (durations.length === 0) return null;
+  return Math.min(...durations);
+}
+
+/**
+ * Pick the first valid local slot on/after `preferredDateStr` (YYYY-MM-DD),
+ * searching up to `searchDays` days ahead.
+ */
+export function findNextLocalSlot(input: {
+  preferredDateStr: string;
+  schedules: readonly ProfessionalSchedule[];
+  durationMinutes?: number;
+  appointmentType?: AppointmentType | string | null;
+  searchDays?: number;
+}): LocalScheduleSlot | null {
+  const active = input.schedules.filter((row) => row.is_active && !row.deleted_at);
+  if (active.length === 0) return null;
+
+  const duration =
+    input.durationMinutes ?? getPreferredSlotDurationMinutes(active) ?? 30;
+  const days = input.searchDays ?? 14;
+  const [y, m, d] = input.preferredDateStr.split('-').map(Number);
+  const anchor = new Date(Date.UTC(y, m - 1, d, 12));
+
+  for (let offset = 0; offset < days; offset += 1) {
+    const cursor = new Date(anchor);
+    cursor.setUTCDate(anchor.getUTCDate() + offset);
+    const dateStr = cursor.toISOString().slice(0, 10);
+    const slots = buildLocalSlotsForDate({
+      dateStr,
+      schedules: active,
+      durationMinutes: duration,
+      appointmentType: input.appointmentType,
+    });
+    if (slots[0]) return slots[0];
+  }
+  return null;
+}
+
 export function validateLocalStartAgainstSchedules(input: {
   startsAtLocal: string;
   durationMinutes: number;

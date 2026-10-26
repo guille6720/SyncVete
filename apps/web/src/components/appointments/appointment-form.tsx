@@ -28,7 +28,9 @@ import {
   PAYMENT_METHOD_LABELS,
   buildLocalSlotsForDate,
   filterAssignableStaffByBranch,
+  findNextLocalSlot,
   getDurationMinutes,
+  getPreferredSlotDurationMinutes,
   toLocalDateTimeInput,
   validateLocalStartAgainstSchedules,
   type AppointmentListRow,
@@ -114,7 +116,29 @@ export function AppointmentForm({
       branchId: selectedBranchId || null,
     })
       .then((ctx) => {
-        if (!cancelled) setProContext(ctx);
+        if (cancelled) return;
+        setProContext(ctx);
+        // Editing an existing appointment: keep saved start/duration.
+        if (appointment) return;
+        const schedules = ctx?.schedules ?? [];
+        if (schedules.length === 0) return;
+
+        const preferredDuration =
+          getPreferredSlotDurationMinutes(schedules) ?? DEFAULT_APPOINTMENT_DURATION_MINUTES;
+        setDurationMinutes(String(preferredDuration));
+
+        const preferredDate = (startsAtDefault || startsAt).slice(0, 10);
+        const nextSlot = findNextLocalSlot({
+          preferredDateStr: preferredDate,
+          schedules,
+          durationMinutes: preferredDuration,
+          appointmentType,
+        });
+        if (nextSlot) {
+          setStartsAt(nextSlot.startsAtLocal);
+          setDurationMinutes(String(nextSlot.durationMinutes));
+          setClientError(null);
+        }
       })
       .catch(() => {
         if (!cancelled) setProContext(null);
@@ -125,12 +149,23 @@ export function AppointmentForm({
     return () => {
       cancelled = true;
     };
-  }, [assignedUserId, selectedBranchId]);
+    // Intentional: re-apply ficha defaults only when professional/branch change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- startsAt/appointmentType would fight user edits
+  }, [assignedUserId, selectedBranchId, appointment]);
 
   const selectedDate = startsAt.slice(0, 10);
   const durationNum = Number(durationMinutes) || DEFAULT_APPOINTMENT_DURATION_MINUTES;
   const schedules = proContext?.schedules ?? [];
   const scheduleEnforced = schedules.length > 0;
+
+  const durationOptions = useMemo(() => {
+    const fromFicha = getPreferredSlotDurationMinutes(schedules);
+    const values = new Set<number>([...APPOINTMENT_DURATION_OPTIONS]);
+    if (fromFicha) values.add(fromFicha);
+    const current = Number(durationMinutes);
+    if (Number.isFinite(current) && current > 0) values.add(current);
+    return [...values].sort((a, b) => a - b);
+  }, [schedules, durationMinutes]);
 
   const slots = useMemo(() => {
     if (!scheduleEnforced || !/^\d{4}-\d{2}-\d{2}$/.test(selectedDate)) return [];
@@ -274,9 +309,12 @@ export function AppointmentForm({
                 value={durationMinutes}
                 onChange={(e) => setDurationMinutes(e.target.value)}
               >
-                {APPOINTMENT_DURATION_OPTIONS.map((minutes) => (
+                {durationOptions.map((minutes) => (
                   <option key={minutes} value={minutes}>
                     {minutes} min
+                    {getPreferredSlotDurationMinutes(schedules) === minutes
+                      ? ' (ficha)'
+                      : ''}
                   </option>
                 ))}
               </Select>

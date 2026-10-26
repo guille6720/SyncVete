@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { ProfessionalSchedule } from '../types/appointments';
 import {
   buildLocalSlotsForDate,
+  findNextLocalSlot,
   getIsoWeekdayFromDateParam,
+  getPreferredSlotDurationMinutes,
   validateLocalStartAgainstSchedules,
 } from './professional-schedules';
 
@@ -72,5 +74,24 @@ describe('professional-schedules', () => {
       schedules: [],
     });
     expect(result).toEqual({ ok: true, enforced: false });
+  });
+
+  it('prefers the ficha slot duration and next open slot', () => {
+    const schedules = [
+      schedule({
+        weekday: 5,
+        start_time: '14:00:00',
+        end_time: '20:00:00',
+        slot_duration_minutes: 20,
+      }),
+    ];
+    expect(getPreferredSlotDurationMinutes(schedules)).toBe(20);
+    // 2026-10-26 is Monday — next Friday is 2026-10-30
+    const next = findNextLocalSlot({
+      preferredDateStr: '2026-10-26',
+      schedules,
+    });
+    expect(next?.startsAtLocal).toBe('2026-10-30T14:00');
+    expect(next?.durationMinutes).toBe(20);
   });
 });
