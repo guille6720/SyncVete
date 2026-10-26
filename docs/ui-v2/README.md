@@ -12,9 +12,15 @@ Test de marca: `apps/web/src/lib/theme-brand.test.ts`
 Flag: `NEXT_PUBLIC_UI_V2_ENABLED` (off por defecto) — shell + dashboard V2  
 Staging visual review: enable the flag on the isolated staging preview only; use authenticated `/dashboard` (no public auth bypass).
 
+Preview branch: `feature/ui-v2-shell-dashboard-staging`  
+Preview URL: https://sync-vete-staging-git-feature-ui-v2-shel-78b6a4-guillermo-c-bmw.vercel.app  
+Flag: `NEXT_PUBLIC_UI_V2_ENABLED=true` (Preview + this branch only on `sync-vete-staging`)
+
 ## Screenshots (shell + dashboard)
 
 | Viewport | Archivo |
 |----------|---------|
-| 1440×900 | [screenshots/ui-v2-dashboard-1440.png](./screenshots/ui-v2-dashboard-1440.png) |
-| 390×844 | [screenshots/ui-v2-dashboard-390.png](./screenshots/ui-v2-dashboard-390.png) |
+| 1440×900 (fixture) | [screenshots/ui-v2-dashboard-1440.png](./screenshots/ui-v2-dashboard-1440.png) |
+| 390×844 (fixture) | [screenshots/ui-v2-dashboard-390.png](./screenshots/ui-v2-dashboard-390.png) |
+| 1440×900 (live staging login gate) | [screenshots/ui-v2-staging-login-1440.png](./screenshots/ui-v2-staging-login-1440.png) |
+| 390×844 (live staging login gate) | [screenshots/ui-v2-staging-login-390.png](./screenshots/ui-v2-staging-login-390.png) |
