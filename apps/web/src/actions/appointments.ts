@@ -529,6 +529,7 @@ const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => 
     fullName: string;
     role: Role;
     branchIds: Set<string>;
+    specialty: string | null;
   };
   const byUser = new Map<string, StaffRow>();
 
@@ -554,6 +555,7 @@ const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => 
           fullName: '',
           role,
           branchIds: new Set([member.branch_id]),
+          specialty: null,
         });
       }
     }
@@ -561,7 +563,7 @@ const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => 
 
   const { data: linkedProfessionals, error: prosError } = await supabase
     .from('professionals')
-    .select('id, user_id, first_name, last_name')
+    .select('id, user_id, first_name, last_name, specialty')
     .eq('organization_id', session.organizationId)
     .eq('is_active', true)
     .is('deleted_at', null)
@@ -593,16 +595,19 @@ const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => 
       if (!pro.user_id) continue;
       const branchIds = branchesByPro.get(pro.id) ?? [];
       const proName = `${pro.first_name ?? ''} ${pro.last_name ?? ''}`.trim();
+      const specialty = pro.specialty ? String(pro.specialty) : null;
       const existing = byUser.get(pro.user_id);
       if (existing) {
         for (const branchId of branchIds) existing.branchIds.add(branchId);
         if (!existing.fullName && proName) existing.fullName = proName;
+        if (!existing.specialty && specialty) existing.specialty = specialty;
       } else {
         byUser.set(pro.user_id, {
           userId: pro.user_id,
           fullName: proName,
           role: 'veterinarian',
           branchIds: new Set(branchIds),
+          specialty,
         });
       }
     }
@@ -631,6 +636,7 @@ const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => 
       fullName: row.fullName || 'Sin nombre',
       role: row.role,
       branchIds: [...row.branchIds],
+      specialty: row.specialty,
     }))
     .sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
 });

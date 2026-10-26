@@ -15,6 +15,11 @@ import {
 } from '@/components/appointments/appointments-calendar-views';
 import { AppointmentsWeekNav } from '@/components/appointments/appointments-week-nav';
 import { getAgendaDynamicData } from '@/actions/agenda-data';
+import {
+  getProfessionalAgendaContext,
+  type ProfessionalAgendaContext,
+} from '@/actions/appointment-availability';
+import { ProfessionalSchedulePanel } from '@/components/appointments/professional-schedule-panel';
 import type {
   AgendaDynamicData,
   AgendaShellData,
@@ -129,6 +134,9 @@ export function AppointmentsAgenda({
   const [branchId, setBranchId] = useState(initialBranchId);
   const [query, setQuery] = useState(initialQuery);
   const [dynamic, setDynamic] = useState<AgendaDynamicData>(initialDynamic);
+  const [professionalContext, setProfessionalContext] =
+    useState<ProfessionalAgendaContext | null>(null);
+  const [professionalContextPending, setProfessionalContextPending] = useState(false);
 
   const requestIdRef = useRef(0);
   const cacheRef = useRef<Map<string, AgendaDynamicData>>(new Map());
@@ -171,6 +179,47 @@ export function AppointmentsAgenda({
   const selectedWaitingStatus = selected
     ? waitingRoomByAppointment?.[selected.id] ?? null
     : null;
+
+  const selectedStaff = useMemo(
+    () => visibleStaff.find((member) => member.userId === assignedUserId) ?? null,
+    [visibleStaff, assignedUserId]
+  );
+
+  useEffect(() => {
+    if (!assignedUserId) {
+      setProfessionalContext(null);
+      setProfessionalContextPending(false);
+      return;
+    }
+
+    let cancelled = false;
+    setProfessionalContextPending(true);
+    void getProfessionalAgendaContext({
+      userId: assignedUserId,
+      branchId: branchId || null,
+    })
+      .then((ctx) => {
+        if (!cancelled) setProfessionalContext(ctx);
+      })
+      .catch(() => {
+        if (!cancelled) setProfessionalContext(null);
+      })
+      .finally(() => {
+        if (!cancelled) setProfessionalContextPending(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [assignedUserId, branchId]);
+
+  const nuevoTurnoHref = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('date', selectedDate);
+    if (assignedUserId) params.set('assigned', assignedUserId);
+    if (branchId) params.set('branch', branchId);
+    return `/agenda/nueva?${params.toString()}`;
+  }, [selectedDate, assignedUserId, branchId]);
 
   const syncUrl = (next: {
     selectedDate: string;
@@ -501,7 +550,7 @@ export function AppointmentsAgenda({
           </Button>
           {canWrite && (
             <Button asChild>
-              <Link href={`/agenda/nueva?date=${selectedDate}`}>
+              <Link href={nuevoTurnoHref}>
                 <Plus className="mr-2 h-4 w-4" />
                 Nuevo turno
               </Link>
@@ -509,6 +558,28 @@ export function AppointmentsAgenda({
           )}
         </div>
       </div>
+
+      {assignedUserId ? (
+        professionalContextPending && !professionalContext ? (
+          <div className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+            Cargando agenda de {selectedStaff?.fullName ?? 'profesional'}…
+          </div>
+        ) : professionalContext ? (
+          <ProfessionalSchedulePanel
+            fullName={professionalContext.fullName}
+            specialty={professionalContext.specialty ?? selectedStaff?.specialty}
+            schedules={professionalContext.schedules}
+            selectedDate={selectedDate}
+          />
+        ) : selectedStaff ? (
+          <ProfessionalSchedulePanel
+            fullName={selectedStaff.fullName}
+            specialty={selectedStaff.specialty}
+            schedules={[]}
+            selectedDate={selectedDate}
+          />
+        ) : null
+      ) : null}
 
       <AppointmentMetrics
         appointments={dayAppointments}

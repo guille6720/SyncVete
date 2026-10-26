@@ -48,6 +48,8 @@ export interface AssignableStaffMember {
   role: string;
   /** Branches where this user can be assigned (from branch_members / professional_branches). */
   branchIds: string[];
+  /** From professionals.specialty when the user is linked to a professional ficha. */
+  specialty?: string | null;
 }
 
 export interface WaitlistEntry {

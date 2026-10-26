@@ -11,7 +11,12 @@ import { Button } from '@/components/ui/button';
 import { parseDateParam } from '@sincvete/shared';
 
 interface NuevaCitaPageProps {
-  searchParams: Promise<{ date?: string; patientId?: string }>;
+  searchParams: Promise<{
+    date?: string;
+    patientId?: string;
+    assigned?: string;
+    branch?: string;
+  }>;
 }
 
 export default async function NuevaCitaPage({ searchParams }: NuevaCitaPageProps) {
@@ -35,6 +40,11 @@ export default async function NuevaCitaPage({ searchParams }: NuevaCitaPageProps
 
   const date = parseDateParam(params.date);
   const defaultStartsAt = `${date}T09:00`;
+  const defaultBranchId = params.branch || session?.branchId || null;
+  const defaultAssignedUserId =
+    params.assigned && staff.some((member) => member.userId === params.assigned)
+      ? params.assigned
+      : null;
 
   return (
     <div className="space-y-4">
@@ -47,12 +57,13 @@ export default async function NuevaCitaPage({ searchParams }: NuevaCitaPageProps
       <AppointmentForm
         staff={staff}
         branches={branches}
-        defaultBranchId={session?.branchId}
+        defaultBranchId={defaultBranchId}
         defaultPatientId={patient?.id}
         defaultPatientName={patient?.name}
         defaultOwnerId={patient?.owner_id}
         defaultOwnerName={owner?.full_name}
         defaultStartsAt={defaultStartsAt}
+        defaultAssignedUserId={defaultAssignedUserId}
       />
     </div>
   );
