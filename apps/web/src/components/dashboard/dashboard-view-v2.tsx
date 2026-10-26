@@ -17,12 +17,13 @@ import { parseOrganizationSettings } from '@sincvete/shared';
 import { DashboardSettlementsSnapshot } from '@/components/dashboard/dashboard-settlements-snapshot';
 import { getSessionContext } from '@/lib/session';
 import { getClinicCommercialShell } from '@/lib/entitlements';
+import { getClinicTodayLabel } from '@/lib/ui-v2/clinic-time';
 import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity-feed';
-import { DashboardQuickActions } from '@/components/dashboard/dashboard-quick-actions';
 import { DashboardRecentLists } from '@/components/dashboard/dashboard-recent-lists';
 import { DashboardSpeciesBreakdown } from '@/components/dashboard/dashboard-species-breakdown';
 import { DashboardWaitingRoomSnapshot } from '@/components/dashboard/dashboard-waiting-room-snapshot';
 import { DashboardHeaderV2 } from '@/components/dashboard/ui-v2/dashboard-header-v2';
+import { DashboardQuickActionsV2 } from '@/components/dashboard/ui-v2/dashboard-quick-actions-v2';
 import { DashboardStatCardsV2 } from '@/components/dashboard/ui-v2/stat-cards-v2';
 import { AppointmentsSummaryPanel } from '@/components/dashboard/ui-v2/appointments-summary-panel';
 import { EmptyState, SurfaceCard } from '@/components/ui-v2/surface-card';
@@ -30,7 +31,7 @@ import { EmptyState, SurfaceCard } from '@/components/ui-v2/surface-card';
 function SkeletonGrid({ count, label }: { count: number; label: string }) {
   return (
     <div
-      className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 animate-pulse"
+      className="grid animate-pulse gap-3 sm:grid-cols-2 xl:grid-cols-3"
       aria-busy="true"
       aria-label={label}
     >
@@ -100,12 +101,6 @@ async function DashboardWaitingRoomSection({
   );
 }
 
-async function DashboardPrioritySection({ entitledHrefs }: { entitledHrefs: string[] | null }) {
-  const session = await getSessionContext();
-  const summary = await getDashboardSummary(session?.branchId ?? null);
-  return <DashboardStatCardsV2 summary={summary} entitledHrefs={entitledHrefs} variant="priority" />;
-}
-
 async function DashboardAppointmentsSection({ entitledHrefs }: { entitledHrefs: string[] | null }) {
   if (!isClinicPathEntitled('/agenda', entitledHrefs)) {
     return (
@@ -125,13 +120,19 @@ async function DashboardAppointmentsSection({ entitledHrefs }: { entitledHrefs: 
     .filter((row) => formatDateParam(new Date(row.starts_at)) === today)
     .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
 
-  const todayLabel = new Date().toLocaleDateString('es-AR', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  });
+  return <AppointmentsSummaryPanel appointments={todays} todayLabel={getClinicTodayLabel()} />;
+}
 
-  return <AppointmentsSummaryPanel appointments={todays} todayLabel={todayLabel} />;
+async function DashboardPendingStrip({ entitledHrefs }: { entitledHrefs: string[] | null }) {
+  const session = await getSessionContext();
+  const summary = await getDashboardSummary(session?.branchId ?? null);
+  return (
+    <DashboardStatCardsV2
+      summary={summary}
+      entitledHrefs={entitledHrefs}
+      variant="actionable"
+    />
+  );
 }
 
 async function DashboardSecondarySection({
@@ -148,11 +149,19 @@ async function DashboardSecondarySection({
   ]);
 
   return (
-    <div className="space-y-6">
+    <section className="space-y-4" aria-labelledby="dashboard-secondary-heading">
+      <div>
+        <h2 id="dashboard-secondary-heading" className="text-sm font-semibold text-foreground">
+          Indicadores y actividad
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          Métricas generales y registros recientes de la clínica
+        </p>
+      </div>
       <DashboardStatCardsV2 summary={summary} entitledHrefs={entitledHrefs} variant="secondary" />
-      <div className="grid gap-4 xl:grid-cols-3">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-3">
         <DashboardSpeciesBreakdown summary={summary} />
-        <div className="xl:col-span-2">
+        <div className="min-w-0 xl:col-span-2">
           {canViewActivity ? (
             <DashboardActivityFeed activity={activity} />
           ) : (
@@ -163,17 +172,17 @@ async function DashboardSecondarySection({
           )}
         </div>
       </div>
-      {canViewActivity && (
+      {canViewActivity ? (
         <DashboardRecentLists
           recentPatients={summary.recentPatients}
           recentOwners={summary.recentOwners}
         />
-      )}
-    </div>
+      ) : null}
+    </section>
   );
 }
 
-/** UI V2 dashboard — same data/actions as legacy; refreshed shell layout only. */
+/** UI V2 day-ops dashboard — same data/permissions as legacy; reordered for work focus. */
 export async function DashboardViewV2() {
   const session = await getSessionContext();
   if (!session) return null;
@@ -182,36 +191,45 @@ export async function DashboardViewV2() {
   const commercial = await getClinicCommercialShell(session.organizationId);
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="mx-auto min-w-0 max-w-7xl space-y-4 md:space-y-5">
       <DashboardHeaderV2 session={session} context={context} />
-      <DashboardQuickActions
-        canWritePatients={context?.canWritePatients ?? false}
-        entitledHrefs={commercial.entitledHrefs}
-      />
-      <div className="grid gap-4 xl:grid-cols-3">
-        <div className="space-y-4 xl:col-span-2">
-          <Suspense fallback={<SkeletonGrid count={6} label="Cargando indicadores del día" />}>
-            <DashboardPrioritySection entitledHrefs={commercial.entitledHrefs} />
-          </Suspense>
-        </div>
+
+      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         <Suspense
           fallback={
-            <div className="h-64 animate-pulse rounded-xl border border-border bg-muted/40" aria-busy />
+            <div
+              className="h-64 animate-pulse rounded-xl border border-border bg-muted/40"
+              aria-busy
+            />
           }
         >
           <DashboardAppointmentsSection entitledHrefs={commercial.entitledHrefs} />
         </Suspense>
+        <Suspense
+          fallback={
+            <div
+              className="h-64 animate-pulse rounded-xl border border-border bg-muted/40"
+              aria-busy
+            />
+          }
+        >
+          <DashboardWaitingRoomSection entitledHrefs={commercial.entitledHrefs} />
+        </Suspense>
       </div>
-      <Suspense
-        fallback={
-          <div className="h-44 animate-pulse rounded-xl border border-border bg-muted/40" aria-busy />
-        }
-      >
-        <DashboardWaitingRoomSection entitledHrefs={commercial.entitledHrefs} />
+
+      <DashboardQuickActionsV2
+        canWritePatients={context?.canWritePatients ?? false}
+        entitledHrefs={commercial.entitledHrefs}
+      />
+
+      <Suspense fallback={<SkeletonGrid count={4} label="Cargando pendientes" />}>
+        <DashboardPendingStrip entitledHrefs={commercial.entitledHrefs} />
       </Suspense>
+
       <Suspense fallback={null}>
         <DashboardSettlementsSection entitledHrefs={commercial.entitledHrefs} />
       </Suspense>
+
       <Suspense fallback={<SkeletonGrid count={8} label="Cargando detalle del dashboard" />}>
         <DashboardSecondarySection
           canViewActivity={context?.canViewActivity ?? false}

@@ -19,12 +19,13 @@ export function AppointmentsSummaryPanel({
   const upcoming = appointments.slice(0, 6);
 
   return (
-    <SurfaceCard padding="md" className="h-full">
+    <SurfaceCard padding="md" className="h-full min-w-0">
       <SurfaceCardHeader
         title="Agenda de hoy"
         description={todayLabel}
+        className="min-w-0"
         action={
-          <Button variant="outline" size="sm" asChild>
+          <Button variant="outline" size="sm" className="shrink-0" asChild>
             <Link href="/agenda">Ver agenda</Link>
           </Button>
         }

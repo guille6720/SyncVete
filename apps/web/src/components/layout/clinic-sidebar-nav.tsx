@@ -25,6 +25,11 @@ interface ClinicSidebarNavProps {
   onNavigate: (href: string, isActive: boolean) => void;
   /** UI V2: icon rail on desktop when sidebar is collapsed. */
   collapsed?: boolean;
+  /**
+   * `all` — legacy default (groups open).
+   * `active` — UI V2: only the route's group starts open; others expand on demand.
+   */
+  expandMode?: 'all' | 'active';
 }
 
 function NavLink({
@@ -87,6 +92,7 @@ export function ClinicSidebarNav({
   pendingHref,
   onNavigate,
   collapsed = false,
+  expandMode = 'all',
 }: ClinicSidebarNavProps) {
   const pathname = usePathname();
 
@@ -109,14 +115,16 @@ export function ClinicSidebarNav({
 
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
+  const defaultOpen = (groupId: DashboardNavGroupId) =>
+    expandMode === 'all' ? true : activeGroupId === groupId;
+
   const isGroupOpen = (groupId: DashboardNavGroupId) =>
-    // Default open so the sidebar matches the dashboard module layout at a glance.
-    openGroups[groupId] ?? true;
+    openGroups[groupId] ?? defaultOpen(groupId);
 
   const toggleGroup = (groupId: DashboardNavGroupId) => {
     setOpenGroups((prev) => ({
       ...prev,
-      [groupId]: !(prev[groupId] ?? true),
+      [groupId]: !(prev[groupId] ?? defaultOpen(groupId)),
     }));
   };
 

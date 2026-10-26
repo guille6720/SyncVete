@@ -32,7 +32,6 @@ type StatTone =
   | 'cyan'
   | 'orange'
   | 'slate'
-  | 'indigo'
   | 'lime';
 
 const TONE: Record<StatTone, string> = {
@@ -44,14 +43,15 @@ const TONE: Record<StatTone, string> = {
   cyan: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-200',
   orange: 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200',
   slate: 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200',
-  indigo: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950 dark:text-indigo-200',
   lime: 'bg-lime-100 text-lime-800 dark:bg-lime-950 dark:text-lime-200',
 };
+
+type StatGroup = 'actionable' | 'priority' | 'secondary';
 
 interface DashboardStatCardsV2Props {
   summary: DashboardSummary;
   entitledHrefs?: string[] | null;
-  variant?: 'priority' | 'secondary' | 'all';
+  variant?: StatGroup | 'all';
 }
 
 export function DashboardStatCardsV2({
@@ -63,25 +63,67 @@ export function DashboardStatCardsV2({
 
   const stats: Array<{
     label: string;
-    value: string;
+    value: number;
     description: string;
     icon: LucideIcon;
     href?: string;
     tone: StatTone;
-    group: 'priority' | 'secondary';
+    group: StatGroup;
+    /** Pending / actionable metric — emphasize when count > 0. */
+    pending?: boolean;
   }> = [
     {
+      label: 'Vacunas vencidas',
+      value: summary.vaccinationsOverdue,
+      description: 'Última dosis por vacuna',
+      icon: Syringe,
+      href: '/vacunacion',
+      tone: 'amber',
+      group: 'actionable',
+      pending: true,
+    },
+    {
+      label: 'Recetas activas',
+      value: summary.prescriptionsActive,
+      description: 'Pendientes de dispensar',
+      icon: Pill,
+      href: '/farmacia',
+      tone: 'sky',
+      group: 'actionable',
+      pending: true,
+    },
+    {
+      label: 'Lab pendientes',
+      value: summary.labOrdersPending,
+      description: 'Solicitadas o en proceso',
+      icon: FlaskConical,
+      href: '/laboratorio',
+      tone: 'orange',
+      group: 'actionable',
+      pending: true,
+    },
+    {
+      label: 'Recordatorios',
+      value: summary.remindersPending,
+      description: 'Turnos, vacunas y saldos por avisar',
+      icon: Bell,
+      href: '/recordatorios',
+      tone: 'rose',
+      group: 'actionable',
+      pending: true,
+    },
+    {
       label: 'Citas hoy',
-      value: String(summary.appointmentsToday),
+      value: summary.appointmentsToday,
       description: 'Agenda del día',
       icon: Calendar,
       href: '/agenda',
-      tone: 'indigo',
+      tone: 'teal',
       group: 'priority',
     },
     {
       label: 'Consultas del mes',
-      value: String(summary.consultationsThisMonth),
+      value: summary.consultationsThisMonth,
       description: `Sala / atención · ${monthLabel}`,
       icon: Stethoscope,
       href: '/consultas',
@@ -90,7 +132,7 @@ export function DashboardStatCardsV2({
     },
     {
       label: 'Pacientes activos',
-      value: String(summary.activePatients),
+      value: summary.activePatients,
       description: 'Sin fallecer ni inactivos',
       icon: PawPrint,
       href: '/pacientes',
@@ -99,34 +141,17 @@ export function DashboardStatCardsV2({
     },
     {
       label: 'Internados',
-      value: String(summary.hospitalizationsActive),
+      value: summary.hospitalizationsActive,
       description: 'Internación u observación',
       icon: BedDouble,
       href: '/internacion',
       tone: 'rose',
       group: 'priority',
-    },
-    {
-      label: 'Recetas activas',
-      value: String(summary.prescriptionsActive),
-      description: 'Pendientes de dispensar',
-      icon: Pill,
-      href: '/farmacia',
-      tone: 'sky',
-      group: 'priority',
-    },
-    {
-      label: 'Vacunas vencidas',
-      value: String(summary.vaccinationsOverdue),
-      description: 'Última dosis por vacuna',
-      icon: Syringe,
-      href: '/vacunacion',
-      tone: 'amber',
-      group: 'priority',
+      pending: true,
     },
     {
       label: 'Tutores activos',
-      value: String(summary.activeOwners),
+      value: summary.activeOwners,
       description: 'Tutores registrados',
       icon: Users,
       href: '/tutores',
@@ -135,7 +160,7 @@ export function DashboardStatCardsV2({
     },
     {
       label: 'Altas del mes',
-      value: String(summary.patientsThisMonth + summary.ownersThisMonth),
+      value: summary.patientsThisMonth + summary.ownersThisMonth,
       description: `${summary.patientsThisMonth} pacientes · ${summary.ownersThisMonth} tutores · ${monthLabel}`,
       icon: TrendingUp,
       tone: 'emerald',
@@ -143,43 +168,37 @@ export function DashboardStatCardsV2({
     },
     {
       label: 'En quirófano',
-      value: String(summary.surgeriesActive),
+      value: summary.surgeriesActive,
       description: 'En curso o recuperación',
       icon: Scissors,
       href: '/cirugias',
       tone: 'orange',
       group: 'secondary',
-    },
-    {
-      label: 'Lab pendientes',
-      value: String(summary.labOrdersPending),
-      description: 'Solicitadas o en proceso',
-      icon: FlaskConical,
-      href: '/laboratorio',
-      tone: 'lime',
-      group: 'secondary',
+      pending: true,
     },
     {
       label: 'Stock bajo',
-      value: String(summary.inventoryLowStock),
+      value: summary.inventoryLowStock,
       description: 'En o bajo el mínimo',
       icon: Package,
       href: '/inventario',
       tone: 'amber',
       group: 'secondary',
+      pending: true,
     },
     {
       label: 'Por cobrar',
-      value: String(summary.invoicesOpen),
+      value: summary.invoicesOpen,
       description: 'Facturas emitidas con saldo',
       icon: Receipt,
       href: '/facturacion',
       tone: 'emerald',
       group: 'secondary',
+      pending: true,
     },
     {
       label: 'Caja abierta',
-      value: String(summary.cashSessionsOpen),
+      value: summary.cashSessionsOpen,
       description: 'Turnos de caja sin cerrar',
       icon: Banknote,
       href: '/caja',
@@ -188,60 +207,58 @@ export function DashboardStatCardsV2({
     },
     {
       label: 'Imágenes del mes',
-      value: String(summary.clinicalImagesThisMonth),
+      value: summary.clinicalImagesThisMonth,
       description: `Subidas · ${monthLabel}`,
       icon: Images,
       href: '/imagenes',
-      tone: 'indigo',
+      tone: 'cyan',
       group: 'secondary',
     },
     {
       label: 'Sin leer',
-      value: String(summary.notificationsUnread),
+      value: summary.notificationsUnread,
       description: 'Avisos de la clínica',
       icon: Inbox,
       href: '/notificaciones',
       tone: 'rose',
       group: 'secondary',
+      pending: true,
     },
     {
       label: 'Auditoría hoy',
-      value: String(summary.auditEventsToday),
+      value: summary.auditEventsToday,
       description: 'Eventos registrados',
       icon: ScrollText,
       href: '/auditoria',
       tone: 'slate',
       group: 'secondary',
     },
-    {
-      label: 'Recordatorios',
-      value: String(summary.remindersPending),
-      description: 'Turnos, vacunas y saldos por avisar',
-      icon: Bell,
-      href: '/recordatorios',
-      tone: 'orange',
-      group: 'secondary',
-    },
   ];
 
-  const visible = (variant === 'all' ? stats : stats.filter((stat) => stat.group === variant)).filter(
-    (stat) => !stat.href || isClinicPathEntitled(stat.href, entitledHrefs)
-  );
+  const visible = (
+    variant === 'all' ? stats : stats.filter((stat) => stat.group === variant)
+  ).filter((stat) => !stat.href || isClinicPathEntitled(stat.href, entitledHrefs));
 
   if (visible.length === 0) return null;
 
   return (
     <div
       className={cn(
-        'grid gap-3 sm:grid-cols-2',
-        variant === 'priority' ? 'xl:grid-cols-3' : 'xl:grid-cols-3 2xl:grid-cols-4'
+        'grid min-w-0 gap-3 sm:grid-cols-2',
+        variant === 'actionable' ? 'xl:grid-cols-4' : 'xl:grid-cols-3 2xl:grid-cols-4'
       )}
     >
       {visible.map((stat) => {
+        const needsAttention = Boolean(stat.pending && stat.value > 0);
         const body = (
           <SurfaceCard
             padding="sm"
-            className="h-full transition-colors hover:border-primary/35 hover:bg-[var(--clinic-soft)]/50"
+            className={cn(
+              'h-full min-w-0 transition-colors hover:bg-[var(--clinic-soft)]/50',
+              needsAttention
+                ? 'border-amber-300/80 bg-amber-50/60 ring-1 ring-amber-200/70 dark:border-amber-800 dark:bg-amber-950/30 dark:ring-amber-900/50'
+                : 'hover:border-primary/35'
+            )}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 space-y-1">
@@ -252,6 +269,11 @@ export function DashboardStatCardsV2({
                   {stat.value}
                 </p>
                 <p className="text-xs text-muted-foreground">{stat.description}</p>
+                {needsAttention ? (
+                  <p className="text-[11px] font-medium text-amber-800 dark:text-amber-200">
+                    Requiere atención
+                  </p>
+                ) : null}
               </div>
               <span
                 className={cn(
@@ -269,12 +291,14 @@ export function DashboardStatCardsV2({
           <Link
             key={stat.label}
             href={stat.href}
-            className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="block min-w-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {body}
           </Link>
         ) : (
-          <div key={stat.label}>{body}</div>
+          <div key={stat.label} className="min-w-0">
+            {body}
+          </div>
         );
       })}
     </div>
