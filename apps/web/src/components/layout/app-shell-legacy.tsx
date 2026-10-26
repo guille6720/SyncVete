@@ -111,7 +111,7 @@ export function AppShellLegacy({
         <button
           type="button"
           className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          aria-label="Cerrar menú"
+          aria-label="Cerrar menÃº"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -195,7 +195,7 @@ export function AppShellLegacy({
           <form action={signOut}>
             <Button variant="ghost" className="w-full justify-start gap-2" type="submit">
               <LogOut className="h-4 w-4" />
-              Cerrar sesión
+              Cerrar sesiÃ³n
             </Button>
           </form>
         </div>
