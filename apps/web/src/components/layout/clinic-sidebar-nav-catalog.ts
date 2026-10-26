@@ -130,11 +130,25 @@ export function isSidebarNavItemActive(pathname: string, href: string): boolean 
 
 export function findActiveSidebarGroupId(
   pathname: string,
-  items: readonly ClinicSidebarNavItem[]
+  items: readonly ClinicSidebarNavItem[],
+  resolveHubGroupId?: (pathname: string) => DashboardNavGroupId | null
 ): DashboardNavGroupId | null {
+  const fromHub = resolveHubGroupId?.(pathname) ?? null;
+  if (fromHub) return fromHub;
+
   // Prefer longest matching href so /liquidaciones/mis-liquidaciones wins over /liquidaciones.
   const matches = items
     .filter((item) => item.groupId != null && isSidebarNavItemActive(pathname, item.href))
     .sort((a, b) => b.href.length - a.href.length);
   return matches[0]?.groupId ?? null;
+}
+
+/** Destination for a sidebar group: hub page, or the only child when there is one. */
+export function getSidebarGroupDestination(
+  groupId: DashboardNavGroupId,
+  items: readonly ClinicSidebarNavItem[],
+  hubPath: (groupId: DashboardNavGroupId) => string
+): string {
+  if (items.length === 1) return items[0]!.href;
+  return hubPath(groupId);
 }

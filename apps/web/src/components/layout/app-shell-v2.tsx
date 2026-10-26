@@ -193,7 +193,7 @@ export function AppShellV2({
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           collapsed={sidebarCompact}
-          expandMode="active"
+          expandMode="hub"
           onNavigate={(href, isActive) => {
             if (!isActive) setPendingHref(href);
             setMobileOpen(false);

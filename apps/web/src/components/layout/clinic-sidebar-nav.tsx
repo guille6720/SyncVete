@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight, Shield } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { isClinicPathEntitled } from '@sincvete/shared';
 import { cn } from '@/lib/utils';
@@ -10,11 +10,16 @@ import {
   CLINIC_SIDEBAR_NAV_ITEMS,
   filterClinicSidebarNavItems,
   findActiveSidebarGroupId,
+  getSidebarGroupDestination,
   groupClinicSidebarNavItems,
   isSidebarNavItemActive,
   type ClinicSidebarNavItem,
 } from '@/components/layout/clinic-sidebar-nav-catalog';
 import type { DashboardNavGroupId } from '@/components/dashboard/dashboard-nav-catalog';
+import {
+  getModuleGroupIdFromSlug,
+  getModuleHubPath,
+} from '@/lib/ui-v2/module-hubs';
 
 interface ClinicSidebarNavProps {
   entitledHrefs?: string[] | null;
@@ -26,10 +31,17 @@ interface ClinicSidebarNavProps {
   /** UI V2: icon rail on desktop when sidebar is collapsed. */
   collapsed?: boolean;
   /**
-   * `all` — legacy default (groups open).
-   * `active` — UI V2: only the route's group starts open; others expand on demand.
+   * `all` — legacy: groups expand in the sidebar.
+   * `active` — UI V2 accordion: only active group starts open.
+   * `hub` — UI V2: groups open a main-area hub (no nested sidebar list).
    */
-  expandMode?: 'all' | 'active';
+  expandMode?: 'all' | 'active' | 'hub';
+}
+
+function resolveHubGroupFromPath(pathname: string): DashboardNavGroupId | null {
+  const match = pathname.match(/^\/modulos\/([^/]+)/);
+  if (!match?.[1]) return null;
+  return getModuleGroupIdFromSlug(match[1]);
 }
 
 function NavLink({
@@ -48,7 +60,6 @@ function NavLink({
   const pathname = usePathname();
   const isActive = isSidebarNavItemActive(pathname, item.href);
   const isPending = pendingHref === item.href;
-  // Light routes may viewport-prefetch; heavy modules only on hover/focus.
   const allowViewportPrefetch = item.href === '/dashboard' || item.href === '/agenda';
 
   return (
@@ -95,6 +106,7 @@ export function ClinicSidebarNav({
   expandMode = 'all',
 }: ClinicSidebarNavProps) {
   const pathname = usePathname();
+  const hubMode = expandMode === 'hub';
 
   const visible = useMemo(
     () =>
@@ -109,7 +121,7 @@ export function ClinicSidebarNav({
 
   const { topLevel, groups } = useMemo(() => groupClinicSidebarNavItems(visible), [visible]);
   const activeGroupId = useMemo(
-    () => findActiveSidebarGroupId(pathname, visible),
+    () => findActiveSidebarGroupId(pathname, visible, resolveHubGroupFromPath),
     [pathname, visible]
   );
 
@@ -130,7 +142,7 @@ export function ClinicSidebarNav({
 
   return (
     <nav
-      className={cn('flex-1 space-y-3 overflow-y-auto p-2 md:p-3', collapsed && 'space-y-2')}
+      className={cn('flex-1 space-y-2 overflow-y-auto p-2 md:p-3', collapsed && 'space-y-2')}
       aria-label="Módulos"
     >
       <div className="space-y-1">
@@ -146,8 +158,54 @@ export function ClinicSidebarNav({
       </div>
 
       {groups.map(({ group, items }) => {
-        const open = collapsed ? true : isGroupOpen(group.id);
         const groupActive = activeGroupId === group.id;
+
+        if (hubMode) {
+          const href = getSidebarGroupDestination(group.id, items, getModuleHubPath);
+          const isActive =
+            groupActive || items.some((item) => isSidebarNavItemActive(pathname, item.href));
+          const isPending = pendingHref === href;
+
+          return (
+            <Link
+              key={group.id}
+              href={href}
+              title={collapsed ? group.label : undefined}
+              onClick={() => onNavigate(href, isActive)}
+              aria-current={isActive ? 'page' : undefined}
+              aria-busy={isPending || undefined}
+              className={cn(
+                'flex items-center rounded-lg text-sm transition-colors',
+                collapsed ? 'justify-center px-2 py-2' : 'gap-3 px-3 py-2',
+                isActive
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-[var(--shell-text)] hover:bg-[var(--clinic-soft)] hover:text-[var(--clinic)]',
+                isPending && !isActive && 'bg-[var(--clinic-soft)] text-[var(--clinic)]'
+              )}
+            >
+              <span
+                className={cn(
+                  'inline-flex h-7 w-7 items-center justify-center rounded-md ring-1',
+                  isActive ? 'bg-white/20 text-primary-foreground ring-white/20' : group.tone
+                )}
+              >
+                <group.icon className="h-4 w-4" aria-hidden />
+              </span>
+              {!collapsed ? (
+                <>
+                  <span className="flex-1 truncate">{group.label}</span>
+                  {items.length > 1 ? (
+                    <ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-70" aria-hidden />
+                  ) : null}
+                </>
+              ) : (
+                <span className="sr-only">{group.label}</span>
+              )}
+            </Link>
+          );
+        }
+
+        const open = collapsed ? true : isGroupOpen(group.id);
 
         return (
           <section key={group.id} className="space-y-1">

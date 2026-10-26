@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { ChevronDown, MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal } from 'lucide-react';
 import { isClinicPathEntitled } from '@sincvete/shared';
 import { cn } from '@/lib/utils';
 import {
@@ -15,7 +15,6 @@ import {
   buildClinicTopNav,
   withTopNavActiveState,
 } from '@/components/layout/clinic-top-nav-catalog';
-import { isSidebarNavItemActive } from '@/components/layout/clinic-sidebar-nav-catalog';
 
 interface ClinicTopNavProps {
   entitledHrefs?: string[] | null;
@@ -24,31 +23,42 @@ interface ClinicTopNavProps {
   onNavigate?: () => void;
 }
 
-function MenuTriggerButton({
+function NavLinkButton({
+  href,
   label,
   active,
+  onNavigate,
+  compact,
 }: {
+  href: string;
   label: string;
-  active?: boolean;
+  active: boolean;
+  onNavigate?: () => void;
+  compact?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <Link
+      href={href}
+      onClick={onNavigate}
+      aria-current={active ? 'page' : undefined}
       className={cn(
-        'inline-flex h-9 items-center gap-1 rounded-lg px-2.5 text-sm font-medium transition-colors',
+        'inline-flex h-9 items-center rounded-lg text-sm font-medium transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+        compact ? 'px-2' : 'px-2.5',
         active
           ? 'bg-primary/10 text-primary'
           : 'text-foreground/80 hover:bg-muted hover:text-foreground'
       )}
-      aria-haspopup="menu"
     >
       {label}
-      <ChevronDown className="h-3.5 w-3.5 opacity-70" aria-hidden />
-    </button>
+    </Link>
   );
 }
 
+/**
+ * Horizontal module shortcuts — each entry opens a hub (or the only child route)
+ * in the main panel. No nested sidebar expansion.
+ */
 export function ClinicTopNav({
   entitledHrefs = null,
   showMySettlementsNav = false,
@@ -68,102 +78,35 @@ export function ClinicTopNav({
 
   if (menus.length === 0) return null;
 
-  // Desktop: all menus. Tablet: first 4 + overflow. (Mobile uses sidebar drawer.)
-  const primaryCount = 4;
+  const primaryCount = 5;
   const primary = menus.slice(0, primaryCount);
   const overflow = menus.slice(primaryCount);
 
   return (
     <nav className="hidden min-w-0 items-center gap-0.5 md:flex" aria-label="Navegación principal">
       <div className="hidden items-center gap-0.5 xl:flex">
-        {menus.map((menu) =>
-          menu.kind === 'link' ? (
-            <Link
-              key={menu.id}
-              href={menu.href}
-              onClick={onNavigate}
-              aria-current={menu.active ? 'page' : undefined}
-              className={cn(
-                'inline-flex h-9 items-center rounded-lg px-2.5 text-sm font-medium transition-colors',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                menu.active
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-foreground/80 hover:bg-muted hover:text-foreground'
-              )}
-            >
-              {menu.label}
-            </Link>
-          ) : (
-            <DropdownMenu key={menu.id}>
-              <DropdownMenuTrigger asChild>
-                <span>
-                  <MenuTriggerButton label={menu.label} active={menu.active} />
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[14rem]">
-                {menu.items.map((item) => {
-                  const active = isSidebarNavItemActive(pathname, item.href);
-                  return (
-                    <DropdownMenuItem key={item.href} asChild>
-                      <Link
-                        href={item.href}
-                        onClick={onNavigate}
-                        aria-current={active ? 'page' : undefined}
-                        className="flex w-full items-center gap-2"
-                      >
-                        <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                        <span>{item.label}</span>
-                      </Link>
-                    </DropdownMenuItem>
-                  );
-                })}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        )}
+        {menus.map((menu) => (
+          <NavLinkButton
+            key={menu.id}
+            href={menu.href}
+            label={menu.label}
+            active={menu.active}
+            onNavigate={onNavigate}
+          />
+        ))}
       </div>
 
       <div className="flex items-center gap-0.5 xl:hidden">
-        {primary.map((menu) =>
-          menu.kind === 'link' ? (
-            <Link
-              key={menu.id}
-              href={menu.href}
-              onClick={onNavigate}
-              aria-current={menu.active ? 'page' : undefined}
-              className={cn(
-                'inline-flex h-9 items-center rounded-lg px-2 text-sm font-medium transition-colors',
-                menu.active
-                  ? 'bg-primary/10 text-primary'
-                  : 'text-foreground/80 hover:bg-muted hover:text-foreground'
-              )}
-            >
-              {menu.label}
-            </Link>
-          ) : (
-            <DropdownMenu key={menu.id}>
-              <DropdownMenuTrigger asChild>
-                <span>
-                  <MenuTriggerButton label={menu.label} active={menu.active} />
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="min-w-[14rem]">
-                {menu.items.map((item) => (
-                  <DropdownMenuItem key={item.href} asChild>
-                    <Link
-                      href={item.href}
-                      onClick={onNavigate}
-                      className="flex w-full items-center gap-2"
-                    >
-                      <item.icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                      <span>{item.label}</span>
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )
-        )}
+        {primary.map((menu) => (
+          <NavLinkButton
+            key={menu.id}
+            href={menu.href}
+            label={menu.label}
+            active={menu.active}
+            onNavigate={onNavigate}
+            compact
+          />
+        ))}
 
         {overflow.length > 0 ? (
           <DropdownMenu>
@@ -177,37 +120,14 @@ export function ClinicTopNav({
                 <span className="hidden lg:inline">Más</span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="min-w-[16rem]">
-              {overflow.map((menu) =>
-                menu.kind === 'link' ? (
-                  <DropdownMenuItem key={menu.id} asChild>
-                    <Link href={menu.href} onClick={onNavigate}>
-                      {menu.label}
-                    </Link>
-                  </DropdownMenuItem>
-                ) : (
-                  <div key={menu.id} className="px-1 py-1">
-                    <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      {menu.label}
-                    </p>
-                    {menu.items.map((item) => (
-                      <DropdownMenuItem key={item.href} asChild>
-                        <Link
-                          href={item.href}
-                          onClick={onNavigate}
-                          className="flex w-full items-center gap-2"
-                        >
-                          <item.icon
-                            className="h-4 w-4 shrink-0 text-muted-foreground"
-                            aria-hidden
-                          />
-                          <span>{item.label}</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    ))}
-                  </div>
-                )
-              )}
+            <DropdownMenuContent align="end" className="min-w-[12rem]">
+              {overflow.map((menu) => (
+                <DropdownMenuItem key={menu.id} asChild>
+                  <Link href={menu.href} onClick={onNavigate}>
+                    {menu.label}
+                  </Link>
+                </DropdownMenuItem>
+              ))}
             </DropdownMenuContent>
           </DropdownMenu>
         ) : null}

@@ -1,111 +1,57 @@
 import {
   CLINIC_SIDEBAR_NAV_ITEMS,
   filterClinicSidebarNavItems,
+  getSidebarGroupDestination,
+  groupClinicSidebarNavItems,
   isSidebarNavItemActive,
-  type ClinicSidebarNavItem,
 } from '@/components/layout/clinic-sidebar-nav-catalog';
+import type { DashboardNavGroupId } from '@/components/dashboard/dashboard-nav-catalog';
+import {
+  getModuleGroupIdFromSlug,
+  getModuleHubPath,
+} from '@/lib/ui-v2/module-hubs';
 
 /**
- * Top-bar menus for UI V2 — labels match the product IA brief.
- * Items are resolved from CLINIC_SIDEBAR_NAV_ITEMS (single source of routes).
+ * Top-bar entries for UI V2 — open module hubs in the main panel (not sidebar accordions).
+ * Destinations resolve from CLINIC_SIDEBAR_NAV_ITEMS (single source of routes).
  */
 export type ClinicTopNavMenuId =
   | 'inicio'
   | 'clinical'
+  | 'patients'
   | 'agenda'
-  | 'admin'
-  | 'inventory'
+  | 'hospitalization'
+  | 'management'
   | 'professionals'
   | 'reports'
+  | 'communication'
   | 'settings';
 
 export type ClinicTopNavMenuDef =
   | { id: ClinicTopNavMenuId; label: string; kind: 'link'; href: string }
-  | { id: ClinicTopNavMenuId; label: string; kind: 'menu'; itemHrefs: readonly string[] };
+  | { id: ClinicTopNavMenuId; label: string; kind: 'hub'; groupId: DashboardNavGroupId };
 
 export const CLINIC_TOP_NAV_MENUS: readonly ClinicTopNavMenuDef[] = [
   { id: 'inicio', label: 'Inicio', kind: 'link', href: '/dashboard' },
-  {
-    id: 'clinical',
-    label: 'Gestión clínica',
-    kind: 'menu',
-    itemHrefs: [
-      '/sala-espera',
-      '/consultas',
-      '/historia-clinica',
-      '/laboratorio',
-      '/imagenes',
-      '/farmacia',
-      '/ia-clinica',
-      '/tutores',
-      '/pacientes',
-      '/internacion',
-    ],
-  },
-  {
-    id: 'agenda',
-    label: 'Agenda',
-    kind: 'menu',
-    itemHrefs: ['/agenda', '/vacunacion', '/cirugias', '/recordatorios'],
-  },
-  {
-    id: 'admin',
-    label: 'Administración',
-    kind: 'menu',
-    itemHrefs: ['/facturacion', '/caja'],
-  },
-  {
-    id: 'inventory',
-    label: 'Inventario',
-    kind: 'menu',
-    itemHrefs: ['/inventario'],
-  },
-  {
-    id: 'professionals',
-    label: 'Profesionales',
-    kind: 'menu',
-    itemHrefs: [
-      '/profesionales',
-      '/interconsultas',
-      '/liquidaciones',
-      '/liquidaciones/mis-liquidaciones',
-    ],
-  },
-  {
-    id: 'reports',
-    label: 'Reportes',
-    kind: 'menu',
-    itemHrefs: ['/reportes', '/auditoria'],
-  },
-  {
-    id: 'settings',
-    label: 'Configuración',
-    kind: 'menu',
-    itemHrefs: ['/whatsapp', '/notificaciones', '/academia', '/configuracion'],
-  },
+  { id: 'clinical', label: 'Clínica', kind: 'hub', groupId: 'clinical' },
+  { id: 'patients', label: 'Pacientes', kind: 'hub', groupId: 'patients' },
+  { id: 'agenda', label: 'Agenda', kind: 'hub', groupId: 'agenda' },
+  { id: 'hospitalization', label: 'Internación', kind: 'hub', groupId: 'hospitalization' },
+  { id: 'management', label: 'Gestión', kind: 'hub', groupId: 'management' },
+  { id: 'professionals', label: 'Profesionales', kind: 'hub', groupId: 'professionals' },
+  { id: 'reports', label: 'Reportes', kind: 'hub', groupId: 'reports' },
+  { id: 'communication', label: 'Comunicación', kind: 'hub', groupId: 'communication' },
+  { id: 'settings', label: 'Configuración', kind: 'hub', groupId: 'settings' },
 ] as const;
 
-const ITEM_BY_HREF = new Map(CLINIC_SIDEBAR_NAV_ITEMS.map((item) => [item.href, item]));
-
-export function resolveTopNavItems(
-  hrefs: readonly string[],
-  visible: readonly ClinicSidebarNavItem[]
-): ClinicSidebarNavItem[] {
-  const visibleHrefs = new Set(visible.map((item) => item.href));
-  return hrefs
-    .map((href) => ITEM_BY_HREF.get(href))
-    .filter((item): item is ClinicSidebarNavItem => Boolean(item) && visibleHrefs.has(item!.href));
-}
-
-export type ClinicTopNavResolvedMenu =
-  | { id: ClinicTopNavMenuId; label: string; kind: 'link'; href: string; active: boolean }
-  | {
-      id: ClinicTopNavMenuId;
-      label: string;
-      kind: 'menu';
-      items: ClinicSidebarNavItem[];
-      active: boolean;
-    };
+export type ClinicTopNavResolvedMenu = {
+  id: ClinicTopNavMenuId;
+  label: string;
+  href: string;
+  active: boolean;
+  groupId?: DashboardNavGroupId;
+  childHrefs?: string[];
+};
 
 export function buildClinicTopNav(opts: {
   entitledHrefs: string[] | null;
@@ -114,58 +60,57 @@ export function buildClinicTopNav(opts: {
   isEntitled: (href: string) => boolean;
 }): ClinicTopNavResolvedMenu[] {
   const visible = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, opts);
+  const { groups } = groupClinicSidebarNavItems(visible);
+  const byGroup = new Map(groups.map((entry) => [entry.group.id, entry.items]));
   const menus: ClinicTopNavResolvedMenu[] = [];
 
   for (const menu of CLINIC_TOP_NAV_MENUS) {
     if (menu.kind === 'link') {
       if (!opts.isEntitled(menu.href)) continue;
-      menus.push({
-        id: menu.id,
-        label: menu.label,
-        kind: 'link',
-        href: menu.href,
-        active: false,
-      });
+      menus.push({ id: menu.id, label: menu.label, href: menu.href, active: false });
       continue;
     }
 
-    const items = resolveTopNavItems(menu.itemHrefs, visible);
+    const items = byGroup.get(menu.groupId) ?? [];
     if (items.length === 0) continue;
     menus.push({
       id: menu.id,
       label: menu.label,
-      kind: 'menu',
-      items,
+      href: getSidebarGroupDestination(menu.groupId, items, getModuleHubPath),
       active: false,
+      groupId: menu.groupId,
+      childHrefs: items.map((item) => item.href),
     });
   }
 
   return menus;
 }
 
-export function withTopNavActiveState<
-  T extends { kind: 'link'; href: string } | { kind: 'menu'; items: ClinicSidebarNavItem[] },
->(menus: T[], pathname: string): Array<T & { active: boolean }> {
+export function withTopNavActiveState(
+  menus: ClinicTopNavResolvedMenu[],
+  pathname: string
+): ClinicTopNavResolvedMenu[] {
+  const hubGroup = (() => {
+    const match = pathname.match(/^\/modulos\/([^/]+)/);
+    return match?.[1] ? getModuleGroupIdFromSlug(match[1]) : null;
+  })();
+
   return menus.map((menu) => {
-    if (menu.kind === 'link') {
-      return { ...menu, active: isSidebarNavItemActive(pathname, menu.href) };
-    }
-    const active = menu.items.some((item) => isSidebarNavItemActive(pathname, item.href));
-    return { ...menu, active };
+    const childActive = Boolean(
+      menu.childHrefs?.some((href) => isSidebarNavItemActive(pathname, href))
+    );
+    const hubActive = Boolean(menu.groupId && hubGroup === menu.groupId);
+    const selfActive = isSidebarNavItemActive(pathname, menu.href);
+    return { ...menu, active: childActive || hubActive || selfActive };
   });
 }
 
-/** Every top-nav href must exist in the sidebar catalog (centralization check). */
+/** Hub destinations are synthetic; leaf hrefs must exist in the sidebar catalog. */
 export function assertTopNavHrefsInSidebarCatalog(): string[] {
   const missing: string[] = [];
+  const known = new Set(CLINIC_SIDEBAR_NAV_ITEMS.map((item) => item.href));
   for (const menu of CLINIC_TOP_NAV_MENUS) {
-    if (menu.kind === 'link') {
-      if (!ITEM_BY_HREF.has(menu.href)) missing.push(menu.href);
-      continue;
-    }
-    for (const href of menu.itemHrefs) {
-      if (!ITEM_BY_HREF.has(href)) missing.push(href);
-    }
+    if (menu.kind === 'link' && !known.has(menu.href)) missing.push(menu.href);
   }
   return missing;
 }

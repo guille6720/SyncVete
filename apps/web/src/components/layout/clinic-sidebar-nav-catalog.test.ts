@@ -51,6 +51,12 @@ describe('clinic-sidebar-nav', () => {
     ).toBe('professionals');
   });
 
+  it('can resolve active group from a module hub pathname', () => {
+    expect(
+      findActiveSidebarGroupId('/modulos/clinica', CLINIC_SIDEBAR_NAV_ITEMS, () => 'clinical')
+    ).toBe('clinical');
+  });
+
   it('includes Interconsultas under professionals group', () => {
     const item = CLINIC_SIDEBAR_NAV_ITEMS.find((entry) => entry.href === '/interconsultas');
     expect(item?.groupId).toBe('professionals');
