@@ -123,6 +123,7 @@ export function buildPaginatedResult<T>(
 export * from './utils/settings';
 export * from './utils/dashboard';
 export * from './utils/appointments';
+export * from './utils/professional-schedules';
 export * from './utils/waiting-room';
 export * from './utils/clinical';
 export * from './utils/hospitalizations';
