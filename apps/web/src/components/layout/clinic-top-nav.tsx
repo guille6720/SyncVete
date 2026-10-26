@@ -83,7 +83,11 @@ export function ClinicTopNav({
   const overflow = menus.slice(primaryCount);
 
   return (
-    <nav className="hidden min-w-0 items-center gap-0.5 md:flex" aria-label="Navegación principal">
+    <nav
+      className="order-last flex w-full min-w-0 basis-full items-center gap-0.5 overflow-x-auto md:order-none md:w-auto md:basis-auto md:flex-1"
+      aria-label="Navegación principal"
+      data-nav-mode="hub"
+    >
       <div className="hidden items-center gap-0.5 xl:flex">
         {menus.map((menu) => (
           <NavLinkButton

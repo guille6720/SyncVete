@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, LogOut, Menu, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { signOut } from '@/actions/auth';
 import { BranchSelector } from '@/components/layout/branch-selector';
-import { ClinicSidebarNav } from '@/components/layout/clinic-sidebar-nav';
+import { ClinicSidebarHubNav } from '@/components/layout/clinic-sidebar-hub-nav';
 import { ClinicTopNav } from '@/components/layout/clinic-top-nav';
 import { ClinicIdentityPanel } from '@/components/layout/clinic-identity-panel';
 import { Button } from '@/components/ui/button';
@@ -186,14 +186,13 @@ export function AppShellV2({
           </div>
         ) : null}
 
-        <ClinicSidebarNav
+        <ClinicSidebarHubNav
           entitledHrefs={entitledHrefs}
           showMySettlementsNav={showMySettlementsNav}
           academiaEnabled={academiaEnabled}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
           collapsed={sidebarCompact}
-          expandMode="hub"
           onNavigate={(href, isActive) => {
             if (!isActive) setPendingHref(href);
             setMobileOpen(false);

@@ -181,6 +181,7 @@ export function AppShellLegacy({
           academiaEnabled={academiaEnabled}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
+          expandMode="all"
           onNavigate={(href, isActive) => {
             if (!isActive) setPendingHref(href);
             setSidebarOpen(false);
