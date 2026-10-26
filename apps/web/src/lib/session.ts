@@ -32,6 +32,7 @@ type SessionBootstrap = {
   is_platform_admin: boolean;
   profile: BootstrapProfile;
   memberships: BootstrapMembership[];
+  denied_permissions?: string[] | null;
   portal_owner_id: string | null;
   portal_pending_owner_id?: string | null;
 };
@@ -78,8 +79,13 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
 
     const profile = bootstrap.profile;
     if (!profile?.id) return null;
+    // Suspended / disabled accounts get no clinic or portal session (RLS blocks them too).
+    if (profile.is_active === false) return null;
 
     const memberships = Array.isArray(bootstrap.memberships) ? bootstrap.memberships : [];
+    const deniedPermissions = Array.isArray(bootstrap.denied_permissions)
+      ? bootstrap.denied_permissions
+      : [];
     const activeMembership =
       memberships.find((m) => m.branch_id === profile.active_branch_id) ?? memberships[0] ?? null;
 
@@ -92,7 +98,7 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
         branchId: activeMembership.branch_id,
         kind: 'staff',
         role,
-        permissions: getPermissionsForRole(role, customPerms),
+        permissions: getPermissionsForRole(role, customPerms, deniedPermissions),
         profile: profileToSession(profile),
         ownerId: null,
         isPlatformAdmin,
@@ -126,7 +132,7 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
     console.warn('[session] get_session_bootstrap', bootstrapError.message);
   }
 
-  const [platformAdminRes, profileRes, membershipsRes] = await Promise.all([
+  const [platformAdminRes, profileRes, membershipsRes, deniedRes] = await Promise.all([
     supabase.rpc('is_platform_admin'),
     supabase
       .from('profiles')
@@ -143,6 +149,11 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
       .eq('is_active', true)
       .is('deleted_at', null)
       .order('created_at', { ascending: true }),
+    supabase
+      .from('user_permission_overrides')
+      .select('permission_key')
+      .eq('user_id', user.id)
+      .eq('enabled', false),
   ]);
 
   const isPlatformAdmin = resolvePlatformAdminAccess({
@@ -152,8 +163,9 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
   });
 
   const profile = profileRes.data;
-  if (!profile) return null;
+  if (!profile || profile.is_active === false) return null;
 
+  const deniedPermissions = (deniedRes.data ?? []).map((row) => row.permission_key);
   const memberships = membershipsRes.data;
   const activeMembership =
     memberships?.find((m) => m.branch_id === profile.active_branch_id) ??
@@ -170,7 +182,7 @@ export const getSessionContext = cache(async (): Promise<SessionContext | null> 
       branchId: activeMembership.branch_id,
       kind: 'staff',
       role,
-      permissions: getPermissionsForRole(role, customPerms),
+      permissions: getPermissionsForRole(role, customPerms, deniedPermissions),
       profile: profileToSession(profile),
       ownerId: null,
       isPlatformAdmin,

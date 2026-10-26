@@ -22,6 +22,7 @@ import {
 interface ClinicSidebarHubNavProps {
   entitledHrefs?: string[] | null;
   showMySettlementsNav?: boolean;
+  permissions?: string[];
   academiaEnabled?: boolean;
   isPlatformAdmin?: boolean;
   pendingHref: string | null;
@@ -36,6 +37,7 @@ interface ClinicSidebarHubNavProps {
 export function ClinicSidebarHubNav({
   entitledHrefs = null,
   showMySettlementsNav = false,
+  permissions,
   academiaEnabled = false,
   isPlatformAdmin = false,
   pendingHref,
@@ -51,8 +53,9 @@ export function ClinicSidebarHubNav({
         showMySettlementsNav,
         academiaEnabled,
         isEntitled: (href) => isClinicPathEntitled(href, entitledHrefs),
+        permissions,
       }),
-    [entitledHrefs, showMySettlementsNav, academiaEnabled]
+    [entitledHrefs, showMySettlementsNav, permissions, academiaEnabled]
   );
 
   const { topLevel, groups } = useMemo(() => groupClinicSidebarNavItems(visible), [visible]);

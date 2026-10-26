@@ -35,6 +35,7 @@ export interface AppShellV2Props {
   entitledHrefs?: string[] | null;
   billingBannerSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
+  permissions?: string[];
   academiaEnabled?: boolean;
 }
 
@@ -52,6 +53,7 @@ export function AppShellV2({
   entitledHrefs = null,
   billingBannerSlot = null,
   showMySettlementsNav = false,
+  permissions = [],
   academiaEnabled = false,
 }: AppShellV2Props) {
   const pathname = usePathname();
@@ -193,6 +195,7 @@ export function AppShellV2({
         <ClinicSidebarHubNav
           entitledHrefs={entitledHrefs}
           showMySettlementsNav={showMySettlementsNav}
+          permissions={permissions}
           academiaEnabled={academiaEnabled}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
@@ -276,6 +279,7 @@ export function AppShellV2({
           <ClinicTopNav
             entitledHrefs={entitledHrefs}
             showMySettlementsNav={showMySettlementsNav}
+            permissions={permissions}
             academiaEnabled={academiaEnabled}
           />
 

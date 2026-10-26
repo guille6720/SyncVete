@@ -254,10 +254,9 @@ export function DashboardStatCardsV2({
           <SurfaceCard
             padding="sm"
             className={cn(
-              'h-full min-w-0 transition-colors hover:bg-[var(--clinic-soft)]/50',
-              needsAttention
-                ? 'border-amber-300/80 bg-amber-50/60 ring-1 ring-amber-200/70 dark:border-amber-800 dark:bg-amber-950/30 dark:ring-amber-900/50'
-                : 'hover:border-primary/35'
+              'h-full min-w-0 hover:bg-[var(--clinic-soft)]/50',
+              needsAttention &&
+                'border-amber-400 bg-amber-50/60 shadow-[0_0_0_1px_rgba(251,191,36,0.35),0_0_18px_rgba(245,158,11,0.4)] dark:border-amber-400 dark:bg-amber-950/30 dark:shadow-[0_0_0_1px_rgba(251,191,36,0.4),0_0_22px_rgba(251,191,36,0.45)]'
             )}
           >
             <div className="flex items-start justify-between gap-3">

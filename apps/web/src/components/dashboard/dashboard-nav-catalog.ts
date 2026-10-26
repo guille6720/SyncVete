@@ -20,6 +20,7 @@ import {
   Sparkles,
   Stethoscope,
   Syringe,
+  UserCog,
   UserPlus,
   Users,
   Wallet,
@@ -51,7 +52,8 @@ export type DashboardNavActionId =
   | 'audit'
   | 'whatsapp'
   | 'notifications'
-  | 'settings';
+  | 'settings'
+  | 'users';
 
 export type DashboardNavGroupId =
   | 'clinical'
@@ -62,6 +64,7 @@ export type DashboardNavGroupId =
   | 'professionals'
   | 'reports'
   | 'communication'
+  | 'users'
   | 'settings';
 
 export interface DashboardNavAction {
@@ -129,6 +132,12 @@ export const DASHBOARD_NAV_GROUPS: DashboardNavGroup[] = [
     label: 'Comunicación',
     icon: MessageCircle,
     tone: 'bg-lime-100 text-lime-800 ring-lime-200 hover:bg-lime-200/80 dark:bg-lime-950 dark:text-lime-200 dark:ring-lime-800 dark:hover:bg-lime-900/80',
+  },
+  {
+    id: 'users',
+    label: 'Usuarios',
+    icon: UserCog,
+    tone: 'bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-200 hover:bg-fuchsia-200/80 dark:bg-fuchsia-950 dark:text-fuchsia-200 dark:ring-fuchsia-800 dark:hover:bg-fuchsia-900/80',
   },
   {
     id: 'settings',
@@ -358,6 +367,15 @@ export const DASHBOARD_NAV_ACTIONS: DashboardNavAction[] = [
     requiresWrite: false,
     tone: 'bg-rose-100 text-rose-800 ring-rose-200 hover:bg-rose-200/80 dark:bg-rose-950 dark:text-rose-200 dark:ring-rose-800',
     groupId: 'communication',
+  },
+  {
+    id: 'users',
+    label: 'Usuarios y permisos',
+    href: '/usuarios',
+    icon: UserCog,
+    requiresWrite: false,
+    tone: 'bg-fuchsia-100 text-fuchsia-800 ring-fuchsia-200 hover:bg-fuchsia-200/80 dark:bg-fuchsia-950 dark:text-fuchsia-200 dark:ring-fuchsia-800',
+    groupId: 'users',
   },
   {
     id: 'settings',

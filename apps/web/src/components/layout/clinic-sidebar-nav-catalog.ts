@@ -26,9 +26,11 @@ import {
   Sparkles,
   Stethoscope,
   Syringe,
+  UserCog,
   Users,
   Wallet,
 } from 'lucide-react';
+import type { Permission } from '@sincvete/shared';
 import {
   DASHBOARD_NAV_GROUPS,
   type DashboardNavGroup,
@@ -43,6 +45,8 @@ export interface ClinicSidebarNavItem {
   groupId: DashboardNavGroupId | null;
   /** Only show when AppShell enables my-settlements nav. */
   requiresMySettlements?: boolean;
+  /** Hide unless the session holds this permission (pages still enforce it server-side). */
+  requiresPermission?: Permission;
   /** Only show when Academia / Tutoriales is enabled for this deployment. */
   requiresAcademia?: boolean;
 }
@@ -91,6 +95,14 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, groupId: 'communication' },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, groupId: 'communication' },
 
+  {
+    label: 'Usuarios y permisos',
+    href: '/usuarios',
+    icon: UserCog,
+    groupId: 'users',
+    requiresPermission: 'users:manage',
+  },
+
   { label: 'Tutoriales', href: '/academia', icon: GraduationCap, groupId: 'settings', requiresAcademia: true },
   { label: 'Configuración', href: '/configuracion', icon: Settings, groupId: 'settings' },
 ];
@@ -102,11 +114,15 @@ export function filterClinicSidebarNavItems(
     showMySettlementsNav: boolean;
     academiaEnabled?: boolean;
     isEntitled: (href: string) => boolean;
+    permissions?: readonly string[];
   }
 ): ClinicSidebarNavItem[] {
   return items.filter((item) => {
     if (item.requiresMySettlements && !opts.showMySettlementsNav) return false;
     if (item.requiresAcademia && !opts.academiaEnabled) return false;
+    if (item.requiresPermission && !opts.permissions?.includes(item.requiresPermission)) {
+      return false;
+    }
     return opts.isEntitled(item.href);
   });
 }

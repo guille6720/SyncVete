@@ -25,6 +25,7 @@ export type ClinicTopNavMenuId =
   | 'professionals'
   | 'reports'
   | 'communication'
+  | 'users'
   | 'settings';
 
 export type ClinicTopNavMenuDef =
@@ -41,6 +42,7 @@ export const CLINIC_TOP_NAV_MENUS: readonly ClinicTopNavMenuDef[] = [
   { id: 'professionals', label: 'Profesionales', kind: 'hub', groupId: 'professionals' },
   { id: 'reports', label: 'Reportes', kind: 'hub', groupId: 'reports' },
   { id: 'communication', label: 'Comunicación', kind: 'hub', groupId: 'communication' },
+  { id: 'users', label: 'Usuarios', kind: 'hub', groupId: 'users' },
   { id: 'settings', label: 'Configuración', kind: 'hub', groupId: 'settings' },
 ] as const;
 
@@ -57,6 +59,7 @@ export function buildClinicTopNav(opts: {
   entitledHrefs: string[] | null;
   showMySettlementsNav: boolean;
   academiaEnabled?: boolean;
+  permissions?: readonly string[];
   isEntitled: (href: string) => boolean;
 }): ClinicTopNavResolvedMenu[] {
   const visible = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, opts);

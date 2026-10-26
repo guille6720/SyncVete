@@ -1,11 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getSessionContext } from '@/actions/auth';
-import {
-  getOrganizationSettingsForm,
-  listBranches,
-  listPendingInvitations,
-  listTeamMembers,
-} from '@/actions/settings';
+import { getOrganizationSettingsForm, listBranches } from '@/actions/settings';
 import { getPlanBillingState, cancelClinicCheckoutIntents } from '@/actions/plan-billing';
 import { getSeatUsageMeters } from '@/lib/entitlements';
 import { SettingsPageClient } from '@/components/settings/settings-page-client';
@@ -13,7 +8,7 @@ import type { SettingsTab } from '@/components/settings/settings-tabs';
 import { hasPermission } from '@sincvete/shared';
 import { canPermissionAndFeature } from '@/lib/permissions';
 import { FEATURES } from '@/lib/entitlements';
-import type { Branch, SeatUsageMeter } from '@sincvete/shared';
+import type { SeatUsageMeter } from '@sincvete/shared';
 import { getOwnerAppBrand } from '@/actions/owner-app';
 import { ownerAppEnabled, parseOwnerAppBrand } from '@/lib/owner-app';
 
@@ -83,23 +78,7 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
     branchesData = await listBranches({ page: 1, pageSize: 50 });
   }
 
-  let teamData;
-  let showProfessionalsLink = false;
-  if (hasPermission(session.permissions, 'users:manage')) {
-    const [members, invitations, branches] = await Promise.all([
-      listTeamMembers({ page: 1, pageSize: 50 }),
-      listPendingInvitations(),
-      listBranches({ page: 1, pageSize: 100 }),
-    ]);
-
-    teamData = {
-      members,
-      invitations,
-      branches: branches.data as Branch[],
-    };
-  }
-
-  showProfessionalsLink = await canPermissionAndFeature(
+  const showProfessionalsLink = await canPermissionAndFeature(
     'professionals:read',
     FEATURES.PROFESSIONALS_SETTLEMENTS
   );
@@ -124,7 +103,6 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
       canExportData={canExportData}
       clinic={clinicData}
       branches={branchesData}
-      team={teamData}
       seats={seats}
       showProfessionalsLink={showProfessionalsLink}
       planBilling={planBilling}

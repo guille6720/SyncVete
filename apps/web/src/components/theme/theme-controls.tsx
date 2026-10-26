@@ -18,7 +18,7 @@ import {
 import { cn } from '@/lib/utils';
 
 const controlClass =
-  'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md border border-teal-700/30 bg-white px-2 text-sm font-semibold text-teal-900 shadow-sm transition hover:bg-teal-50 sm:px-2.5 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
+  'sv-neon sv-neon-hover inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-white px-2 text-sm font-semibold text-teal-900 hover:bg-teal-50 sm:px-2.5 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
 
 const labelClass = 'hidden lg:inline';
 

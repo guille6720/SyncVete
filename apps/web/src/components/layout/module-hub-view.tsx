@@ -14,7 +14,7 @@ export function ModuleHubView({
 }) {
   return (
     <div className="mx-auto min-w-0 max-w-[90rem] space-y-5">
-      <SurfaceCard padding="sm" className="border-primary/15">
+      <SurfaceCard padding="sm">
         <div className="flex min-w-0 items-center gap-3">
           <span
             className={cn(
@@ -51,7 +51,7 @@ export function ModuleHubView({
             >
               <SurfaceCard
                 padding="sm"
-                className="h-full transition-colors hover:border-primary/35 hover:bg-[var(--clinic-soft)]/50"
+                className="h-full hover:bg-[var(--clinic-soft)]/50"
               >
                 <div className="flex items-start gap-3">
                   <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--clinic-soft)] text-primary">

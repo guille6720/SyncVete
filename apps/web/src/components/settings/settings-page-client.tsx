@@ -15,11 +15,9 @@ import type { OwnerAppBrand } from '@/lib/owner-app';
 import type { PlanBillingState } from '@/actions/plan-billing';
 import type {
   Branch,
-  OrganizationInvitation,
   OrganizationSettings,
   PaginatedResult,
   SeatUsageMeter,
-  TeamMemberRow,
 } from '@sincvete/shared';
 
 interface SettingsPageClientProps {
@@ -33,11 +31,6 @@ interface SettingsPageClientProps {
     settings: OrganizationSettings;
   };
   branches?: PaginatedResult<Branch>;
-  team?: {
-    members: PaginatedResult<TeamMemberRow>;
-    invitations: OrganizationInvitation[];
-    branches: Branch[];
-  };
   seats?: SeatUsageMeter[];
   showProfessionalsLink?: boolean;
   planBilling?: PlanBillingState;
@@ -52,7 +45,6 @@ export function SettingsPageClient({
   canExportData = false,
   clinic,
   branches,
-  team,
   seats = [],
   showProfessionalsLink = false,
   planBilling,
@@ -84,11 +76,8 @@ export function SettingsPageClient({
         />
       )}
 
-      {activeTab === 'equipo' && team && (
+      {activeTab === 'equipo' && (
         <TeamPanel
-          members={team.members}
-          invitations={team.invitations}
-          branches={team.branches}
           seatMeters={seats.filter(
             (meter) => meter.featureKey === 'users.max' || meter.featureKey === 'professionals.max'
           )}

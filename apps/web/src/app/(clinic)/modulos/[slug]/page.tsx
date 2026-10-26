@@ -39,6 +39,7 @@ export default async function ModuleHubPage({
     entitledHrefs,
     showMySettlementsNav,
     academiaEnabled: isAcademiaEnabled(),
+    permissions: session.permissions ?? [],
     isEntitled: (href) => isClinicPathEntitled(href, entitledHrefs),
   });
 

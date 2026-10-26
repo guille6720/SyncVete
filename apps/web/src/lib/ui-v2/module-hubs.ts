@@ -11,6 +11,7 @@ export const MODULE_HUB_SLUG_BY_GROUP: Record<DashboardNavGroupId, string> = {
   professionals: 'profesionales',
   reports: 'reportes',
   communication: 'comunicacion',
+  users: 'usuarios',
   settings: 'configuracion',
 };
 
@@ -60,6 +61,7 @@ export const MODULE_ITEM_BLURB: Record<string, string> = {
   '/notificaciones': 'Bandeja interna',
   '/academia': 'Tutoriales guiados',
   '/configuracion': 'Ajustes de la clínica',
+  '/usuarios': 'Invitaciones, roles y permisos por módulo',
 };
 
 export function getModuleItemBlurb(href: string): string {

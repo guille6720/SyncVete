@@ -16,7 +16,7 @@ export function DashboardHeaderV2({
   const roleLabel = session.role ? ROLE_LABELS[session.role] : 'Portal';
 
   return (
-    <SurfaceCard padding="sm" className="border-primary/15 bg-card/95">
+    <SurfaceCard padding="sm" className="bg-card/95">
       <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0 space-y-1">
           <p className="truncate text-sm text-muted-foreground">

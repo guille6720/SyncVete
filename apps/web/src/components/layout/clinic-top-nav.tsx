@@ -19,6 +19,7 @@ import {
 interface ClinicTopNavProps {
   entitledHrefs?: string[] | null;
   showMySettlementsNav?: boolean;
+  permissions?: string[];
   academiaEnabled?: boolean;
   onNavigate?: () => void;
 }
@@ -62,6 +63,7 @@ function NavLinkButton({
 export function ClinicTopNav({
   entitledHrefs = null,
   showMySettlementsNav = false,
+  permissions,
   academiaEnabled = false,
   onNavigate,
 }: ClinicTopNavProps) {
@@ -71,6 +73,7 @@ export function ClinicTopNav({
       entitledHrefs,
       showMySettlementsNav,
       academiaEnabled,
+      permissions,
       isEntitled: (href) => isClinicPathEntitled(href, entitledHrefs),
     }),
     pathname

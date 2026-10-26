@@ -1,4 +1,4 @@
-import { ROLE_PERMISSIONS, type Permission, type Role } from './constants';
+import { IMPLIED_PERMISSIONS, ROLE_PERMISSIONS, type Permission, type Role } from './constants';
 
 export * from './constants';
 export * from './constants/features';
@@ -28,6 +28,7 @@ export * from './constants/notifications';
 export * from './constants/audit';
 export * from './constants/professionals';
 export * from './constants/interconsultations';
+export * from './constants/managed-users';
 export * from './types';
 export * from './types/dashboard';
 export * from './types/appointments';
@@ -52,16 +53,38 @@ export * from './types/notifications';
 export * from './types/audit';
 export * from './types/professionals';
 export * from './types/interconsultations';
+export * from './types/managed-users';
 export * from './schemas';
 export * from './entitlements';
 export * from './billing';
 export * from './tutorials';
 
-export function getPermissionsForRole(role: Role, custom?: Permission[] | null): Permission[] {
-  if (custom && custom.length > 0) {
-    return custom;
+/**
+ * Effective permissions = (custom list or role defaults) + implied granular children,
+ * minus user restrictions. A restricted parent also removes its children. Central Admin
+ * (owner) cannot be restricted. Mirrors SQL has_permission().
+ */
+export function getPermissionsForRole(
+  role: Role,
+  custom?: Permission[] | null,
+  denied?: readonly string[] | null
+): Permission[] {
+  const base = custom && custom.length > 0 ? custom : ROLE_PERMISSIONS[role];
+  const granted = new Set<Permission>(base);
+  for (const [child, parent] of Object.entries(IMPLIED_PERMISSIONS) as Array<[Permission, Permission]>) {
+    if (granted.has(parent)) granted.add(child);
   }
-  return ROLE_PERMISSIONS[role];
+
+  if (role === 'owner' || !denied || denied.length === 0) {
+    return [...granted];
+  }
+
+  const deniedSet = new Set(denied);
+  return [...granted].filter((permission) => {
+    if (deniedSet.has(permission)) return false;
+    const parent = IMPLIED_PERMISSIONS[permission];
+    return !(parent && deniedSet.has(parent));
+  });
 }
 
 export function hasPermission(
@@ -100,7 +123,6 @@ export function buildPaginatedResult<T>(
 export * from './utils/settings';
 export * from './utils/dashboard';
 export * from './utils/appointments';
-export * from './utils/professional-schedules';
 export * from './utils/waiting-room';
 export * from './utils/clinical';
 export * from './utils/hospitalizations';

@@ -56,6 +56,12 @@
   --shell-border: color-mix(in oklab, var(--clinic) 18%, transparent);
   --shell-text: #334155;
   --shell-text-muted: #64748b;
+
+  /* Neon borders (clinic accent) — light mode */
+  --sv-neon-border: color-mix(in oklab, var(--clinic) 62%, transparent);
+  --sv-neon-ring: color-mix(in oklab, var(--clinic) 28%, transparent);
+  --sv-neon-glow: color-mix(in oklab, var(--clinic) 34%, transparent);
+  --sv-neon-glow-strong: color-mix(in oklab, var(--clinic) 50%, transparent);
 }
 
 .dark {
@@ -82,6 +88,12 @@
   --shell-border: color-mix(in oklab, var(--clinic) 28%, transparent);
   --shell-text: #e2e8f0;
   --shell-text-muted: #94a3b8;
+
+  /* Neon borders — stronger glow in dark mode */
+  --sv-neon-border: color-mix(in oklab, var(--clinic) 82%, white 10%);
+  --sv-neon-ring: color-mix(in oklab, var(--clinic) 42%, transparent);
+  --sv-neon-glow: color-mix(in oklab, var(--clinic) 48%, transparent);
+  --sv-neon-glow-strong: color-mix(in oklab, var(--clinic) 68%, transparent);
 }
 
 /* Brand default (SyncVete UI V2): teal. Optional accents below are user prefs — not MyVete. See docs/ui-v2/BRAND.md */
@@ -189,6 +201,30 @@ html.pwa-standalone body {
 
 @utility font-display {
   font-family: var(--font-display);
+}
+
+/** Brand neon border + glow (light + dark). Use on buttons and interactive cards. */
+@utility sv-neon {
+  border-width: 2px;
+  border-style: solid;
+  border-color: var(--sv-neon-border);
+  box-shadow:
+    0 0 0 1px var(--sv-neon-ring),
+    0 0 16px var(--sv-neon-glow);
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background-color 150ms ease,
+    color 150ms ease;
+}
+
+@utility sv-neon-hover {
+  &:hover:not(:disabled) {
+    border-color: var(--clinic);
+    box-shadow:
+      0 0 0 1px var(--sv-neon-ring),
+      0 0 24px var(--sv-neon-glow-strong);
+  }
 }
 
 .landing-root {

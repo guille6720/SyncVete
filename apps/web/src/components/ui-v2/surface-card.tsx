@@ -14,7 +14,7 @@ export function SurfaceCard({
   return (
     <div
       className={cn(
-        'rounded-xl border border-border bg-card text-card-foreground shadow-sm',
+        'sv-neon sv-neon-hover rounded-xl bg-card text-card-foreground',
         padding === 'sm' && 'p-3',
         padding === 'md' && 'p-4 md:p-5',
         padding === 'lg' && 'p-5 md:p-6',

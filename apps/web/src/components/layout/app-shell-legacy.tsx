@@ -32,6 +32,7 @@ interface AppShellProps {
   /** Streamed commercial banner (non-critical). Prefer over blocking layout awaits. */
   billingBannerSlot?: React.ReactNode;
   showMySettlementsNav?: boolean;
+  permissions?: string[];
   /** When false, Tutoriales stays out of the sidebar and command palette. */
   academiaEnabled?: boolean;
 }
@@ -48,6 +49,7 @@ export function AppShellLegacy({
   entitledHrefs = null,
   billingBannerSlot = null,
   showMySettlementsNav = false,
+  permissions = [],
   academiaEnabled = false,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -178,6 +180,7 @@ export function AppShellLegacy({
         <ClinicSidebarNav
           entitledHrefs={entitledHrefs}
           showMySettlementsNav={showMySettlementsNav}
+          permissions={permissions}
           academiaEnabled={academiaEnabled}
           isPlatformAdmin={isPlatformAdmin}
           pendingHref={pendingHref}
