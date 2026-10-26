@@ -24,6 +24,8 @@ import { DashboardRecentLists } from '@/components/dashboard/dashboard-recent-li
 import { DashboardSpeciesBreakdown } from '@/components/dashboard/dashboard-species-breakdown';
 import { DashboardStatCards } from '@/components/dashboard/dashboard-stat-cards';
 import { DashboardWaitingRoomSnapshot } from '@/components/dashboard/dashboard-waiting-room-snapshot';
+import { DashboardViewV2 } from '@/components/dashboard/dashboard-view-v2';
+import { isUiV2Enabled } from '@/lib/ui-v2/feature-flag';
 
 function DashboardPrioritySkeleton() {
   return (
@@ -188,8 +190,13 @@ async function DashboardSecondarySection({
 /**
  * First paint: header + quick actions (session/org already request-cached).
  * Then stream priority KPIs, then secondary widgets / activity.
+ * When NEXT_PUBLIC_UI_V2_ENABLED=true, renders the UI V2 dashboard layout.
  */
 export async function DashboardView() {
+  if (isUiV2Enabled()) {
+    return <DashboardViewV2 />;
+  }
+
   const session = await getSessionContext();
   if (!session) return null;
 

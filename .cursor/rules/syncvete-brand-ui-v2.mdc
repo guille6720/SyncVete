@@ -1,0 +1,33 @@
+---
+description: SyncVete UI V2 brand guardrails — teal identity; MyVete for UX only, never purple rebrand
+globs: apps/web/src/**/*.{tsx,ts,css}
+alwaysApply: false
+---
+
+# SyncVete brand (UI V2)
+
+Full token reference: `docs/ui-v2/BRAND.md`. PR checklist: `docs/ui-v2/PR-CHECKLIST.md`.
+
+## Must
+
+- Keep SyncVete teal as the product default (`DEFAULT_THEME.accent = 'teal'`, `--clinic` / `--sv-primary` `#0d9488`).
+- Reuse existing CSS variables and UI primitives (`bg-background`, `bg-primary`, `bg-card`, `border-border`, `Button`/`Card`/`Badge`).
+- Preserve logo (`BrandLogo` / syncvete-logo), DM Sans + Fraunces, and light/dark via `.dark` + `data-accent`.
+- Improve layout, spacing, navigation, cards, tables, and interactions without changing the brand palette.
+- Treat MyVete only as a reference for workflow organization / operational UX — never for colors, logo, or type.
+
+## Must not
+
+- Do not adopt MyVete’s purple scheme as the SyncVete look (no hardcoded `#7c3aed` / `#8b5cf6` / purple-on-white themes as UI V2 defaults).
+- Do not invent a second purple stylesheet for clinic staff UI.
+- Do not change `DEFAULT_THEME.accent` away from `teal`.
+- Do not replace SyncVete logo or display/sans font identity.
+
+## Allowed exceptions
+
+- User-selected accent presets in `COLOR_PRESETS` (including optional violet) remain user preference, not product branding.
+- Owner portal neon / clinic `primaryColor` white-label is out of scope for clinic staff brand rules.
+
+## When touching clinic UI
+
+Prefer token classes over new hex colors. If a status color is needed, reuse dashboard tones (teal/sky/emerald/amber/rose/cyan) already in the codebase.

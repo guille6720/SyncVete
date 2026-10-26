@@ -84,6 +84,7 @@
   --shell-text-muted: #94a3b8;
 }
 
+/* Brand default (SyncVete UI V2): teal. Optional accents below are user prefs — not MyVete. See docs/ui-v2/BRAND.md */
 :root,
 [data-accent='teal'] {
   --clinic: #0d9488;

@@ -1,3 +1,4 @@
+/** SyncVete product theme. Brand default is teal — see docs/ui-v2/BRAND.md */
 export const THEME_STORAGE_KEY = 'syncvete-theme';
 const THEME_STORAGE_KEY_LEGACY = 'sincvete-theme';
 
