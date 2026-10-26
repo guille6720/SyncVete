@@ -127,7 +127,11 @@ export function AppShellV2({
   const sidebarCompact = collapsed && !mobileOpen;
 
   return (
-    <div className="flex min-h-dvh min-w-0" style={{ background: 'var(--shell-bg)' }}>
+    <div
+      className="flex min-h-dvh min-w-0"
+      style={{ background: 'var(--shell-bg)' }}
+      data-shell="ui-v2"
+    >
       <CommandPalette
         entitledHrefs={entitledHrefs}
         isPlatformAdmin={isPlatformAdmin}
