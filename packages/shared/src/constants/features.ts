@@ -92,6 +92,7 @@ export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/tutores': FEATURES.OWNERS,
   '/pacientes': FEATURES.PATIENTS,
   '/agenda': FEATURES.APPOINTMENTS,
+  '/agenda/turnos': FEATURES.APPOINTMENTS,
   '/sala-espera': FEATURES.WAITING_ROOM,
   '/historia-clinica': FEATURES.CLINICAL_HISTORY,
   '/consultas': FEATURES.CONSULTATIONS,

@@ -6,6 +6,7 @@ import {
   Bell,
   Briefcase,
   Calendar,
+  CalendarPlus,
   ClipboardList,
   FlaskConical,
   Hourglass,
@@ -62,6 +63,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, groupId: 'patients' },
 
   { label: 'Agenda', href: '/agenda', icon: Calendar, groupId: 'agenda' },
+  { label: 'Turnos', href: '/agenda/turnos', icon: CalendarPlus, groupId: 'agenda' },
   { label: 'Vacunación', href: '/vacunacion', icon: Syringe, groupId: 'agenda' },
   { label: 'Cirugías', href: '/cirugias', icon: Scissors, groupId: 'agenda' },
   { label: 'Recordatorios', href: '/recordatorios', icon: Bell, groupId: 'agenda' },
@@ -124,8 +126,22 @@ export function groupClinicSidebarNavItems(
   return { topLevel, groups };
 }
 
-export function isSidebarNavItemActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+/**
+ * Active when this href is the longest catalog match for the pathname.
+ * Avoids `/agenda` staying active on `/agenda/turnos`.
+ */
+export function isSidebarNavItemActive(
+  pathname: string,
+  href: string,
+  catalogHrefs: readonly string[] = CLINIC_SIDEBAR_NAV_ITEMS.map((item) => item.href)
+): boolean {
+  const matches = catalogHrefs
+    .filter((candidate) => pathname === candidate || pathname.startsWith(`${candidate}/`))
+    .sort((a, b) => b.length - a.length);
+  if (matches.length === 0) {
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+  return matches[0] === href;
 }
 
 export function findActiveSidebarGroupId(

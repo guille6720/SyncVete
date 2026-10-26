@@ -46,9 +46,17 @@ describe('clinic-sidebar-nav', () => {
 
   it('resolves active group preferring the longest href match', () => {
     expect(isSidebarNavItemActive('/agenda/nueva', '/agenda')).toBe(true);
+    expect(isSidebarNavItemActive('/agenda/turnos', '/agenda')).toBe(false);
+    expect(isSidebarNavItemActive('/agenda/turnos', '/agenda/turnos')).toBe(true);
     expect(
       findActiveSidebarGroupId('/liquidaciones/mis-liquidaciones', CLINIC_SIDEBAR_NAV_ITEMS)
     ).toBe('professionals');
+  });
+
+  it('includes Turnos under the agenda group', () => {
+    const item = CLINIC_SIDEBAR_NAV_ITEMS.find((entry) => entry.href === '/agenda/turnos');
+    expect(item?.groupId).toBe('agenda');
+    expect(item?.label).toBe('Turnos');
   });
 
   it('can resolve active group from a module hub pathname', () => {
