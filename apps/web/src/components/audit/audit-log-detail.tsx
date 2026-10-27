@@ -8,7 +8,6 @@ import {
   AUDIT_ACTION_VARIANT,
   auditChangedFields,
   auditEntityLabel,
-  buildAuditEntityHref,
   formatAuditValue,
   formatClinicalEntryDateTime,
   isAuditAction,
@@ -21,7 +20,6 @@ interface AuditLogDetailViewProps {
 
 export function AuditLogDetailView({ log }: AuditLogDetailViewProps) {
   const action = isAuditAction(log.action) ? log.action : 'update';
-  const href = buildAuditEntityHref(log.entity_type, log.entity_id, log.new_data ?? log.old_data);
   const changes = auditChangedFields(log.old_data, log.new_data);
 
   return (
@@ -33,11 +31,6 @@ export function AuditLogDetailView({ log }: AuditLogDetailViewProps) {
             Volver a auditoría
           </Link>
         </Button>
-        {href && (
-          <Button variant="outline" size="sm" asChild>
-            <Link href={href}>Ver registro</Link>
-          </Button>
-        )}
       </div>
 
       <Card>
