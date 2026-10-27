@@ -69,6 +69,7 @@ test('CRUD through browser: parties, category, USD vaccine, sale catalog and rep
   await page.getByLabel('Cotización: pesos por 1 USD').fill('1300');
   await page.getByRole('button', { name: 'Guardar cotización' }).click();
   await expect(page.getByText('Venta $ 22.750,00', { exact: true })).toBeVisible();
+  await page.screenshot({ path: '../../test-results/compras-precios-desktop.png', fullPage: true });
   await page.getByRole('textbox', { name: 'Buscar producto para ver su precio de venta...' }).fill('no-existe-qa');
   await expect(page.getByText('Todavía no hay precios de venta.', { exact: false })).toBeVisible();
   await page.goto('/compras?seccion=vacunas');
@@ -83,6 +84,7 @@ test('CRUD through browser: parties, category, USD vaccine, sale catalog and rep
   await page.getByRole('button', { name: 'Eliminar', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Eliminar', exact: true }).click();
   await expect(page).toHaveURL(/\/compras/);
+  await expect(page.getByRole('navigation', { name: 'Secciones de Compras' })).toBeVisible();
   await expect(page.getByText(`QA Séxtuple editada ${qa.run}`, { exact: true })).toHaveCount(0);
   await page.goto('/compras?seccion=categorias');
   await page.getByLabel('Nombre de categoría', { exact: true }).nth(1).fill(`QA Categoría editada ${qa.run}`);
@@ -113,7 +115,10 @@ test('read-only UI hides mutations and mobile navigation remains usable', async 
   await expect(page.getByRole('link', { name: 'Agregar proveedor' })).toHaveCount(0);
   await expect(page.getByRole('navigation', { name: 'Secciones de Compras' })).toBeVisible();
   await page.goto('/compras?seccion=precios');
+  await expect(page.getByLabel('Cotización: pesos por 1 USD')).toBeVisible();
+  await expect(page.getByLabel('Cotización: pesos por 1 USD')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Guardar cotización' })).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: '../../test-results/compras-mobile.png', fullPage: true });
   await page.goto('/compras/productos/nuevo');
   await expect(page).toHaveURL(/\/compras(?:\?|$)/);

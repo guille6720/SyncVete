@@ -1,7 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? 'http://localhost:3017';
 const hostname = new URL(baseURL).hostname;
-if (!['localhost', '127.0.0.1'].includes(hostname) && !/^sync-vete-staging-[a-z0-9-]+\\.vercel\\.app$/.test(hostname)) throw new Error('Only local or SyncVete-Staging previews are allowed');
+if (!['localhost', '127.0.0.1'].includes(hostname) && !/^sync-vete-staging-[a-z0-9-]+\.vercel\.app$/.test(hostname)) throw new Error('Only local or SyncVete-Staging previews are allowed');
 
 export default defineConfig({
   testDir: './e2e',
