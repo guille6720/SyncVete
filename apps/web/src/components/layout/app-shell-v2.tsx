@@ -10,7 +10,13 @@ import { ClinicTopNav } from '@/components/layout/clinic-top-nav';
 import { ClinicIdentityPanel } from '@/components/layout/clinic-identity-panel';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { APP_NAME, ROLE_LABELS, isClinicPathEntitled, type Role } from '@sincvete/shared';
+import {
+  APP_NAME,
+  INVITABLE_ROLES,
+  ROLE_LABELS,
+  isClinicPathEntitled,
+  type Role,
+} from '@sincvete/shared';
 import { ThemeControls } from '@/components/theme/theme-controls';
 import { InstallAppButton } from '@/components/pwa/install-app-button';
 import { CommandPalette, CommandPaletteTrigger } from './command-palette';
@@ -226,9 +232,11 @@ export function AppShellV2({
           {!sidebarCompact ? (
             <div className="mb-2 px-2">
               <p className="truncate text-sm font-medium text-foreground">{userName}</p>
-              <p className="truncate text-xs font-medium text-primary">
-                {branchName ? `Usuario de ${branchName}` : 'Usuario de la clínica'}
-              </p>
+              {INVITABLE_ROLES.includes(role) ? (
+                <p className="truncate text-xs font-medium text-primary">
+                  {branchName ? `Usuario de ${branchName}` : 'Usuario de la clínica'}
+                </p>
+              ) : null}
               <p className="text-xs text-muted-foreground">{ROLE_LABELS[role]}</p>
             </div>
           ) : null}
