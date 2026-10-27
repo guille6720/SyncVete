@@ -423,7 +423,7 @@ export async function createReferralFromConsultation(
       ({ data, error } = await supabase.from('appointments').insert(baseRow).select('id').single());
     }
 
-    if (error) {
+    if (error || !data) {
       console.error('[createReferralFromConsultation]', error);
       return {
         success: false,

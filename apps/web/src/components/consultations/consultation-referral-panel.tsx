@@ -71,7 +71,7 @@ export function ConsultationReferralPanel({
     };
   }, [assignedUserId, consultation.branch_id]);
 
-  const schedules = proContext?.schedules ?? [];
+  const schedules = useMemo(() => proContext?.schedules ?? [], [proContext]);
   const durationMinutes =
     getPreferredSlotDurationMinutes(schedules) ?? DEFAULT_APPOINTMENT_DURATION_MINUTES;
   const slots = useMemo(() => {
