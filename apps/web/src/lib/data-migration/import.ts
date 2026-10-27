@@ -15,6 +15,7 @@ import {
   chunkRange,
   DEFAULT_IMPORT_CHUNK_SIZE,
   MAX_IMPORT_CSV_BYTES,
+  hasPermission,
   mapRow,
   normalizeDocument,
   parseCsv,
@@ -39,7 +40,7 @@ import {
   type VaccinationImportRow,
   type ValidationIssue,
 } from '@sincvete/shared';
-import { requirePermission } from '@/lib/permissions';
+import { PermissionError, requirePermission, requireSession } from '@/lib/permissions';
 import {
   commitSpecialtySlice,
   fieldsForSpecialty,
@@ -55,6 +56,21 @@ type ImportEntity =
   | 'clinical_entries'
   | 'vaccinations'
   | SpecialtyEntity;
+
+/** data:import always; inventory:write also allowed for product catalog imports. */
+async function requireImportPermission(opts?: {
+  importType?: ImportType | null;
+  entity?: ImportEntity | null;
+}) {
+  const session = await requireSession();
+  if (hasPermission(session.permissions, 'data:import')) return session;
+  const isInventoryCatalog =
+    opts?.importType === 'inventory_products' || opts?.entity === 'inventory_products';
+  if (isInventoryCatalog && hasPermission(session.permissions, 'inventory:write')) {
+    return session;
+  }
+  throw new PermissionError();
+}
 
 async function loadKnownBranchInternalIds(
   supabase: Awaited<ReturnType<typeof migrationDb>>,
@@ -296,7 +312,7 @@ export async function createImportBatch(input: {
   conflictPolicy?: ConflictPolicy;
   idempotencyMode?: IdempotencyMode;
 }) {
-  const session = await requirePermission('data:import');
+  const session = await requireImportPermission({ importType: input.importType });
   const supabase = await migrationDb();
   const { data, error } = await supabase
     .from('data_import_batches')
@@ -323,7 +339,7 @@ export async function analyzeImportFile(input: {
   csvText: string;
   entity: ImportEntity;
 }) {
-  await requirePermission('data:import');
+  await requireImportPermission({ entity: input.entity });
   const parsed = parseCsv(input.csvText);
   const fields = isSpecialtyEntity(input.entity)
     ? fieldsForSpecialty(input.entity)
@@ -370,7 +386,7 @@ export async function dryRunImport(input: {
   branchIdByExternal?: Record<string, string>;
   userIdByExternal?: Record<string, string>;
 }) {
-  const session = await requirePermission('data:import');
+  const session = await requireImportPermission({ entity: input.entity });
   const supabase = await migrationDb();
   const { data: batch, error: batchError } = await supabase
     .from('data_import_batches')
@@ -625,7 +641,7 @@ export async function commitImport(input: {
   chunkSize?: number;
   rowDecisions?: Record<number, RowConflictDecision>;
 }) {
-  const session = await requirePermission('data:import');
+  const session = await requireImportPermission({ entity: input.entity });
   const supabase = await migrationDb();
   const { data: batch, error: batchError } = await supabase
     .from('data_import_batches')

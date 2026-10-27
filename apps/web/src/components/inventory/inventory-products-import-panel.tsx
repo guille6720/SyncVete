@@ -8,27 +8,22 @@ import {
   DEFAULT_IMPORT_CHUNK_SIZE,
   IDEMPOTENCY_MODE_LABELS,
   INVENTORY_PRODUCT_IMPORT_FIELDS,
-  completeInventoryProductMapping,
   type IdempotencyMode,
   type ValidationIssue,
 } from '@sincvete/shared';
 import {
-  commitDataImport,
-  convertSpreadsheetToCsvAction,
-  downloadImportTemplate,
-  downloadValidationReportAction,
-  startDataImport,
-  validateDataImport,
-} from '@/actions/data-migration';
+  analyzeInventoryProductImport,
+  commitInventoryProductImport,
+  downloadInventoryProductTemplateAction,
+  validateInventoryProductImport,
+} from '@/actions/inventory-import';
+import { convertSpreadsheetToCsvAction } from '@/actions/data-migration';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
-
-const ENTITY = 'inventory_products' as const;
-const IMPORT_TYPE = 'inventory_products' as const;
 
 function downloadText(filename: string, text: string, type = 'text/csv;charset=utf-8') {
   const blob = new Blob([text], { type });
@@ -84,7 +79,6 @@ export function InventoryProductsImportPanel({
     () =>
       requiredFields.filter((field) => {
         if (mapping[field.key]) return false;
-        // ID can be derived from SKU/Código once mapped
         if (field.key === 'external_product_id' && mapping.sku) return false;
         return true;
       }),
@@ -93,9 +87,7 @@ export function InventoryProductsImportPanel({
 
   async function onDownloadTemplate() {
     setMessage(null);
-    const form = new FormData();
-    form.set('kind', ENTITY);
-    const result = await run(() => downloadImportTemplate(form));
+    const result = await run(() => downloadInventoryProductTemplateAction());
     if (!result?.success || !result.data) {
       setMessage(result?.error ?? 'No se pudo descargar la plantilla');
       return;
@@ -132,61 +124,16 @@ export function InventoryProductsImportPanel({
     setMessage(`Archivo cargado: ${file.name}`);
   }
 
-  async function onAnalyze() {
-    if (!csvText.trim()) {
-      setMessage('Subí un CSV o Excel primero');
-      return;
-    }
-    setMessage(null);
-    setValidation(null);
-    setImportReport(null);
-    const form = new FormData();
-    form.set('importType', IMPORT_TYPE);
-    form.set('entity', ENTITY);
-    form.set('csvText', csvText);
-    form.set('sourceFilename', sourceFilename);
-    form.set('sourceSystem', sourceSystem);
-    form.set('idempotencyMode', idempotencyMode);
-    const result = await run(() => startDataImport(form));
-    if (!result?.success || !result.data) {
-      setMessage(result?.error ?? 'No se pudo analizar el archivo');
-      return;
-    }
-    const completedMapping = completeInventoryProductMapping(
-      result.data.headers,
-      result.data.mapping
-    );
-    setBatchId(result.data.batchId);
-    setMapping(completedMapping);
-    setHeaders(result.data.headers);
-    const missing = requiredFields.filter((field) => {
-      if (completedMapping[field.key]) return false;
-      if (field.key === 'external_product_id' && completedMapping.sku) return false;
-      return true;
-    });
-    if (missing.length > 0) {
-      setMessage(
-        `Analizado · ${result.data.rowCount} filas · faltan columnas: ${missing
-          .map((field) => field.label)
-          .join(', ')}. Elegilas abajo en el mapeo y validá.`
-      );
-      return;
-    }
-
-    setMessage(`Analizado · ${result.data.rowCount} filas · mapeo listo, validando…`);
-    // Auto-validate so Importar se habilita sin un paso extra.
+  async function runValidation(
+    nextBatchId: string,
+    nextMapping: Record<string, string | null>,
+    nextCsv: string
+  ) {
     const validateForm = new FormData();
-    validateForm.set('batchId', result.data.batchId);
-    validateForm.set('entity', ENTITY);
-    validateForm.set('csvText', csvText);
-    validateForm.set('mapping', JSON.stringify(completedMapping));
-    validateForm.set('knownOwnerExternalIds', '');
-    validateForm.set('knownPatientExternalIds', '');
-    validateForm.set('knownInvoiceExternalIds', '');
-    validateForm.set('invoiceIdByExternal', '{}');
-    validateForm.set('branchIdByExternal', '{}');
-    validateForm.set('userIdByExternal', '{}');
-    const validated = await run(() => validateDataImport(validateForm));
+    validateForm.set('batchId', nextBatchId);
+    validateForm.set('csvText', nextCsv);
+    validateForm.set('mapping', JSON.stringify(nextMapping));
+    const validated = await run(() => validateInventoryProductImport(validateForm));
     if (!validated?.success || !validated.data) {
       setMessage(validated?.error ?? 'Validación fallida');
       return;
@@ -196,7 +143,7 @@ export function InventoryProductsImportPanel({
       ready: validated.data.ready,
       warnings: validated.data.warnings,
       errors: validated.data.errors,
-      issues: validated.data.issues as ValidationIssue[],
+      issues: validated.data.issues,
     });
     setMessage(
       validated.data.errors > 0
@@ -205,51 +152,54 @@ export function InventoryProductsImportPanel({
     );
   }
 
+  async function onAnalyze() {
+    if (!csvText.trim()) {
+      setMessage('Subí un CSV o Excel primero');
+      return;
+    }
+    setMessage(null);
+    setValidation(null);
+    setImportReport(null);
+    const form = new FormData();
+    form.set('csvText', csvText);
+    form.set('sourceFilename', sourceFilename);
+    form.set('sourceSystem', sourceSystem);
+    form.set('idempotencyMode', idempotencyMode);
+    const result = await run(() => analyzeInventoryProductImport(form));
+    if (!result?.success || !result.data) {
+      setMessage(result?.error ?? 'No se pudo analizar el archivo');
+      return;
+    }
+    setBatchId(result.data.batchId);
+    setMapping(result.data.mapping);
+    setHeaders(result.data.headers);
+
+    const missing = requiredFields.filter((field) => {
+      if (result.data!.mapping[field.key]) return false;
+      if (field.key === 'external_product_id' && result.data!.mapping.sku) return false;
+      return true;
+    });
+    if (missing.length > 0) {
+      setMessage(
+        `Analizado · ${result.data.rowCount} filas · faltan columnas: ${missing
+          .map((field) => field.label)
+          .join(', ')}. Elegilas abajo y validá.`
+      );
+      return;
+    }
+
+    setMessage(`Analizado · ${result.data.rowCount} filas · validando productos…`);
+    await runValidation(result.data.batchId, result.data.mapping, csvText);
+  }
+
   async function onValidate() {
     if (!batchId) return;
     setMessage(null);
-    const form = new FormData();
-    form.set('batchId', batchId);
-    form.set('entity', ENTITY);
-    form.set('csvText', csvText);
-    form.set('mapping', JSON.stringify(mapping));
-    form.set('knownOwnerExternalIds', '');
-    form.set('knownPatientExternalIds', '');
-    form.set('knownInvoiceExternalIds', '');
-    form.set('invoiceIdByExternal', '{}');
-    form.set('branchIdByExternal', '{}');
-    form.set('userIdByExternal', '{}');
-    const result = await run(() => validateDataImport(form));
-    if (!result?.success || !result.data) {
-      setMessage(result?.error ?? 'Validación fallida');
-      return;
-    }
-    setValidation({
-      detected: result.data.detected,
-      ready: result.data.ready,
-      warnings: result.data.warnings,
-      errors: result.data.errors,
-      issues: result.data.issues as ValidationIssue[],
-    });
-    setMessage(
-      `${result.data.detected} detectados · ${result.data.ready} listos · ${result.data.warnings} avisos · ${result.data.errors} errores`
-    );
-  }
-
-  async function onDownloadValidationReport() {
-    if (!validation?.issues.length) return;
-    const form = new FormData();
-    form.set('validationIssues', JSON.stringify(validation.issues));
-    const result = await run(() => downloadValidationReportAction(form));
-    if (!result?.success || !result.data) {
-      setMessage(result?.error ?? 'No se pudo generar el reporte');
-      return;
-    }
-    downloadText(result.data.filename, result.data.csv);
+    await runValidation(batchId, mapping, csvText);
   }
 
   async function onCommit() {
-    if (!batchId || !validation || validation.errors > 0) {
+    if (!batchId || !validation || validation.errors > 0 || validation.ready <= 0) {
       setMessage('Corregí los errores antes de importar');
       return;
     }
@@ -264,22 +214,12 @@ export function InventoryProductsImportPanel({
       setProgressLabel(`Importando productos: ${offset}…`);
       const form = new FormData();
       form.set('batchId', batchId);
-      form.set('entity', ENTITY);
       form.set('csvText', csvText);
       form.set('mapping', JSON.stringify(mapping));
-      form.set('ownerIdByExternal', '{}');
-      form.set('branchIdByExternal', '{}');
-      form.set('userIdByExternal', '{}');
-      form.set('patientIdByExternal', '{}');
-      form.set('productIdByExternal', '{}');
-      form.set('invoiceIdByExternal', '{}');
-      form.set('appointmentIdByExternal', '{}');
       form.set('sourceSystem', sourceSystem);
       form.set('offset', String(offset));
       form.set('chunkSize', String(DEFAULT_IMPORT_CHUNK_SIZE));
-      form.set('rowDecisions', '{}');
-      form.set('validationIssues', JSON.stringify(validation.issues));
-      const result = await run(() => commitDataImport(form));
+      const result = await run(() => commitInventoryProductImport(form));
       if (!result?.success || !result.data) {
         setMessage(result?.error ?? 'Importación fallida');
         setProgressLabel(null);
@@ -312,14 +252,18 @@ export function InventoryProductsImportPanel({
 
       <Card>
         <CardHeader>
-          <CardTitle>Importar productos</CardTitle>
+          <CardTitle>Importar productos de inventario</CardTitle>
           <CardDescription>
-            Subí un CSV o Excel (coma o punto y coma). Si tu archivo tiene Código/Descripción, se
-            mapean solos. Obligatorios: {requiredFields.map((field) => field.label).join(', ')} —
-            el ID puede salir del Código/SKU.
+            Solo catálogo de productos (no tutores ni pacientes). CSV/Excel con coma o punto y coma.
+            Código/Descripción se mapean solos.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
+          <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-100">
+            Tipo fijo: <strong>Productos de inventario</strong>. No uses Configuración → Importar
+            tutores para este archivo.
+          </p>
+
           {(message || progressLabel || importReport) && (
             <div className="space-y-2 text-sm">
               {message && (
@@ -342,7 +286,12 @@ export function InventoryProductsImportPanel({
           )}
 
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="outline" disabled={pending} onClick={() => void onDownloadTemplate()}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={pending}
+              onClick={() => void onDownloadTemplate()}
+            >
               <Download className="mr-2 h-4 w-4" />
               Plantilla CSV
             </Button>
@@ -357,9 +306,6 @@ export function InventoryProductsImportPanel({
                 onChange={(e) => setSourceSystem(e.target.value)}
                 placeholder="Ej. Catalogo / Vetsoft"
               />
-              <p className="text-xs text-muted-foreground">
-                Se usa con el ID externo para no duplicar si reimportás.
-              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="idempotencyMode">Si ya existe</Label>
@@ -387,7 +333,8 @@ export function InventoryProductsImportPanel({
             />
             {csvText && (
               <p className="text-xs text-muted-foreground">
-                {sourceFilename} · {csvText.split(/\r?\n/).filter((line) => line.trim()).length} líneas
+                {sourceFilename} · {csvText.split(/\r?\n/).filter((line) => line.trim()).length}{' '}
+                líneas
               </p>
             )}
           </div>
@@ -417,14 +364,13 @@ export function InventoryProductsImportPanel({
           {batchId && headers.length > 0 && (
             <div className="space-y-3 rounded-lg border p-4">
               <div>
-                <h3 className="font-medium">Mapeo de columnas</h3>
+                <h3 className="font-medium">Mapeo de columnas (productos)</h3>
                 <p className="text-sm text-muted-foreground">
                   Columnas detectadas: {headers.join(' · ')}
                 </p>
                 {unmappedRequired.length > 0 && (
                   <p className="mt-2 text-sm text-destructive">
-                    Falta mapear: {unmappedRequired.map((field) => field.label).join(', ')}. Sin
-                    eso la validación marca todas las filas en error.
+                    Falta mapear: {unmappedRequired.map((field) => field.label).join(', ')}.
                   </p>
                 )}
               </div>
@@ -469,23 +415,12 @@ export function InventoryProductsImportPanel({
             <div className="space-y-3 rounded-lg border p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <h3 className="font-medium">Resultado de validación</h3>
+                  <h3 className="font-medium">Resultado de validación (productos)</h3>
                   <p className="text-sm text-muted-foreground">
                     {validation.detected} detectados · {validation.ready} listos ·{' '}
                     {validation.warnings} avisos · {validation.errors} errores
                   </p>
                 </div>
-                {validation.issues.length > 0 && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => void onDownloadValidationReport()}
-                  >
-                    Descargar reporte
-                  </Button>
-                )}
               </div>
               {validation.issues.length > 0 && (
                 <div className="max-h-56 space-y-2 overflow-auto text-sm">
@@ -496,7 +431,8 @@ export function InventoryProductsImportPanel({
                         issue.severity === 'error' ? 'text-destructive' : 'text-muted-foreground'
                       }
                     >
-                      Fila {issue.rowNumber}: {issue.message}
+                      Fila {issue.rowNumber}: [{issue.severity}] {issue.message}
+                      {issue.recommendedAction ? ` → ${issue.recommendedAction}` : ''}
                     </p>
                   ))}
                   {validation.issues.length > 40 && (
