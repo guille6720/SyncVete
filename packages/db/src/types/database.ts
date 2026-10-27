@@ -7431,6 +7431,21 @@ export interface Database {
           total_count: number;
         }[];
       };
+      list_audit_members: {
+        Args: Record<string, never>;
+        Returns: {
+          user_id: string;
+          full_name: string;
+          roles: string[];
+          is_active: boolean;
+        }[];
+      };
+      search_audit_logs_by_member: {
+        Args: Database['public']['Functions']['search_audit_logs']['Args'] & {
+          p_user_id?: string | null;
+        };
+        Returns: Database['public']['Functions']['search_audit_logs']['Returns'];
+      };
       count_audit_logs_today: {
         Args: Record<string, never>;
         Returns: number;

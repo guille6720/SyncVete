@@ -1383,6 +1383,7 @@ export type NotificationIdInput = z.infer<typeof notificationIdSchema>;
 
 export const auditLogListSchema = paginationSchema
   .extend({
+    userId: z.string().uuid('Integrante inválido').optional(),
     action: z.enum(['create', 'update', 'delete']).optional(),
     entityType: z.string().max(60).optional(),
     from: optionalIsoDate,

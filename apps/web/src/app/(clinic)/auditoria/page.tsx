@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
-import { canReadAudit, listAuditLogs } from '@/actions/audit';
+import { canReadAudit, listAuditLogs, listAuditMembers } from '@/actions/audit';
 import { AuditLogList } from '@/components/audit/audit-log-list';
 import {
   AUDIT_ACTIONS,
@@ -8,6 +8,7 @@ import {
   AUDIT_LIQUIDACIONES_FAMILY,
   defaultAuditRange,
   isValidAuditRange,
+  auditLogListSchema,
   type AuditAction,
   type AuditEntityType,
 } from '@sincvete/shared';
@@ -16,6 +17,7 @@ interface AuditoriaPageProps {
   searchParams: Promise<{
     page?: string;
     search?: string;
+    userId?: string;
     action?: string;
     entityType?: string;
     from?: string;
@@ -35,6 +37,8 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
 
   const page = Math.max(1, Number(params.page) || 1);
   const search = params.search?.trim() ?? '';
+  const userFilter = auditLogListSchema.safeParse({ userId: params.userId?.trim() || undefined });
+  const userId = userFilter.success ? userFilter.data.userId : undefined;
   const actionParam = params.action?.trim() ?? '';
   const action = AUDIT_ACTIONS.includes(actionParam as AuditAction)
     ? (actionParam as AuditAction)
@@ -46,15 +50,19 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
       ? entityParam
       : undefined;
 
-  const data = await listAuditLogs({
-    page,
-    pageSize: 25,
-    search: search || undefined,
-    action,
-    entityType,
-    from: range.from,
-    to: range.to,
-  });
+  const [data, members] = await Promise.all([
+    listAuditLogs({
+      page,
+      pageSize: 25,
+      search: search || undefined,
+      userId,
+      action,
+      entityType,
+      from: range.from,
+      to: range.to,
+    }),
+    listAuditMembers(),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -68,6 +76,8 @@ export default async function AuditoriaPage({ searchParams }: AuditoriaPageProps
       <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando eventos...</div>}>
         <AuditLogList
           data={data}
+          members={members}
+          initialUserId={userId ?? ''}
           initialSearch={search}
           initialAction={action ?? ''}
           initialEntityType={entityType ?? ''}

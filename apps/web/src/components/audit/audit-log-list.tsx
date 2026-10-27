@@ -18,12 +18,16 @@ import {
   auditEntityLabel,
   formatRelativeTime,
   isAuditAction,
+  ROLE_LABELS,
+  type AuditMemberOption,
   type AuditLogListRow,
   type PaginatedResult,
 } from '@sincvete/shared';
 
 interface AuditLogListProps {
   data: PaginatedResult<AuditLogListRow>;
+  members: AuditMemberOption[];
+  initialUserId?: string;
   initialSearch?: string;
   initialAction?: string;
   initialEntityType?: string;
@@ -33,6 +37,8 @@ interface AuditLogListProps {
 
 export function AuditLogList({
   data,
+  members,
+  initialUserId = '',
   initialSearch = '',
   initialAction = '',
   initialEntityType = '',
@@ -77,15 +83,23 @@ export function AuditLogList({
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap">
-        <div className="relative max-w-md flex-1">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por usuario, entidad, nombre..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
+        <Select
+          aria-label="Integrante de la clínica"
+          value={initialUserId}
+          onChange={(e) => updateParam('userId', e.target.value)}
+          className="w-full lg:max-w-md lg:flex-1"
+        >
+          <option value="">Todos los integrantes de la clínica</option>
+          {initialUserId && !members.some((member) => member.userId === initialUserId) && (
+            <option value={initialUserId}>Integrante no disponible</option>
+          )}
+          {members.map((member) => (
+            <option key={member.userId} value={member.userId}>
+              {member.fullName} · {member.roles.map((role) => ROLE_LABELS[role]).join(', ')}
+              {member.isActive ? '' : ' (inactivo)'}
+            </option>
+          ))}
+        </Select>
         <Select
           value={initialAction}
           onChange={(e) => updateParam('action', e.target.value)}
@@ -124,6 +138,20 @@ export function AuditLogList({
           value={initialTo}
           onChange={(e) => updateParam('to', e.target.value)}
           className="w-full sm:w-40"
+        />
+      </div>
+
+      <div className="relative max-w-md">
+        <Search
+          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden
+        />
+        <Input
+          aria-label="Buscar en los eventos de auditoría"
+          placeholder="Buscar en los eventos..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="pl-9"
         />
       </div>
 

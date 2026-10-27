@@ -4,6 +4,9 @@ import {
   auditLogListSchema,
   auditRangeToTimestamps,
   buildPaginatedResult,
+  ROLES,
+  type AuditMemberOption,
+  type Role,
   type AuditLogDetail,
   type AuditLogListRow,
   type PaginatedResult,
@@ -12,9 +15,7 @@ import { createServerClient } from '@/lib/supabase/server';
 import { requirePermissionIfFeature, canPermissionAndFeature } from '@/lib/permissions';
 import { FEATURES } from '@/lib/entitlements';
 
-function toListRow(
-  row: AuditLogListRow & { total_count?: number }
-): AuditLogListRow {
+function toListRow(row: AuditLogListRow & { total_count?: number }): AuditLogListRow {
   const { total_count: _total, ...entry } = row;
   void _total;
   return entry;
@@ -29,11 +30,35 @@ export async function canReadAudit(): Promise<boolean> {
   return canPermissionAndFeature('audit:read', FEATURES.AUDIT);
 }
 
+export async function listAuditMembers(): Promise<AuditMemberOption[]> {
+  const session = await requirePermissionIfFeature('audit:read', FEATURES.AUDIT);
+  if (!session) return [];
+  const supabase = await createServerClient();
+  const members: AuditMemberOption[] = [];
+  const batchSize = 1000;
+  for (let offset = 0; ; offset += batchSize) {
+    const { data, error } = await supabase
+      .rpc('list_audit_members')
+      .range(offset, offset + batchSize - 1);
+    if (error) throw error;
+    members.push(
+      ...(data ?? []).map((member) => ({
+        userId: member.user_id,
+        fullName: member.full_name,
+        roles: member.roles.filter((role): role is Role => ROLES.includes(role as Role)),
+        isActive: member.is_active,
+      }))
+    );
+    if (!data || data.length < batchSize) return members;
+  }
+}
+
 export async function listAuditLogs(
   input: {
     page?: number;
     pageSize?: number;
     search?: string;
+    userId?: string;
     action?: string;
     entityType?: string;
     from?: string;
@@ -47,10 +72,10 @@ export async function listAuditLogs(
   }
   const supabase = await createServerClient();
 
-  const range =
-    parsed.from && parsed.to ? auditRangeToTimestamps(parsed.from, parsed.to) : null;
+  const range = parsed.from && parsed.to ? auditRangeToTimestamps(parsed.from, parsed.to) : null;
 
-  const { data, error } = await supabase.rpc('search_audit_logs', {
+  const { data, error } = await supabase.rpc('search_audit_logs_by_member', {
+    p_user_id: parsed.userId || null,
     p_search: parsed.search?.trim() || null,
     p_action: parsed.action || null,
     p_entity_type: parsed.entityType || null,
@@ -77,11 +102,7 @@ export async function getAuditLog(id: string): Promise<AuditLogDetail | null> {
   if (!session) return null;
   const supabase = await createServerClient();
 
-  const { data: log, error } = await supabase
-    .from('audit_logs')
-    .select('*')
-    .eq('id', id)
-    .single();
+  const { data: log, error } = await supabase.from('audit_logs').select('*').eq('id', id).single();
 
   if (error || !log) return null;
 
@@ -107,8 +128,6 @@ export async function getAuditLog(id: string): Promise<AuditLogDetail | null> {
     user_full_name: profile?.full_name ?? null,
     branch_name: branch?.name ?? null,
     summary:
-      typeof summary === 'string' && summary
-        ? summary
-        : `${log.action} en ${log.entity_type}`,
+      typeof summary === 'string' && summary ? summary : `${log.action} en ${log.entity_type}`,
   };
 }
