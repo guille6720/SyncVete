@@ -190,4 +190,23 @@ describe('Compras database isolation, CRUD and pricing', () => {
       /permission denied/
     );
   });
+  it('rejects inserts assigned to another organization', async () => {
+    await expect(database.exec(`insert into purchase_categories(organization_id,name,base_category) values ('${orgB}','Ajena','otro')`)).rejects.toThrow(/row-level security/);
+  });
+  it('prevents relocating products to another tenant', async () => {
+    await addProduct();
+    await expect(database.exec(`update inventory_products set organization_id='${orgB}'`)).rejects.toThrow(/trasladar/);
+  });
+  it('prevents removing referenced suppliers', async () => {
+    await addProduct();
+    await expect(database.exec(`update purchase_parties set deleted_at=now() where id='${supplier}'`)).rejects.toThrow(/vinculados/);
+  });
+  it('rejects zero exchange rates at the database boundary', async () => {
+    await expect(database.exec(`insert into purchase_pricing_settings(organization_id,usd_ars) values ('${orgA}',0)`)).rejects.toThrow(/check constraint/);
+  });
+  it('does not let read-only users alter exchange rates', async () => {
+    await database.exec(`insert into purchase_pricing_settings(organization_id,usd_ars) values ('${orgA}',1200); reset role`);
+    await asUser(orgA, false);
+    expect((await database.query('update purchase_pricing_settings set usd_ars=1 returning organization_id')).rows).toHaveLength(0);
+  });
 });

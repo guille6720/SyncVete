@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useActionState, useState } from 'react';
+import { startTransition, useActionState, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
@@ -179,7 +179,11 @@ export function InventoryProductDetail({
               <CardTitle>Datos del producto</CardTitle>
             </CardHeader>
             <CardContent>
-              <form action={updateFormAction} onReset={(event) => event.preventDefault()} className="grid max-w-3xl gap-4">
+              <form action={updateFormAction} onSubmit={(event) => {
+                event.preventDefault();
+                const formData = new FormData(event.currentTarget);
+                startTransition(() => updateFormAction(formData));
+              }} className="grid max-w-3xl gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nombre *</Label>
                   <Input id="name" name="name" required defaultValue={product.name} />
