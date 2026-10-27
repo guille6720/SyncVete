@@ -13,7 +13,6 @@ import {
   Pill,
   Receipt,
   Scissors,
-  ScrollText,
   Stethoscope,
   Syringe,
   TrendingUp,
@@ -223,15 +222,6 @@ export function DashboardStatCardsV2({
       tone: 'rose',
       group: 'secondary',
       pending: true,
-    },
-    {
-      label: 'Auditoría hoy',
-      value: summary.auditEventsToday,
-      description: 'Eventos registrados',
-      icon: ScrollText,
-      href: '/auditoria',
-      tone: 'slate',
-      group: 'secondary',
     },
   ];
 

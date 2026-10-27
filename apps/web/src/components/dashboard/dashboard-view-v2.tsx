@@ -6,7 +6,7 @@ import {
   isClinicPathEntitled,
   type AppointmentListRow,
 } from '@sincvete/shared';
-import { getDashboardActivity, getDashboardContext, getDashboardSummary } from '@/actions/dashboard';
+import { getDashboardContext, getDashboardSummary } from '@/actions/dashboard';
 import { listAppointments } from '@/actions/appointments';
 import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import {
@@ -19,7 +19,6 @@ import { DashboardSettlementsSnapshot } from '@/components/dashboard/dashboard-s
 import { getSessionContext } from '@/lib/session';
 import { getClinicCommercialShell } from '@/lib/entitlements';
 import { getClinicTodayLabel } from '@/lib/ui-v2/clinic-time';
-import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity-feed';
 import { DashboardRecentLists } from '@/components/dashboard/dashboard-recent-lists';
 import { DashboardSpeciesBreakdown } from '@/components/dashboard/dashboard-species-breakdown';
 import { DashboardWaitingRoomSnapshot } from '@/components/dashboard/dashboard-waiting-room-snapshot';
@@ -149,23 +148,18 @@ async function DashboardPendingStrip({ entitledHrefs }: { entitledHrefs: string[
 }
 
 async function DashboardSecondarySection({
-  canViewActivity,
   entitledHrefs,
 }: {
-  canViewActivity: boolean;
   entitledHrefs: string[] | null;
 }) {
   const session = await getSessionContext();
-  const [summary, activity] = await Promise.all([
-    getDashboardSummary(session?.branchId ?? null),
-    canViewActivity ? getDashboardActivity() : Promise.resolve([]),
-  ]);
+  const summary = await getDashboardSummary(session?.branchId ?? null);
 
   return (
     <section className="space-y-4" aria-labelledby="dashboard-secondary-heading">
       <div>
         <h2 id="dashboard-secondary-heading" className="text-sm font-semibold text-foreground">
-          Indicadores y actividad
+          Indicadores de la clínica
         </h2>
         <p className="text-xs text-muted-foreground">
           Métricas generales y registros recientes de la clínica
@@ -175,22 +169,12 @@ async function DashboardSecondarySection({
       <div className="grid min-w-0 gap-4 xl:grid-cols-3">
         <DashboardSpeciesBreakdown summary={summary} />
         <div className="min-w-0 xl:col-span-2">
-          {canViewActivity ? (
-            <DashboardActivityFeed activity={activity} />
-          ) : (
-            <DashboardRecentLists
-              recentPatients={summary.recentPatients}
-              recentOwners={summary.recentOwners}
-            />
-          )}
+          <DashboardRecentLists
+            recentPatients={summary.recentPatients}
+            recentOwners={summary.recentOwners}
+          />
         </div>
       </div>
-      {canViewActivity ? (
-        <DashboardRecentLists
-          recentPatients={summary.recentPatients}
-          recentOwners={summary.recentOwners}
-        />
-      ) : null}
     </section>
   );
 }
@@ -245,7 +229,6 @@ export async function DashboardViewV2() {
 
       <Suspense fallback={<SkeletonGrid count={8} label="Cargando detalle del dashboard" />}>
         <DashboardSecondarySection
-          canViewActivity={context?.canViewActivity ?? false}
           entitledHrefs={commercial.entitledHrefs}
         />
       </Suspense>
