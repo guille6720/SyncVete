@@ -8,6 +8,7 @@ import {
   DEFAULT_IMPORT_CHUNK_SIZE,
   IDEMPOTENCY_MODE_LABELS,
   INVENTORY_PRODUCT_IMPORT_FIELDS,
+  completeInventoryProductMapping,
   type IdempotencyMode,
   type ValidationIssue,
 } from '@sincvete/shared';
@@ -151,12 +152,16 @@ export function InventoryProductsImportPanel({
       setMessage(result?.error ?? 'No se pudo analizar el archivo');
       return;
     }
+    const completedMapping = completeInventoryProductMapping(
+      result.data.headers,
+      result.data.mapping
+    );
     setBatchId(result.data.batchId);
-    setMapping(result.data.mapping);
+    setMapping(completedMapping);
     setHeaders(result.data.headers);
     const missing = requiredFields.filter((field) => {
-      if (result.data!.mapping[field.key]) return false;
-      if (field.key === 'external_product_id' && result.data!.mapping.sku) return false;
+      if (completedMapping[field.key]) return false;
+      if (field.key === 'external_product_id' && completedMapping.sku) return false;
       return true;
     });
     if (missing.length > 0) {
@@ -165,9 +170,39 @@ export function InventoryProductsImportPanel({
           .map((field) => field.label)
           .join(', ')}. Elegilas abajo en el mapeo y validá.`
       );
-    } else {
-      setMessage(`Analizado · ${result.data.rowCount} filas · mapeo listo, podés validar`);
+      return;
     }
+
+    setMessage(`Analizado · ${result.data.rowCount} filas · mapeo listo, validando…`);
+    // Auto-validate so Importar se habilita sin un paso extra.
+    const validateForm = new FormData();
+    validateForm.set('batchId', result.data.batchId);
+    validateForm.set('entity', ENTITY);
+    validateForm.set('csvText', csvText);
+    validateForm.set('mapping', JSON.stringify(completedMapping));
+    validateForm.set('knownOwnerExternalIds', '');
+    validateForm.set('knownPatientExternalIds', '');
+    validateForm.set('knownInvoiceExternalIds', '');
+    validateForm.set('invoiceIdByExternal', '{}');
+    validateForm.set('branchIdByExternal', '{}');
+    validateForm.set('userIdByExternal', '{}');
+    const validated = await run(() => validateDataImport(validateForm));
+    if (!validated?.success || !validated.data) {
+      setMessage(validated?.error ?? 'Validación fallida');
+      return;
+    }
+    setValidation({
+      detected: validated.data.detected,
+      ready: validated.data.ready,
+      warnings: validated.data.warnings,
+      errors: validated.data.errors,
+      issues: validated.data.issues as ValidationIssue[],
+    });
+    setMessage(
+      validated.data.errors > 0
+        ? `${validated.data.detected} detectados · ${validated.data.ready} listos · ${validated.data.errors} errores — revisá el mapeo`
+        : `${validated.data.detected} detectados · ${validated.data.ready} listos · podés importar`
+    );
   }
 
   async function onValidate() {
@@ -372,7 +407,7 @@ export function InventoryProductsImportPanel({
             </Button>
             <Button
               type="button"
-              disabled={pending || !validation || validation.errors > 0}
+              disabled={pending || !validation || validation.ready <= 0 || validation.errors > 0}
               onClick={() => void onCommit()}
             >
               Importar productos

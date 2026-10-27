@@ -50,6 +50,7 @@ import {
   parseBranchMapCsv,
   resolveImportStaffUserId,
   INVENTORY_PRODUCT_IMPORT_FIELDS,
+  completeInventoryProductMapping,
   buildInventoryProductTemplateCsv,
   validateInventoryProductRows,
   buildInvoiceTemplateCsv,
@@ -514,6 +515,14 @@ describe('data-migration autoMapColumns', () => {
     expect(mapping.name).toBe('Descripción');
     expect(mapping.quantity).toBe('Stock');
     expect(mapping.unit_price).toBe('Precio');
+  });
+
+  it('completes unknown catalog headers with positional fallback', () => {
+    const base = autoMapColumns(['Art', 'Detalle item', 'Cant'], INVENTORY_PRODUCT_IMPORT_FIELDS);
+    const mapping = completeInventoryProductMapping(['Art', 'Detalle item', 'Cant'], base);
+    expect(mapping.external_product_id).toBeTruthy();
+    expect(mapping.name).toBeTruthy();
+    expect(mapping.quantity).toBe('Cant');
   });
 });
 

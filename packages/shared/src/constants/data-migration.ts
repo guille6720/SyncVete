@@ -1703,6 +1703,71 @@ export function autoMapColumns(
   return mapping;
 }
 
+/**
+ * Last-resort mapping for product catalogs with unknown headers.
+ * Prefer first unused column as ID and the "most name-like" unused column as name.
+ */
+export function completeInventoryProductMapping(
+  headers: string[],
+  mapping: Record<string, string | null>
+): Record<string, string | null> {
+  const next: Record<string, string | null> = { ...mapping };
+  const used = new Set(
+    Object.values(next).filter((value): value is string => typeof value === 'string' && value.length > 0)
+  );
+  const unused = headers.filter((header) => header.trim() && !used.has(header));
+
+  const looksNumeric = (header: string) =>
+    /^(stock|cantidad|qty|precio|costo|price|cost|min|existencia|saldo)/i.test(
+      normalizeHeader(header)
+    );
+
+  if (!next.external_product_id && !next.sku) {
+    const idCandidate =
+      unused.find((header) =>
+        /^(id|cod|sku|ean|barra|art|ref)/i.test(normalizeHeader(header))
+      ) ?? unused[0];
+    if (idCandidate) {
+      next.external_product_id = idCandidate;
+      used.add(idCandidate);
+    }
+  }
+
+  if (!next.name) {
+    const remaining = headers.filter((header) => header.trim() && !used.has(header));
+    const nameCandidate =
+      remaining.find((header) =>
+        /(nombre|desc|detalle|producto|articulo|item)/i.test(normalizeHeader(header))
+      ) ??
+      remaining.find((header) => !looksNumeric(header)) ??
+      remaining[0];
+    if (nameCandidate) {
+      next.name = nameCandidate;
+      used.add(nameCandidate);
+    }
+  }
+
+  if (!next.quantity) {
+    const remaining = headers.filter((header) => header.trim() && !used.has(header));
+    const qtyCandidate = remaining.find((header) =>
+      /(stock|cantidad|qty|existencia|saldo)/i.test(normalizeHeader(header))
+    );
+    if (qtyCandidate) next.quantity = qtyCandidate;
+  }
+
+  if (!next.unit_price) {
+    const remaining = headers.filter(
+      (header) => header.trim() && header !== next.quantity && !used.has(header)
+    );
+    const priceCandidate = remaining.find((header) =>
+      /(precio|price|pvp|venta)/i.test(normalizeHeader(header))
+    );
+    if (priceCandidate) next.unit_price = priceCandidate;
+  }
+
+  return next;
+}
+
 export function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
   const lines = text
     .replace(/^\uFEFF/, '')

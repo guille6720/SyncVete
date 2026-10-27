@@ -11,6 +11,7 @@ import {
   PATIENT_SPECIES,
   VACCINATION_IMPORT_FIELDS,
   autoMapColumns,
+  completeInventoryProductMapping,
   chunkRange,
   DEFAULT_IMPORT_CHUNK_SIZE,
   MAX_IMPORT_CSV_BYTES,
@@ -335,7 +336,10 @@ export async function analyzeImportFile(input: {
           : input.entity === 'vaccinations'
             ? VACCINATION_IMPORT_FIELDS
             : CLINICAL_IMPORT_FIELDS;
-  const mapping = autoMapColumns(parsed.headers, fields);
+  let mapping = autoMapColumns(parsed.headers, fields);
+  if (input.entity === 'inventory_products') {
+    mapping = completeInventoryProductMapping(parsed.headers, mapping);
+  }
   const supabase = await migrationDb();
   const { error } = await supabase
     .from('data_import_batches')
