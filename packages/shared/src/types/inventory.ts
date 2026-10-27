@@ -20,6 +20,7 @@ export interface InventoryProduct {
   cost_currency: ProductCurrency;
   margin_percent: number | null;
   supplier_party_id: string | null;
+  catalog_category_id?: string | null;
   manufacturer: string | null;
   notes: string | null;
   is_active: boolean;

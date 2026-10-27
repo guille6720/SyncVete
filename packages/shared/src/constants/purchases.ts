@@ -21,6 +21,7 @@ export const COMPRAS_SECTIONS = [
   'proveedores',
   'prestadores',
   'productos',
+  'categorias',
   'vacunas',
   'precios',
 ] as const;
@@ -32,6 +33,7 @@ export const COMPRAS_SECTION_LABELS: Record<ComprasSection, string> = {
   proveedores: 'Proveedores',
   prestadores: 'Prestadores',
   productos: 'Productos',
+  categorias: 'Categorías',
   vacunas: 'Vacunas',
   precios: 'Precios de venta',
 };

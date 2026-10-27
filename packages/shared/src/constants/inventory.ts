@@ -35,9 +35,13 @@ export function resolveProductSalePrice(input: {
   unitCost?: number;
   unitPrice?: number;
   marginPercent?: number;
+  costCurrency?: ProductCurrency;
+  exchangeRate?: number | null;
 }): number | null {
   if (input.unitCost != null && input.marginPercent != null) {
-    return salePriceFromCost(input.unitCost, input.marginPercent);
+    const rate = input.costCurrency === 'USD' ? input.exchangeRate : 1;
+    if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
+    return salePriceFromCost(input.unitCost * rate, input.marginPercent);
   }
   return input.unitPrice ?? null;
 }
@@ -80,12 +84,7 @@ export const INVENTORY_UNIT_LABELS: Record<InventoryUnit, string> = {
   otro: 'Otra',
 };
 
-export const INVENTORY_MOVEMENT_TYPES = [
-  'entrada',
-  'salida',
-  'ajuste',
-  'descarte',
-] as const;
+export const INVENTORY_MOVEMENT_TYPES = ['entrada', 'salida', 'ajuste', 'descarte'] as const;
 
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 
@@ -107,7 +106,11 @@ export const INVENTORY_MOVEMENT_TYPE_VARIANT: Record<
 };
 
 export const INVENTORY_PRODUCT_PRESETS = [
-  { name: 'Amoxicilina + Ác. clavulánico', category: 'medicamento' as const, unit: 'caja' as const },
+  {
+    name: 'Amoxicilina + Ác. clavulánico',
+    category: 'medicamento' as const,
+    unit: 'caja' as const,
+  },
   { name: 'Meloxicam', category: 'medicamento' as const, unit: 'frasco' as const },
   { name: 'Vacuna séxtuple canina', category: 'vacuna' as const, unit: 'dosis' as const },
   { name: 'Vacuna triple felina', category: 'vacuna' as const, unit: 'dosis' as const },

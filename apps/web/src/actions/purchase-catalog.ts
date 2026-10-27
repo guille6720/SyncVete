@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { z } from 'zod';
 import {
   buildPaginatedResult,
   INVENTORY_PRODUCT_CATEGORIES,
@@ -15,6 +16,7 @@ import {
   type PurchaseParty,
   type PurchasePartyKind,
   type PurchasePartyScope,
+  type PurchaseCategory,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
 import { getSessionContext } from '@/actions/auth';
@@ -43,7 +45,10 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
 }
 
 function ilikeFilter(columns: string[], search: string | undefined): string | null {
-  const safe = (search ?? '').replace(/[%_"\\,()]/g, ' ').replace(/\s+/g, ' ').trim();
+  const safe = (search ?? '')
+    .replace(/[%_"\\,()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!safe) return null;
   const pattern = `"%${safe}%"`;
   return columns.map((column) => `${column}.ilike.${pattern}`).join(',');
@@ -66,14 +71,16 @@ function toParty(row: PurchaseParty): PurchaseParty {
   };
 }
 
-export async function listPurchaseParties(input: {
-  page?: number;
-  pageSize?: number;
-  search?: string;
-  kind?: PurchasePartyKind;
-  scope?: PurchasePartyScope;
-} = {}): Promise<PaginatedResult<PurchaseParty>> {
-  await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+export async function listPurchaseParties(
+  input: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    kind?: PurchasePartyKind;
+    scope?: PurchasePartyScope;
+  } = {}
+): Promise<PaginatedResult<PurchaseParty>> {
+  const session = await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
   const parsed = purchasePartyListSchema.parse(input);
   const supabase = await createServerClient();
   const from = (parsed.page - 1) * parsed.pageSize;
@@ -85,6 +92,7 @@ export async function listPurchaseParties(input: {
       'id, organization_id, kind, scope, name, contact_name, phone, email, notes, is_active, created_at, updated_at',
       { count: 'exact' }
     )
+    .eq('organization_id', session.organizationId)
     .is('deleted_at', null)
     .order('is_active', { ascending: false })
     .order('name', { ascending: true });
@@ -138,14 +146,18 @@ export async function getPurchaseParty(id: string): Promise<PurchaseParty | null
   return data ? toParty(data as PurchaseParty) : null;
 }
 
-export async function listCatalogProducts(input: {
-  page?: number;
-  pageSize?: number;
-  search?: string;
-  category?: string;
-  excludeCategory?: string;
-  pricedOnly?: boolean;
-} = {}): Promise<PaginatedResult<CatalogProductRow>> {
+export async function listCatalogProducts(
+  input: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    category?: string;
+    excludeCategory?: string;
+    pricedOnly?: boolean;
+    catalogCategoryId?: string;
+    supplierId?: string;
+  } = {}
+): Promise<PaginatedResult<CatalogProductRow>> {
   await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
   const parsed = inventoryProductListSchema.parse({
     page: input.page,
@@ -161,7 +173,7 @@ export async function listCatalogProducts(input: {
   let query = supabase
     .from('inventory_products')
     .select(
-      'id, name, sku, category, unit, quantity, unit_cost, unit_price, cost_currency, margin_percent, manufacturer, supplier_party_id',
+      'id, name, sku, category, unit, quantity, unit_cost, unit_price, cost_currency, margin_percent, manufacturer, supplier_party_id, catalog_category_id',
       { count: 'exact' }
     )
     .is('deleted_at', null)
@@ -177,6 +189,10 @@ export async function listCatalogProducts(input: {
     query = query.neq('category', input.excludeCategory as InventoryProductCategory);
   }
   if (input.pricedOnly) query = query.not('unit_price', 'is', null);
+  if (input.catalogCategoryId)
+    query = query.eq('catalog_category_id', z.string().uuid().parse(input.catalogCategoryId));
+  if (input.supplierId)
+    query = query.eq('supplier_party_id', z.string().uuid().parse(input.supplierId));
 
   const filter = ilikeFilter(['name', 'sku', 'manufacturer'], parsed.search);
   if (filter) query = query.or(filter);
@@ -185,6 +201,7 @@ export async function listCatalogProducts(input: {
   if (error) throw error;
 
   const rows = data ?? [];
+  const categories = await listPurchaseCategories();
   const supplierIds = [
     ...new Set(rows.map((row) => row.supplier_party_id).filter((id): id is string => Boolean(id))),
   ];
@@ -210,7 +227,12 @@ export async function listCatalogProducts(input: {
     margin_percent: row.margin_percent == null ? null : Number(row.margin_percent),
     manufacturer: row.manufacturer,
     supplier_party_id: row.supplier_party_id,
-    supplier_name: row.supplier_party_id ? (supplierNames.get(row.supplier_party_id) ?? null) : null,
+    supplier_name: row.supplier_party_id
+      ? (supplierNames.get(row.supplier_party_id) ?? null)
+      : null,
+    catalog_category_id: row.catalog_category_id,
+    catalog_category_name:
+      categories.find((category) => category.id === row.catalog_category_id)?.name ?? null,
   }));
 
   return buildPaginatedResult(products, count ?? 0, parsed.page, parsed.pageSize);
@@ -278,7 +300,7 @@ export async function updatePurchaseParty(
   formData: FormData
 ): Promise<ActionResult> {
   try {
-    await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
     const parsed = purchasePartySchema.safeParse({
       name: formData.get('name'),
       kind: formData.get('kind'),
@@ -303,7 +325,7 @@ export async function updatePurchaseParty(
     }
 
     const supabase = await createServerClient();
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('purchase_parties')
       .update({
         name: parsed.data.name,
@@ -313,7 +335,11 @@ export async function updatePurchaseParty(
         notes: parsed.data.notes ?? null,
         is_active: parsed.data.isActive,
       })
-      .eq('id', partyId);
+      .eq('id', z.string().uuid().parse(partyId))
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       if (error.code === '23505') {
@@ -322,8 +348,153 @@ export async function updatePurchaseParty(
       return { success: false, error: error.message || 'No se pudo actualizar' };
     }
 
+    if (!data) return { success: false, error: 'El registro no está disponible' };
     revalidatePath('/compras');
     revalidatePath(`/compras/partes/${partyId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deletePurchaseParty(partyId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('purchase_parties')
+      .update({ deleted_at: new Date().toISOString(), is_active: false })
+      .eq('id', z.string().uuid().parse(partyId))
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'El registro no está disponible' };
+    revalidatePath('/compras');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listPurchaseCategories(): Promise<PurchaseCategory[]> {
+  const session = await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from('purchase_categories')
+    .select('id, organization_id, name, base_category')
+    .eq('organization_id', session.organizationId)
+    .is('deleted_at', null)
+    .order('name');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function savePurchaseCategory(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = z
+      .object({
+        id: z.string().uuid().or(z.literal('')),
+        name: z.string().trim().min(2).max(80),
+        baseCategory: z.enum(INVENTORY_PRODUCT_CATEGORIES),
+      })
+      .safeParse({
+        id: formData.get('id') || '',
+        name: formData.get('name'),
+        baseCategory: formData.get('baseCategory'),
+      });
+    if (!parsed.success)
+      return { success: false, error: 'Revisá el nombre y el tipo de categoría' };
+    const supabase = await createServerClient();
+    const payload = { name: parsed.data.name, base_category: parsed.data.baseCategory };
+    const result = parsed.data.id
+      ? await supabase
+          .from('purchase_categories')
+          .update(payload)
+          .eq('id', parsed.data.id)
+          .eq('organization_id', session.organizationId)
+          .is('deleted_at', null)
+          .select('id')
+          .maybeSingle()
+      : await supabase
+          .from('purchase_categories')
+          .insert({ ...payload, organization_id: session.organizationId })
+          .select('id')
+          .single();
+    if (result.error)
+      return {
+        success: false,
+        error:
+          result.error.code === '23505'
+            ? 'Ya existe una categoría con ese nombre'
+            : result.error.message,
+      };
+    if (!result.data) return { success: false, error: 'La categoría no está disponible' };
+    revalidatePath('/compras');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deletePurchaseCategory(categoryId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('purchase_categories')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', z.string().uuid().parse(categoryId))
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'La categoría no está disponible' };
+    revalidatePath('/compras');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getPurchaseExchangeRate(): Promise<number | null> {
+  const session = await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from('purchase_pricing_settings')
+    .select('usd_ars')
+    .eq('organization_id', session.organizationId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? Number(data.usd_ars) : null;
+}
+
+export async function savePurchaseExchangeRate(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = z.coerce
+      .number()
+      .finite()
+      .positive()
+      .lt(1000000000)
+      .safeParse(formData.get('usdArs'));
+    if (!parsed.success) return { success: false, error: 'Ingresá una cotización mayor que cero' };
+    const supabase = await createServerClient();
+    const { error } = await supabase
+      .from('purchase_pricing_settings')
+      .upsert({ organization_id: session.organizationId, usd_ars: parsed.data });
+    if (error) return { success: false, error: error.message };
+    revalidatePath('/compras');
+    revalidatePath('/inventario', 'layout');
     return { success: true };
   } catch (error) {
     return actionError(error);

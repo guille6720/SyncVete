@@ -996,6 +996,12 @@ export const inventoryProductSchema = z.object({
     .union([z.string().uuid('Proveedor inválido'), z.literal('')])
     .optional()
     .transform((value) => (value === '' || value === undefined ? undefined : value)),
+  catalogCategoryId: z
+    .string()
+    .uuid()
+    .nullish()
+    .or(z.literal(''))
+    .transform((value) => value || undefined),
   manufacturer: optionalShortText(120),
   notes: optionalClinicalText,
   branchId: z

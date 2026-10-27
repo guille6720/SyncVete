@@ -2,7 +2,11 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { canManageInventory } from '@/actions/inventory';
-import { listPurchasePartyOptions } from '@/actions/purchase-catalog';
+import {
+  listPurchasePartyOptions,
+  listPurchaseCategories,
+  getPurchaseExchangeRate,
+} from '@/actions/purchase-catalog';
 import { getSessionContext } from '@/actions/auth';
 import { getUserBranches } from '@/actions/settings';
 import { InventoryProductForm } from '@/components/inventory/inventory-product-form';
@@ -19,10 +23,12 @@ export default async function NuevoInventarioPage({ searchParams }: NuevoInventa
 
   const query = await searchParams;
   const listHref = resolveListHref('/inventario', query.return);
-  const [session, branches, suppliers] = await Promise.all([
+  const [session, branches, suppliers, categories, exchangeRate] = await Promise.all([
     getSessionContext(),
     getUserBranches(),
     listPurchasePartyOptions(),
+    listPurchaseCategories(),
+    getPurchaseExchangeRate(),
   ]);
 
   return (
@@ -38,6 +44,8 @@ export default async function NuevoInventarioPage({ searchParams }: NuevoInventa
         defaultBranchId={session?.branchId}
         listHref={listHref}
         suppliers={suppliers}
+        categories={categories}
+        exchangeRate={exchangeRate}
       />
     </div>
   );

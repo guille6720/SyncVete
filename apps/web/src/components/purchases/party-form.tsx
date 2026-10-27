@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { CatalogDelete } from '@/components/purchases/catalog-management';
 import {
   PURCHASE_PARTY_KIND_LABELS,
   PURCHASE_PARTY_SCOPE_LABELS,
@@ -26,14 +27,14 @@ interface PartyFormProps {
 export function PartyForm({ kind, scope, party, listHref }: PartyFormProps) {
   const action = party ? updatePurchaseParty.bind(null, party.id) : createPurchaseParty;
   const [state, formAction, pending] = useActionState(action, null);
-  const title = scope === 'vacunas'
-    ? 'Proveedor de vacunas'
-    : PURCHASE_PARTY_KIND_LABELS[kind];
+  const title = scope === 'vacunas' ? 'Proveedor de vacunas' : PURCHASE_PARTY_KIND_LABELS[kind];
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{party ? `Editar ${title.toLowerCase()}` : `Nuevo ${title.toLowerCase()}`}</CardTitle>
+        <CardTitle>
+          {party ? `Editar ${title.toLowerCase()}` : `Nuevo ${title.toLowerCase()}`}
+        </CardTitle>
         <p className="text-sm text-muted-foreground">
           {PURCHASE_PARTY_KIND_LABELS[kind]}
           {scope === 'vacunas' ? ` · ${PURCHASE_PARTY_SCOPE_LABELS[scope]}` : ''}
@@ -95,6 +96,11 @@ export function PartyForm({ kind, scope, party, listHref }: PartyFormProps) {
             </Button>
           </div>
         </form>
+        {party && (
+          <div className="mt-4">
+            <CatalogDelete id={party.id} kind="party" returnHref={listHref} />
+          </div>
+        )}
       </CardContent>
     </Card>
   );

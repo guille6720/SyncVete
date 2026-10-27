@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ProductPricingFields } from '@/components/inventory/product-pricing-fields';
+import { CatalogCategorySelect } from '@/components/purchases/catalog-management';
 import {
   INVENTORY_PRODUCT_CATEGORIES,
   INVENTORY_PRODUCT_CATEGORY_LABELS,
@@ -19,6 +20,7 @@ import {
   suppliersForProductCategory,
   type PurchasePartyKind,
   type PurchasePartyScope,
+  type PurchaseCategory,
 } from '@sincvete/shared';
 
 interface InventoryProductFormProps {
@@ -27,6 +29,8 @@ interface InventoryProductFormProps {
   listHref?: string;
   defaultCategory?: string;
   lockCategory?: boolean;
+  categories?: PurchaseCategory[];
+  exchangeRate?: number | null;
   suppliers?: Array<{
     id: string;
     name: string;
@@ -45,6 +49,8 @@ export function InventoryProductForm({
   lockCategory = false,
   suppliers = [],
   afterCreate,
+  categories = [],
+  exchangeRate = null,
 }: InventoryProductFormProps) {
   const [state, formAction, pending] = useActionState(createInventoryProduct, null);
   const [name, setName] = useState('');
@@ -58,7 +64,8 @@ export function InventoryProductForm({
     const preset = INVENTORY_PRODUCT_PRESETS.find((item) => item.name === presetName);
     if (!preset) return;
     setName(preset.name);
-    setCategory(preset.category);
+    if (!lockCategory) setCategory(preset.category);
+    setSupplierId('');
     setUnit(preset.unit);
   };
 
@@ -87,7 +94,9 @@ export function InventoryProductForm({
             <Label htmlFor="preset">Plantilla rápida</Label>
             <Select id="preset" defaultValue="" onChange={(e) => applyPreset(e.target.value)}>
               <option value="">—</option>
-              {INVENTORY_PRODUCT_PRESETS.map((preset) => (
+              {INVENTORY_PRODUCT_PRESETS.filter(
+                (preset) => !lockCategory || preset.category === category
+              ).map((preset) => (
                 <option key={preset.name} value={preset.name}>
                   {preset.name}
                 </option>
@@ -176,7 +185,14 @@ export function InventoryProductForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="quantity">Stock inicial</Label>
-              <Input id="quantity" name="quantity" type="number" min="0" step="any" defaultValue="0" />
+              <Input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="0"
+                step="any"
+                defaultValue="0"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="minQuantity">Stock mínimo</Label>
@@ -219,7 +235,8 @@ export function InventoryProductForm({
             )}
           </div>
 
-          <ProductPricingFields />
+          <CatalogCategorySelect categories={categories} category={category} />
+          <ProductPricingFields exchangeRate={exchangeRate} />
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notas</Label>

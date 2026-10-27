@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveProductSalePrice, salePriceFromCost } from '../constants/inventory';
-import {
-  inventoryMovementSchema,
-  inventoryProductSchema,
-} from '../schemas';
+import { inventoryMovementSchema, inventoryProductSchema } from '../schemas';
 
 describe('inventoryProductSchema', () => {
   it('validates a product', () => {
@@ -50,6 +47,44 @@ describe('inventoryProductSchema', () => {
       expect(result.data.costCurrency).toBe('USD');
       expect(result.data.marginPercent).toBe(40);
     }
+  });
+
+  it('converts USD costs to ARS before applying markup and rounding', () => {
+    expect(
+      resolveProductSalePrice({
+        unitCost: 12.5,
+        marginPercent: 40,
+        costCurrency: 'USD',
+        exchangeRate: 1200,
+      })
+    ).toBe(21000);
+    expect(
+      resolveProductSalePrice({
+        unitCost: 0.1,
+        marginPercent: 25,
+        costCurrency: 'USD',
+        exchangeRate: 1234.5678,
+      })
+    ).toBe(154.32);
+    expect(
+      resolveProductSalePrice({ unitCost: 10, marginPercent: 0, costCurrency: 'USD' })
+    ).toBeNull();
+    expect(
+      resolveProductSalePrice({
+        unitCost: 10,
+        marginPercent: 0,
+        costCurrency: 'USD',
+        exchangeRate: 0,
+      })
+    ).toBeNull();
+    expect(
+      resolveProductSalePrice({
+        unitCost: 10,
+        unitPrice: 15000,
+        costCurrency: 'USD',
+        exchangeRate: 1200,
+      })
+    ).toBe(15000);
   });
 
   it('rejects negative stock', () => {

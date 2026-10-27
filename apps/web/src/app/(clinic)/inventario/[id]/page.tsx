@@ -1,10 +1,10 @@
 import { notFound, redirect } from 'next/navigation';
+import { canManageInventory, canReadInventory, getInventoryProduct } from '@/actions/inventory';
 import {
-  canManageInventory,
-  canReadInventory,
-  getInventoryProduct,
-} from '@/actions/inventory';
-import { listPurchasePartyOptions } from '@/actions/purchase-catalog';
+  listPurchasePartyOptions,
+  listPurchaseCategories,
+  getPurchaseExchangeRate,
+} from '@/actions/purchase-catalog';
 import { InventoryProductDetail } from '@/components/inventory/inventory-product-detail';
 import { resolveListHref } from '@/lib/list-return';
 
@@ -23,10 +23,12 @@ export default async function InventarioDetailPage({
   const { id } = await params;
   const query = await searchParams;
   const fromCompras = query.from === 'compras';
-  const [data, canWrite, suppliers] = await Promise.all([
+  const [data, canWrite, suppliers, categories, exchangeRate] = await Promise.all([
     getInventoryProduct(id),
     canManageInventory(),
     listPurchasePartyOptions(),
+    listPurchaseCategories(),
+    getPurchaseExchangeRate(),
   ]);
 
   if (!data) notFound();
@@ -37,6 +39,8 @@ export default async function InventarioDetailPage({
       movements={data.movements}
       canWrite={canWrite}
       suppliers={suppliers}
+      categories={categories}
+      exchangeRate={exchangeRate}
       listHref={resolveListHref(fromCompras ? '/compras' : '/inventario', query.return)}
       backLabel={fromCompras ? 'Volver a compras' : 'Volver a inventario'}
     />
