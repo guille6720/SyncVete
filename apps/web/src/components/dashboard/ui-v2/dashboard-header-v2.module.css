@@ -1,0 +1,16 @@
+/* Keep the user/branch identity distinct from every selectable clinic accent. */
+.identityCard {
+  --identity-neon: #d946ef;
+
+  border-color: var(--identity-neon);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--identity-neon) 38%, transparent),
+    0 0 18px color-mix(in oklab, var(--identity-neon) 36%, transparent);
+}
+
+.identityCard:hover:not(:disabled) {
+  border-color: var(--identity-neon);
+  box-shadow:
+    0 0 0 1px color-mix(in oklab, var(--identity-neon) 48%, transparent),
+    0 0 24px color-mix(in oklab, var(--identity-neon) 48%, transparent);
+}
