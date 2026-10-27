@@ -226,6 +226,9 @@ export function AppShellV2({
           {!sidebarCompact ? (
             <div className="mb-2 px-2">
               <p className="truncate text-sm font-medium text-foreground">{userName}</p>
+              <p className="truncate text-xs font-medium text-primary">
+                {organizationName ? `Usuario de ${organizationName}` : 'Usuario de la clínica'}
+              </p>
               <p className="text-xs text-muted-foreground">{ROLE_LABELS[role]}</p>
             </div>
           ) : null}

@@ -205,29 +205,31 @@ export async function DashboardViewV2() {
 
   return (
     <div className="mx-auto min-w-0 max-w-[90rem] space-y-4 md:space-y-5">
-      <DashboardHeaderV2 session={session} context={context} />
+      <div className="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)]">
+        <DashboardHeaderV2 session={session} context={context} />
 
-      <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-        <Suspense
-          fallback={
-            <div
-              className="h-64 animate-pulse rounded-xl border border-border bg-muted/40"
-              aria-busy
-            />
-          }
-        >
-          <DashboardAppointmentsSection entitledHrefs={commercial.entitledHrefs} />
-        </Suspense>
-        <Suspense
-          fallback={
-            <div
-              className="h-64 animate-pulse rounded-xl border border-border bg-muted/40"
-              aria-busy
-            />
-          }
-        >
-          <DashboardWaitingRoomSection entitledHrefs={commercial.entitledHrefs} />
-        </Suspense>
+        <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+          <Suspense
+            fallback={
+              <div
+                className="h-64 animate-pulse rounded-xl border border-border bg-muted/40"
+                aria-busy
+              />
+            }
+          >
+            <DashboardAppointmentsSection entitledHrefs={commercial.entitledHrefs} />
+          </Suspense>
+          <Suspense
+            fallback={
+              <div
+                className="h-64 animate-pulse rounded-xl border border-border bg-muted/40"
+                aria-busy
+              />
+            }
+          >
+            <DashboardWaitingRoomSection entitledHrefs={commercial.entitledHrefs} />
+          </Suspense>
+        </div>
       </div>
 
       <DashboardQuickActionsV2
