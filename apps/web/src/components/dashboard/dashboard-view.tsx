@@ -18,6 +18,7 @@ import { DashboardSettlementsSnapshot } from '@/components/dashboard/dashboard-s
 import { getSessionContext } from '@/lib/session';
 import { getClinicCommercialShell } from '@/lib/entitlements';
 import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity-feed';
+import { DashboardConsultationAlert } from '@/components/dashboard/dashboard-consultation-alert';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { DashboardQuickActions } from '@/components/dashboard/dashboard-quick-actions';
 import { DashboardRecentLists } from '@/components/dashboard/dashboard-recent-lists';
@@ -215,6 +216,9 @@ export async function DashboardView() {
         aria-hidden
       />
       <DashboardHeader session={session} context={context} />
+      <Suspense fallback={null}>
+        <DashboardConsultationAlert entitledHrefs={commercial.entitledHrefs} />
+      </Suspense>
       <DashboardQuickActions
         canWritePatients={context?.canWritePatients ?? false}
         entitledHrefs={commercial.entitledHrefs}

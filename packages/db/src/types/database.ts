@@ -7354,6 +7354,12 @@ export interface Database {
         Args: Record<string, never>;
         Returns: number;
       };
+      count_my_pending_consultations: {
+        Args: {
+          p_branch_id?: string | null;
+        };
+        Returns: number;
+      };
       mark_notification_read: {
         Args: {
           p_id: string;
