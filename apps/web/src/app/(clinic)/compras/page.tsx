@@ -11,6 +11,7 @@ import {
   getPurchaseExchangeRate,
 } from '@/actions/purchase-catalog';
 import { CategoryManager, ExchangeRateForm } from '@/components/purchases/catalog-management';
+import { ComprasWorkspaceView } from '@/components/purchases/compras-workspace-view';
 import { listLowStock } from '@/actions/inventory';
 import { getSessionContext } from '@/actions/auth';
 import { getUserBranches } from '@/actions/settings';
@@ -50,6 +51,18 @@ interface ComprasPageProps {
     paginaPartes?: string;
     grupo?: string;
     proveedor?: string;
+    partesBuscar?: string;
+    partesPagina?: string;
+    tipo?: string;
+    productosBuscar?: string;
+    productosPagina?: string;
+    productoCategoria?: string;
+    productoProveedor?: string;
+    vacunasBuscar?: string;
+    vacunasPagina?: string;
+    vacunaProveedor?: string;
+    preciosBuscar?: string;
+    preciosPagina?: string;
   }>;
 }
 
@@ -88,9 +101,24 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
       getPurchaseExchangeRate(),
     ]);
 
+  if (section === 'compras')
+    return (
+      <Suspense
+        fallback={<p className="text-sm text-muted-foreground">Cargando el panel de compras…</p>}
+      >
+        <ComprasWorkspaceView
+          query={params}
+          categories={categories}
+          suppliers={supplierOptions}
+          exchangeRate={exchangeRate}
+          canWrite={canWrite}
+        />
+      </Suspense>
+    );
   const branchName = branches.find((branch) => branch.id === session?.branchId)?.name ?? null;
   const descriptions: Record<ComprasSection, string> = {
     compras: 'Adquirí productos y actualizá el stock',
+    historial: 'Adquirí productos y consultá tus compras recibidas o anuladas',
     proveedores: 'Proveedores de productos',
     prestadores: 'Prestadores de servicios',
     productos: 'Productos separados por categoría',
@@ -103,7 +131,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
     section === 'proveedores' || section === 'prestadores' || section === 'vacunas';
   const showProducts = section === 'productos' || section === 'vacunas' || section === 'precios';
   const [purchases, lowStockItems, parties, products] = await Promise.all([
-    section === 'compras'
+    section === 'historial'
       ? listInventoryPurchases({
           page,
           pageSize: 25,
@@ -111,7 +139,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
           status,
         })
       : Promise.resolve(null),
-    section === 'compras' ? listLowStock() : Promise.resolve([]),
+    section === 'historial' ? listLowStock() : Promise.resolve([]),
     showParties
       ? listPurchaseParties({
           page: partyPage,
@@ -159,7 +187,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
             {branchName ? ` · ${branchName}` : ''}
           </p>
         </div>
-        {section === 'compras' ? (
+        {section === 'historial' ? (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
               <Link href="/inventario">
@@ -203,7 +231,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
         </Suspense>
       )}
 
-      {section === 'compras' && purchases ? (
+      {section === 'historial' && purchases ? (
         <>
           <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
             <div className="flex items-start gap-2">

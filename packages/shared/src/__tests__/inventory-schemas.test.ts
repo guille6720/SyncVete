@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveProductSalePrice, salePriceFromCost } from '../constants/inventory';
-import { inventoryMovementSchema, inventoryProductSchema } from '../schemas';
+import { inventoryMovementSchema, inventoryProductSchema, purchasePartySchema } from '../schemas';
 
 describe('inventoryProductSchema', () => {
   it('validates a product', () => {
@@ -97,6 +97,11 @@ describe('inventoryProductSchema', () => {
 });
 
 describe('inventoryMovementSchema', () => {
+  it('normalizes an optional CUIT without accepting malformed text', () => {
+    expect(purchasePartySchema.parse({ name: 'Proveedor', kind: 'proveedor', cuit: '30-12345678-9' }).cuit).toBe('30123456789');
+    expect(purchasePartySchema.parse({ name: 'Proveedor', kind: 'proveedor', cuit: '' }).cuit).toBeUndefined();
+    expect(purchasePartySchema.safeParse({ name: 'Proveedor', kind: 'proveedor', cuit: '123' }).success).toBe(false);
+  });
   it('accepts an entrada', () => {
     const result = inventoryMovementSchema.safeParse({
       movementType: 'entrada',

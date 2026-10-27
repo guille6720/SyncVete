@@ -61,6 +61,7 @@ describe('Compras database isolation, CRUD and pricing', () => {
     );
     await executeMigration('20261027143000_compras_catalog.sql');
     await executeMigration('20261027153648_compras_catalog_integrity.sql');
+    await executeMigration('20261027172455_compras_party_cuit.sql');
     await database.exec(`grant select,insert,update on inventory_products to authenticated;
       insert into organizations values ('${orgA}'),('${orgB}');
       insert into branches(id,organization_id) values ('${branch}','${orgA}');
@@ -190,23 +191,52 @@ describe('Compras database isolation, CRUD and pricing', () => {
       /permission denied/
     );
   });
+  it('stores optional CUIT and rejects malformed direct writes', async () => {
+    await database.exec(`update purchase_parties set cuit='30123456789' where id='${supplier}'`);
+    expect(
+      (await database.query<{ cuit: string }>('select cuit from purchase_parties')).rows[0].cuit
+    ).toBe('30123456789');
+    await expect(
+      database.exec(`update purchase_parties set cuit='incorrecto' where id='${supplier}'`)
+    ).rejects.toThrow(/check constraint/);
+  });
   it('rejects inserts assigned to another organization', async () => {
-    await expect(database.exec(`insert into purchase_categories(organization_id,name,base_category) values ('${orgB}','Ajena','otro')`)).rejects.toThrow(/row-level security/);
+    await expect(
+      database.exec(
+        `insert into purchase_categories(organization_id,name,base_category) values ('${orgB}','Ajena','otro')`
+      )
+    ).rejects.toThrow(/row-level security/);
   });
   it('prevents relocating products to another tenant', async () => {
     await addProduct();
-    await expect(database.exec(`update inventory_products set organization_id='${orgB}'`)).rejects.toThrow(/trasladar/);
+    await expect(
+      database.exec(`update inventory_products set organization_id='${orgB}'`)
+    ).rejects.toThrow(/trasladar/);
   });
   it('prevents removing referenced suppliers', async () => {
     await addProduct();
-    await expect(database.exec(`update purchase_parties set deleted_at=now() where id='${supplier}'`)).rejects.toThrow(/vinculados/);
+    await expect(
+      database.exec(`update purchase_parties set deleted_at=now() where id='${supplier}'`)
+    ).rejects.toThrow(/vinculados/);
   });
   it('rejects zero exchange rates at the database boundary', async () => {
-    await expect(database.exec(`insert into purchase_pricing_settings(organization_id,usd_ars) values ('${orgA}',0)`)).rejects.toThrow(/check constraint/);
+    await expect(
+      database.exec(
+        `insert into purchase_pricing_settings(organization_id,usd_ars) values ('${orgA}',0)`
+      )
+    ).rejects.toThrow(/check constraint/);
   });
   it('does not let read-only users alter exchange rates', async () => {
-    await database.exec(`insert into purchase_pricing_settings(organization_id,usd_ars) values ('${orgA}',1200); reset role`);
+    await database.exec(
+      `insert into purchase_pricing_settings(organization_id,usd_ars) values ('${orgA}',1200); reset role`
+    );
     await asUser(orgA, false);
-    expect((await database.query('update purchase_pricing_settings set usd_ars=1 returning organization_id')).rows).toHaveLength(0);
+    expect(
+      (
+        await database.query(
+          'update purchase_pricing_settings set usd_ars=1 returning organization_id'
+        )
+      ).rows
+    ).toHaveLength(0);
   });
 });

@@ -1,6 +1,6 @@
 # Compras y catálogo de precios
 
-Implementación del catálogo funcional de Compras para staging, basada en el catálogo existente `7df6f28`. Incluye proveedores, prestadores, productos, categorías propias, vacunas y precios de venta. Cada sección dispone de búsqueda; los productos y precios admiten filtros por proveedor y categoría. La referencia conversacional no expuso el archivo de la maqueta, por lo que no se certifica coincidencia visual exacta con esa imagen.
+Implementación del catálogo funcional de Compras para staging, basada en el catálogo existente `7df6f28`. Incluye proveedores, prestadores, productos, categorías propias, vacunas y precios de venta. Cada sección dispone de búsqueda; los productos y precios admiten filtros por proveedor y categoría. La vista principal se adapta a la maqueta adjuntada por el usuario: tres tablas a la izquierda, calculadora y valores de venta a la derecha, tarjetas de navegación e iconos. Se conserva la identidad y la navegación general de SyncVete.
 
 ## Arquitectura y comportamiento
 
@@ -32,6 +32,7 @@ Aplicadas solamente en `SyncVete-Staging` (`owmcrqvnfubyjxrlyhlc`):
 
 1. `20261027153648_compras_catalog_integrity.sql`: tablas de categorías y cotización, RLS y grants mínimos, referencias de categorías por organización, validaciones de proveedor/sucursal/categoría, recálculo y compatibilidad de recepción de compras.
 2. `20261027163110_compras_rpc_grants.sql`: revoca el acceso de `PUBLIC` y `anon` a las cuatro operaciones de compras y conserva la ejecución para usuarios autenticados.
+3. `20261027172455_compras_party_cuit.sql`: CUIT opcional, formato normalizado de once dígitos, sin alterar registros existentes ni sus políticas de acceso.
 
 La primera migración es transaccional, con límites de bloqueo y ejecución. La referencia compuesta de categorías se agrega con `NOT VALID` y se valida antes de confirmar. No se borran ni recategorizan productos existentes. Se comprobó que staging no tenía productos USD antes de aplicar la migración.
 

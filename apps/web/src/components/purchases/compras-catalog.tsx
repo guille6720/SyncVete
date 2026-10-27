@@ -3,7 +3,18 @@
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Users,
+  Package,
+  Tags,
+  Syringe,
+  List,
+  ShoppingCart,
+  UserRound,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -24,18 +35,48 @@ import {
 } from '@sincvete/shared';
 
 export function ComprasSectionNav({ active }: { active: ComprasSection }) {
+  const icons = {
+    compras: Users,
+    historial: ShoppingCart,
+    proveedores: Users,
+    prestadores: UserRound,
+    productos: Package,
+    categorias: Tags,
+    vacunas: Syringe,
+    precios: List,
+  };
+  const sections = COMPRAS_SECTIONS.filter(
+    (section) => section !== 'proveedores' && section !== 'prestadores'
+  );
   return (
-    <nav aria-label="Secciones de Compras" className="flex flex-wrap gap-2">
-      {COMPRAS_SECTIONS.map((section) => (
-        <Button key={section} variant={section === active ? 'default' : 'outline'} asChild>
-          <Link
-            aria-current={section === active ? 'page' : undefined}
-            href={section === 'compras' ? '/compras' : `/compras?seccion=${section}`}
+    <nav
+      aria-label="Secciones de Compras"
+      className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
+    >
+      {sections.map((section) => {
+        const Icon = icons[section];
+        const selected =
+          section === active ||
+          (section === 'compras' && (active === 'proveedores' || active === 'prestadores'));
+        return (
+          <Button
+            className={`h-auto min-h-14 whitespace-normal border p-3 text-xs shadow-none ${selected ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15' : 'bg-card'}`}
+            key={section}
+            variant="outline"
+            asChild
           >
-            {COMPRAS_SECTION_LABELS[section]}
-          </Link>
-        </Button>
-      ))}
+            <Link
+              aria-current={selected ? 'page' : undefined}
+              href={section === 'compras' ? '/compras' : `/compras?seccion=${section}`}
+            >
+              <Icon className="h-6 w-6 shrink-0" />
+              {section === 'compras'
+                ? 'Prestadores / Proveedores'
+                : COMPRAS_SECTION_LABELS[section]}
+            </Link>
+          </Button>
+        );
+      })}
     </nav>
   );
 }

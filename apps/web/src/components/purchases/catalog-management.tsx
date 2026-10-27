@@ -2,6 +2,8 @@
 
 import { useActionState, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { Trash2 } from 'lucide-react';
+import { softDeleteInventoryProduct } from '@/actions/inventory';
 import {
   deletePurchaseCategory,
   deletePurchaseParty,
@@ -23,10 +25,14 @@ export function CatalogDelete({
   id,
   kind,
   returnHref,
+  compact = false,
+  label,
 }: {
   id: string;
-  kind: 'party' | 'category';
+  kind: 'party' | 'category' | 'product';
   returnHref?: string;
+  compact?: boolean;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
@@ -34,8 +40,16 @@ export function CatalogDelete({
   const router = useRouter();
   return (
     <>
-      <Button type="button" variant="destructive" disabled={pending} onClick={() => setOpen(true)}>
-        Eliminar
+      <Button
+        type="button"
+        variant={compact ? 'ghost' : 'destructive'}
+        size={compact ? 'icon' : 'default'}
+        className={compact ? 'h-7 w-7 text-destructive' : undefined}
+        aria-label={compact ? `Eliminar ${label ?? 'registro'}` : undefined}
+        disabled={pending}
+        onClick={() => setOpen(true)}
+      >
+        {compact ? <Trash2 className="h-3.5 w-3.5" /> : 'Eliminar'}
       </Button>
       <ConfirmDialog
         open={open}
@@ -46,9 +60,11 @@ export function CatalogDelete({
         onClose={() => setOpen(false)}
         onConfirm={() =>
           startTransition(async () => {
-            const result = await (kind === 'party'
-              ? deletePurchaseParty(id)
-              : deletePurchaseCategory(id));
+            const result = await (kind === 'product'
+              ? softDeleteInventoryProduct(id)
+              : kind === 'party'
+                ? deletePurchaseParty(id)
+                : deletePurchaseCategory(id));
             setOpen(false);
             if (!result.success) setError(result.error || 'No se pudo eliminar');
             else if (returnHref) router.push(returnHref);

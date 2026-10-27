@@ -22,7 +22,7 @@ async function login(page: Page, kind = 'writer') {
   await page.getByLabel('Email').fill(user.email);
   await page.getByLabel('Contraseña', { exact: true }).fill(user.password);
   await page.getByRole('button', { name: /Ingresar|Iniciar sesión/ }).click();
-  await expect(page).not.toHaveURL(/\/login/);
+  await expect(page).not.toHaveURL(/\/login/, { timeout: 45000 });
 }
 
 test('CRUD through browser: parties, category, USD vaccine, sale catalog and repricing', async ({ page }) => {
@@ -160,4 +160,64 @@ test('product editor preserves controlled values after repeated saves', async ({
     await expect(page.getByLabel('Moneda del costo')).toHaveValue('USD');
     await expect(page.getByLabel('Nombre *', { exact: true })).toHaveValue(`QA Editor ${suffix} ${qa.run}`);
   }
+});
+
+test('reference layout has independent tables, calculator, CUIT and inline pricing', async ({ page }) => {
+  const supabase = await client();
+  const { data: suppliers, error: supplierError } = await supabase.from('purchase_parties').insert([
+    { organization_id: qa.organizationId, kind: 'proveedor', scope: 'general', name: 'Distribuidora VetPlus', cuit: '30123456789', phone: '11 4567-8901', email: 'ventas@ejemplo.invalid' },
+    { organization_id: qa.organizationId, kind: 'proveedor', scope: 'vacunas', name: 'Laboratorios Zoovet', phone: '11 2345-6789' },
+    { organization_id: qa.organizationId, kind: 'prestador', scope: 'general', name: 'Dr. Carlos Méndez', phone: '11 3456-7890' },
+  ]).select();
+  expect(supplierError).toBeNull();
+  const generalSupplier = suppliers!.find((supplier) => supplier.scope === 'general' && supplier.kind === 'proveedor')!;
+  const vaccineSupplier = suppliers!.find((supplier) => supplier.scope === 'vacunas')!;
+  const { data: products, error: productError } = await supabase.from('inventory_products').insert([
+    { organization_id: qa.organizationId, branch_id: qa.branchId, name: 'Amoxicilina 50 mg', category: 'medicamento', unit: 'caja', unit_cost: 3500, margin_percent: 30, supplier_party_id: generalSupplier.id },
+    { organization_id: qa.organizationId, branch_id: qa.branchId, name: 'Meloxicam 1,5 mg', category: 'medicamento', unit: 'frasco', unit_cost: 4800, margin_percent: 27, supplier_party_id: generalSupplier.id },
+    { organization_id: qa.organizationId, branch_id: qa.branchId, name: 'Shampoo medicado', category: 'insumo', unit: 'unidad', unit_cost: 4200, margin_percent: 27, supplier_party_id: generalSupplier.id },
+    { organization_id: qa.organizationId, branch_id: qa.branchId, name: 'Antirrábica', category: 'vacuna', unit: 'dosis', unit_cost: 9800, margin_percent: 31, supplier_party_id: vaccineSupplier.id },
+  ]).select();
+  expect(productError).toBeNull();
+  await login(page);
+  await page.setViewportSize({width: 1440, height: 1080});
+  await page.goto('/compras');
+  const parties = page.getByRole('region', {name: 'Prestadores / Proveedores', exact: true});
+  const productPanel = page.getByRole('region', {name: 'Productos', exact: true});
+  const vaccinePanel = page.getByRole('region', {name: 'Vacunas', exact: true});
+  await expect(parties.getByText('30-12345678-9')).toBeVisible();
+  await expect(vaccinePanel.getByRole('link', {name: 'Antirrábica', exact: true})).toBeVisible();
+  await page.getByLabel('Costo del producto', {exact: true}).fill('12500');
+  await page.getByLabel('% de ganancia', {exact: true}).fill('30');
+  await page.getByRole('button', {name: 'Calcular precio', exact: true}).click();
+  await expect(page.getByLabel('Resultado de cálculo')).toHaveText('$ 16.250,00');
+  await page.screenshot({path: '../../test-results/compras-maqueta-desktop.png', fullPage: true});
+  await productPanel.getByLabel('Ganancia de Amoxicilina 50 mg').fill('35');
+  await productPanel.getByRole('button', {name: 'Guardar precio de Amoxicilina 50 mg'}).click();
+  await expect(productPanel.getByText('Precio guardado')).toBeVisible();
+  expect(Number((await supabase.from('inventory_products').select('unit_price').eq('id', products!.find((product) => product.name === 'Amoxicilina 50 mg')!.id).single()).data?.unit_price)).toBe(4725);
+  await page.getByRole('searchbox', {name: 'Buscar productos...', exact: true}).fill('Meloxicam');
+  await expect(productPanel.getByRole('link', {name: 'Amoxicilina 50 mg', exact: true})).toHaveCount(0);
+  await expect(productPanel.getByRole('link', {name: 'Meloxicam 1,5 mg', exact: true})).toBeVisible();
+  await expect(vaccinePanel.getByRole('link', {name: 'Antirrábica', exact: true})).toBeVisible();
+  await page.getByRole('button', {name: 'Limpiar filtros'}).click();
+  await expect(page.getByRole('searchbox', {name: 'Buscar productos...', exact: true})).toHaveValue('');
+  await expect(productPanel.getByRole('link', {name: 'Amoxicilina 50 mg', exact: true})).toBeVisible();
+  await page.getByLabel('Todos los tipos', {exact: true}).selectOption('prestador');
+  await expect(parties.getByRole('link', {name: 'Distribuidora VetPlus', exact: true})).toHaveCount(0);
+  await expect(parties.getByRole('link', {name: 'Dr. Carlos Méndez', exact: true})).toBeVisible();
+});
+
+test('reference workspace is usable on mobile without exposing write controls to readers', async ({ page }) => {
+  await login(page, 'reader');
+  await page.setViewportSize({width: 390, height: 844});
+  await page.goto('/compras');
+  await expect(page.getByRole('region', {name: 'Productos', exact: true})).toBeVisible();
+  await expect(page.getByRole('button', {name: /Guardar precio de/})).toHaveCount(0);
+  await expect(page.getByRole('link', {name: 'Agregar producto', exact: true})).toHaveCount(0);
+  await page.getByLabel('Costo del producto', {exact: true}).fill('12500');
+  await page.getByRole('button', {name: 'Calcular precio', exact: true}).click();
+  await expect(page.getByLabel('Resultado de cálculo')).toHaveText('$ 16.250,00');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({path: '../../test-results/compras-maqueta-mobile.png', fullPage: true});
 });

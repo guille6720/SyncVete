@@ -17,13 +17,13 @@ export default async function PartePage({ params }: PartePageProps) {
   const { id } = await params;
   const [party, canWrite] = await Promise.all([getPurchaseParty(id), canManagePurchases()]);
   if (!party) notFound();
-  if (!canWrite) redirect('/compras');
 
-  const listHref = party.scope === 'vacunas'
-    ? '/compras?seccion=vacunas'
-    : party.kind === 'prestador'
-      ? '/compras?seccion=prestadores'
-      : '/compras?seccion=proveedores';
+  const listHref =
+    party.scope === 'vacunas'
+      ? '/compras?seccion=vacunas'
+      : party.kind === 'prestador'
+        ? '/compras?seccion=prestadores'
+        : '/compras?seccion=proveedores';
 
   return (
     <div className="space-y-4">
@@ -33,7 +33,28 @@ export default async function PartePage({ params }: PartePageProps) {
           Volver a compras
         </Link>
       </Button>
-      <PartyForm kind={party.kind} scope={party.scope} party={party} listHref={listHref} />
+      {canWrite ? (
+        <PartyForm kind={party.kind} scope={party.scope} party={party} listHref={listHref} />
+      ) : (
+        <section className="space-y-4 rounded-lg border bg-card p-5">
+          <h2 className="text-xl font-semibold">{party.name}</h2>
+          <dl className="grid gap-4 text-sm sm:grid-cols-2">
+            {[
+              ['Tipo', party.kind === 'proveedor' ? 'Proveedor' : 'Prestador'],
+              ['CUIT', party.cuit],
+              ['Contacto', party.contact_name],
+              ['Teléfono', party.phone],
+              ['Email', party.email],
+              ['Notas', party.notes],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-muted-foreground">{label}</dt>
+                <dd className="mt-1 whitespace-pre-wrap">{value || '—'}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+      )}
     </div>
   );
 }

@@ -1062,6 +1062,7 @@ export const inventoryPurchaseListSchema = paginationSchema.extend({
 });
 
 export const purchasePartySchema = z.object({
+  cuit: z.string().trim().regex(/^(?:\d{11}|\d{2}-\d{8}-\d|)$/, 'Ingresá 11 dígitos de CUIT').nullish().transform((value) => value ? value.replace(/-/g, '') : undefined),
   name: z
     .string()
     .min(2, 'Indicá el nombre')

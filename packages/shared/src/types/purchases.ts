@@ -10,6 +10,7 @@ import type {
 } from '../constants/purchases';
 
 export interface PurchaseParty {
+  cuit?: string | null;
   id: string;
   organization_id: string;
   kind: PurchasePartyKind;

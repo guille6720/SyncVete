@@ -3959,6 +3959,7 @@ export interface Database {
       };
       purchase_parties: {
         Row: {
+          cuit: string | null;
           id: string;
           organization_id: string;
           kind: PurchasePartyKind;
@@ -3974,6 +3975,7 @@ export interface Database {
           deleted_at: string | null;
         };
         Insert: {
+          cuit?: string | null;
           id?: string;
           organization_id: string;
           kind: PurchasePartyKind;
@@ -3989,6 +3991,7 @@ export interface Database {
           deleted_at?: string | null;
         };
         Update: {
+          cuit?: string | null;
           id?: string;
           organization_id?: string;
           kind?: PurchasePartyKind;

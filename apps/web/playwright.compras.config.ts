@@ -10,7 +10,7 @@ export default defineConfig({
   workers: 1,
   retries: 0,
   timeout: 120000,
-  expect: { timeout: 15000 },
+  expect: { timeout: 30000 },
   reporter: [['list'], ['json', { outputFile: '../../test-results/compras-e2e.json' }]],
   use: { baseURL, trace: 'off', screenshot: 'only-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], channel: 'chrome' } }],

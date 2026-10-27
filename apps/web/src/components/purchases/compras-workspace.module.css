@@ -1,0 +1,76 @@
+.root {
+  font-family: Arial, Helvetica, sans-serif;
+  color: var(--color-foreground);
+}
+.root :global(.sv-neon) {
+  box-shadow: none;
+  border: 1px solid var(--color-border);
+}
+.root :global(.sv-neon-hover):hover {
+  box-shadow: none;
+}
+.root h1,
+.root h2,
+.root h3 {
+  font-family: inherit;
+}
+.root a[aria-current='page'] {
+  border-color: var(--color-primary);
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.panel {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-card);
+  box-shadow: 0 2px 10px rgb(15 23 42 / 3%);
+  padding: 14px;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.table th {
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+  font-weight: 600;
+  font-size: 11px;
+}
+.table th,
+.table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
+}
+.table input,
+.table select {
+  height: 29px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.table input {
+  min-width: 66px;
+}
+.calculator {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-card));
+  border-radius: 6px;
+  padding: 12px;
+}
+@media (min-width: 1280px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 308px;
+  }
+}

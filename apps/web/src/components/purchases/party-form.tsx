@@ -55,6 +55,20 @@ export function PartyForm({ kind, scope, party, listHref }: PartyFormProps) {
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
+              <Label htmlFor="cuit">CUIT</Label>
+              <Input
+                id="cuit"
+                name="cuit"
+                inputMode="numeric"
+                maxLength={13}
+                placeholder="30-12345678-9"
+                defaultValue={party?.cuit ?? ''}
+              />
+              {state?.fieldErrors?.cuit?.[0] && (
+                <p className="text-sm text-destructive">{state.fieldErrors.cuit[0]}</p>
+              )}
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="contactName">Contacto</Label>
               <Input id="contactName" name="contactName" defaultValue={party?.contact_name ?? ''} />
             </div>

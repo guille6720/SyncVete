@@ -71,6 +71,51 @@ function toParty(row: PurchaseParty): PurchaseParty {
   };
 }
 
+export async function updateCatalogPricing(
+  productId: string,
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = z
+      .object({
+        id: z.string().uuid(),
+        cost: z.union([z.literal(''), z.coerce.number().finite().min(0).max(999999999999.99)]),
+        currency: z.enum(['ARS', 'USD']),
+        margin: z.union([z.literal(''), z.coerce.number().finite().min(0).max(1000)]),
+      })
+      .safeParse({
+        id: productId,
+        cost: formData.get('unitCost'),
+        currency: formData.get('costCurrency'),
+        margin: formData.get('marginPercent'),
+      });
+    if (!parsed.success)
+      return { success: false, error: 'Revisá costo, moneda y porcentaje (0 a 1000%)' };
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .update({
+        unit_cost: parsed.data.cost === '' ? null : parsed.data.cost,
+        cost_currency: parsed.data.currency,
+        margin_percent: parsed.data.margin === '' ? null : parsed.data.margin,
+      })
+      .eq('id', parsed.data.id)
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'El producto no está disponible' };
+    revalidatePath('/compras');
+    revalidatePath(`/inventario/${productId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
 export async function listPurchaseParties(
   input: {
     page?: number;
@@ -89,7 +134,7 @@ export async function listPurchaseParties(
   let query = supabase
     .from('purchase_parties')
     .select(
-      'id, organization_id, kind, scope, name, contact_name, phone, email, notes, is_active, created_at, updated_at',
+      'id, organization_id, kind, scope, name, cuit, contact_name, phone, email, notes, is_active, created_at, updated_at',
       { count: 'exact' }
     )
     .eq('organization_id', session.organizationId)
@@ -100,8 +145,12 @@ export async function listPurchaseParties(
   if (parsed.kind) query = query.eq('kind', parsed.kind);
   if (parsed.scope) query = query.eq('scope', parsed.scope);
 
-  const filter = ilikeFilter(['name', 'contact_name', 'phone', 'email'], parsed.search);
-  if (filter) query = query.or(filter);
+  const filter = ilikeFilter(['name', 'cuit', 'contact_name', 'phone', 'email'], parsed.search);
+  const cuitDigits = (parsed.search ?? '').replace(/[\s-]/g, '');
+  if (filter)
+    query = query.or(
+      /^\d{2,11}$/.test(cuitDigits) ? `${filter},cuit.ilike.%${cuitDigits}%` : filter
+    );
 
   const { data, error, count } = await query.range(from, to);
   if (error) throw error;
@@ -136,7 +185,7 @@ export async function getPurchaseParty(id: string): Promise<PurchaseParty | null
   const { data, error } = await supabase
     .from('purchase_parties')
     .select(
-      'id, organization_id, kind, scope, name, contact_name, phone, email, notes, is_active, created_at, updated_at'
+      'id, organization_id, kind, scope, name, cuit, contact_name, phone, email, notes, is_active, created_at, updated_at'
     )
     .eq('id', id)
     .is('deleted_at', null)
@@ -245,6 +294,7 @@ export async function createPurchaseParty(
   try {
     const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
     const parsed = purchasePartySchema.safeParse({
+      cuit: formData.get('cuit'),
       name: formData.get('name'),
       kind: formData.get('kind'),
       scope: formData.get('scope') || 'general',
@@ -271,6 +321,7 @@ export async function createPurchaseParty(
     const { error } = await supabase.from('purchase_parties').insert({
       organization_id: session.organizationId,
       kind: parsed.data.kind,
+      cuit: parsed.data.cuit ?? null,
       scope: parsed.data.scope,
       name: parsed.data.name,
       contact_name: parsed.data.contactName ?? null,
@@ -302,6 +353,7 @@ export async function updatePurchaseParty(
   try {
     const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
     const parsed = purchasePartySchema.safeParse({
+      cuit: formData.get('cuit'),
       name: formData.get('name'),
       kind: formData.get('kind'),
       scope: formData.get('scope') || 'general',
@@ -329,6 +381,7 @@ export async function updatePurchaseParty(
       .from('purchase_parties')
       .update({
         name: parsed.data.name,
+        cuit: parsed.data.cuit ?? null,
         contact_name: parsed.data.contactName ?? null,
         phone: parsed.data.phone ?? null,
         email: parsed.data.email ?? null,
