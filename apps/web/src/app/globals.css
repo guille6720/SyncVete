@@ -328,6 +328,22 @@ html.pwa-standalone body {
   }
 }
 
+@keyframes sv-consultas-alert-blink {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow:
+      0 0 0 1px rgba(245, 158, 11, 0.55),
+      0 0 18px rgba(245, 158, 11, 0.45);
+  }
+  50% {
+    opacity: 0.72;
+    box-shadow:
+      0 0 0 1px rgba(245, 158, 11, 0.95),
+      0 0 28px rgba(245, 158, 11, 0.75);
+  }
+}
+
 .sv-tutorial-intro-enter {
   animation: sv-tutorial-intro-enter 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -344,11 +360,16 @@ html.pwa-standalone body {
   animation: sv-tutorial-status-pulse 0.9s ease-in-out infinite;
 }
 
+.sv-consultas-alert-blink {
+  animation: sv-consultas-alert-blink 1.1s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .sv-tutorial-intro-enter,
   .sv-tutorial-cursor-ripple,
   .sv-tutorial-spotlight-pulse,
-  .sv-tutorial-status-pulse {
+  .sv-tutorial-status-pulse,
+  .sv-consultas-alert-blink {
     animation: none;
   }
 }

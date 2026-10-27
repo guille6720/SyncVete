@@ -93,6 +93,29 @@ export async function listConsultationQueue(): Promise<ConsultationQueueItem[]> 
   return (data ?? []) as ConsultationQueueItem[];
 }
 
+/** Consultas / turnos pendientes de hoy asignados al usuario logueado. */
+export async function countMyPendingConsultations(): Promise<number> {
+  const session = await getSessionContext();
+  if (
+    !session ||
+    (!session.permissions.includes('clinical:read') &&
+      !session.permissions.includes('appointments:read'))
+  ) {
+    return 0;
+  }
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase.rpc('count_my_pending_consultations', {
+    p_branch_id: session.branchId ?? null,
+  });
+
+  if (error) {
+    console.error('[consultations] count_my_pending_consultations', error);
+    return 0;
+  }
+  return Number(data ?? 0);
+}
+
 export async function listConsultations(
   input: {
     page?: number;

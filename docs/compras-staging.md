@@ -1,5 +1,11 @@
 # Compras y catálogo de precios
 
+## Dirección de trabajo indicada por el usuario
+
+El entorno de trabajo y validación es https://sync-vete-staging-git-feature-ui-v2-shel-78b6a4-guillermo-c-bmw.vercel.app/dashboard y Compras se abre en el mismo dominio, ruta `/compras`. Corresponde al proyecto Vercel `sync-vete-staging`, rama `feature/ui-v2-shell-dashboard-staging` y base Supabase `owmcrqvnfubyjxrlyhlc`.
+
+Esta dirección compartida es la referencia para los siguientes ajustes. Los previews aislados que figuran más abajo son evidencia histórica de pruebas, no el destino de trabajo solicitado. Las integraciones deben conservar los otros cambios de la rama de staging y no modificar producción.
+
 Implementación del catálogo funcional de Compras para staging, basada en el catálogo existente `7df6f28`. Incluye proveedores, prestadores, productos, categorías propias, vacunas y precios de venta. Cada sección dispone de búsqueda; los productos y precios admiten filtros por proveedor y categoría. La vista principal se adapta a la maqueta adjuntada por el usuario: tres tablas a la izquierda, calculadora y valores de venta a la derecha, tarjetas de navegación e iconos. Se conserva la identidad y la navegación general de SyncVete.
 
 ## Arquitectura y comportamiento

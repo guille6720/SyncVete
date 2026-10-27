@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import {
   formatDateParam,
   getWeekStartDate,
+  INVITABLE_ROLES,
   isClinicPathEntitled,
   type AppointmentListRow,
 } from '@sincvete/shared';
@@ -113,14 +114,26 @@ async function DashboardAppointmentsSection({ entitledHrefs }: { entitledHrefs: 
     );
   }
 
+  const session = await getSessionContext();
   const today = formatDateParam(new Date());
   const weekStart = getWeekStartDate(today);
   const appointments = await listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[]);
   const todays = appointments
     .filter((row) => formatDateParam(new Date(row.starts_at)) === today)
     .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+  const showAlert = Boolean(
+    session?.kind === 'staff' && session.role && INVITABLE_ROLES.includes(session.role)
+  );
 
-  return <AppointmentsSummaryPanel appointments={todays} todayLabel={getClinicTodayLabel()} />;
+  return (
+    <AppointmentsSummaryPanel
+      appointments={todays}
+      todayLabel={getClinicTodayLabel()}
+      today={today}
+      weekStart={weekStart}
+      showAlert={showAlert}
+    />
+  );
 }
 
 async function DashboardPendingStrip({ entitledHrefs }: { entitledHrefs: string[] | null }) {
