@@ -106,6 +106,7 @@ const QUICK_ACTIONS = [
   { label: 'Programar cirugía', href: '/cirugias/nueva', keywords: 'operar quirofano castracion' },
   { label: 'Nueva orden de laboratorio', href: '/laboratorio/nueva', keywords: 'lab hemograma bioquimica' },
   { label: 'Nuevo producto de inventario', href: '/inventario/nuevo', keywords: 'stock farmacia producto' },
+  { label: 'Importar productos', href: '/inventario/importar', keywords: 'importar csv excel catalogo stock inventario' },
   { label: 'Nueva compra', href: '/compras/nueva', keywords: 'comprar proveedor stock entrada remito' },
   { label: 'Nueva receta', href: '/farmacia/nueva', keywords: 'prescribir medicamento farmacia recetar' },
   { label: 'Subir imagen', href: '/imagenes/nueva', keywords: 'foto radiografia ecografia documento galeria' },

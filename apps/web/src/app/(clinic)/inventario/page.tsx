@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { Suspense } from 'react';
+import { Plus, Upload } from 'lucide-react';
 import {
   canManageInventory,
   canReadInventory,
@@ -10,8 +12,11 @@ import { getSessionContext } from '@/actions/auth';
 import { getUserBranches } from '@/actions/settings';
 import { InventoryLowStockBoard } from '@/components/inventory/inventory-low-stock-board';
 import { InventoryList } from '@/components/inventory/inventory-list';
+import { Button } from '@/components/ui/button';
+import { canPermissionAndFeature } from '@/lib/permissions';
 import { buildListQuery } from '@/lib/list-return';
 import {
+  FEATURES,
   INVENTORY_PRODUCT_CATEGORIES,
   type InventoryProductCategory,
 } from '@sincvete/shared';
@@ -38,7 +43,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
     : undefined;
   const lowStock = params.lowStock === '1' || params.lowStock === 'true';
 
-  const [lowStockItems, catalog, canWrite, session, branches] = await Promise.all([
+  const [lowStockItems, catalog, canWrite, canImport, session, branches] = await Promise.all([
     listLowStock(),
     listInventoryProducts({
       page,
@@ -48,6 +53,7 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
       lowStock: lowStock || undefined,
     }),
     canManageInventory(),
+    canPermissionAndFeature('data:import', FEATURES.DATA_IMPORT_EXPORT),
     getSessionContext(),
     getUserBranches(),
   ]);
@@ -63,12 +69,32 @@ export default async function InventarioPage({ searchParams }: InventarioPagePro
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
-        <p className="text-muted-foreground">
-          Stock, mínimos y movimientos de productos
-          {branchName ? ` · ${branchName}` : ''}
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Inventario</h1>
+          <p className="text-muted-foreground">
+            Stock, mínimos y movimientos de productos
+            {branchName ? ` · ${branchName}` : ''}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {(canImport || canWrite) && (
+            <Button variant="outline" asChild>
+              <Link href="/inventario/importar">
+                <Upload className="mr-2 h-4 w-4" />
+                Importar
+              </Link>
+            </Button>
+          )}
+          {canWrite && (
+            <Button asChild>
+              <Link href="/inventario/nuevo">
+                <Plus className="mr-2 h-4 w-4" />
+                Nuevo producto
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       <InventoryLowStockBoard

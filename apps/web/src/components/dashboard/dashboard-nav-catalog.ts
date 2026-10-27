@@ -13,6 +13,7 @@ import {
   Pill,
   Receipt,
   ShoppingCart,
+  Upload,
   Banknote,
   Bell,
   ScrollText,
@@ -44,6 +45,7 @@ export type DashboardNavActionId =
   | 'reminders'
   | 'admit-hospitalization'
   | 'new-product'
+  | 'import-products'
   | 'new-purchase'
   | 'new-invoice'
   | 'cash-register'
@@ -287,6 +289,15 @@ export const DASHBOARD_NAV_ACTIONS: DashboardNavAction[] = [
     icon: Package,
     requiresWrite: false,
     tone: 'bg-slate-100 text-slate-800 ring-slate-200 hover:bg-slate-200/80 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700',
+    groupId: 'management',
+  },
+  {
+    id: 'import-products',
+    label: 'Importar productos',
+    href: '/inventario/importar',
+    icon: Upload,
+    requiresWrite: false,
+    tone: 'bg-indigo-100 text-indigo-800 ring-indigo-200 hover:bg-indigo-200/80 dark:bg-indigo-950 dark:text-indigo-200 dark:ring-indigo-800',
     groupId: 'management',
   },
   {

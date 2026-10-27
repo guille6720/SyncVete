@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { Package, Plus, ShoppingCart } from 'lucide-react';
+import { Package, Plus, ShoppingCart, Upload } from 'lucide-react';
 import {
   canManagePurchases,
   canReadPurchases,
@@ -13,8 +13,10 @@ import { getUserBranches } from '@/actions/settings';
 import { InventoryLowStockBoard } from '@/components/inventory/inventory-low-stock-board';
 import { PurchasesList } from '@/components/purchases/purchases-list';
 import { Button } from '@/components/ui/button';
+import { canPermissionAndFeature } from '@/lib/permissions';
 import { buildListQuery } from '@/lib/list-return';
 import {
+  FEATURES,
   INVENTORY_PURCHASE_STATUSES,
   type InventoryPurchaseStatus,
 } from '@sincvete/shared';
@@ -39,7 +41,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
     ? (statusParam as InventoryPurchaseStatus)
     : undefined;
 
-  const [purchases, lowStockItems, canWrite, session, branches] = await Promise.all([
+  const [purchases, lowStockItems, canWrite, canImport, session, branches] = await Promise.all([
     listInventoryPurchases({
       page,
       pageSize: 25,
@@ -48,6 +50,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
     }),
     listLowStock(),
     canManagePurchases(),
+    canPermissionAndFeature('data:import', FEATURES.DATA_IMPORT_EXPORT),
     getSessionContext(),
     getUserBranches(),
   ]);
@@ -77,6 +80,14 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
               Inventario
             </Link>
           </Button>
+          {(canImport || canWrite) && (
+            <Button variant="outline" asChild>
+              <Link href="/inventario/importar">
+                <Upload className="mr-2 h-4 w-4" />
+                Importar productos
+              </Link>
+            </Button>
+          )}
           {canWrite && (
             <Button asChild>
               <Link href="/compras/nueva">
