@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@/lib/supabase/server';
+import { asEmailOtpType, isPasswordLinkOtpType } from '@/lib/auth/password-link-types';
 
 function safeNextPath(next: string | null): string {
   if (!next || !next.startsWith('/') || next.startsWith('//')) {
@@ -34,13 +35,13 @@ export async function GET(request: Request) {
     }
   }
 
-  if (tokenHash && type === 'recovery') {
+  if (tokenHash && isPasswordLinkOtpType(type)) {
     const { error } = await supabase.auth.verifyOtp({
       token_hash: tokenHash,
-      type: 'recovery',
+      type: asEmailOtpType(type),
     });
     if (!error) {
-      redirect(next);
+      redirect(next.includes('actualizar-contrasena') ? next : '/actualizar-contrasena');
     }
   }
 

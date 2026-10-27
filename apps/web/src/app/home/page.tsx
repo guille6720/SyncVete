@@ -19,6 +19,16 @@ export default async function HomeRouterPage() {
   } = await supabase.auth.getUser();
 
   if (user) {
+    // Invited users may have Auth but no profile until this RPC runs.
+    await supabase.rpc('accept_pending_invitation');
+    const afterInvite = await getSessionContext();
+    if (afterInvite?.kind === 'portal') {
+      redirect('/portal');
+    }
+    if (afterInvite?.kind === 'staff') {
+      redirect('/dashboard');
+    }
+
     // Auth ok but no clinic profile yet — send back to login with a clear reason
     // instead of signing out silently (looks like "can't enter").
     await supabase.auth.signOut();

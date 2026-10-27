@@ -72,6 +72,8 @@ export async function signIn(
       };
     }
 
+    await supabase.rpc('accept_pending_invitation');
+
     const redirectTo = safeOwnerPortalRedirect(formData.get('redirectTo'));
     if (redirectTo) {
       redirect(redirectTo);
@@ -305,6 +307,9 @@ export async function updatePassword(
           'No se pudo actualizar la contraseña. Intentá de nuevo.',
       };
     }
+
+    // Invite emails land here first; bind the pending org invitation before /home.
+    await supabase.rpc('accept_pending_invitation');
 
     redirect('/home');
   } catch (error) {
