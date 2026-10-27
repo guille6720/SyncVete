@@ -8,7 +8,6 @@ import {
   signInSchema,
   signUpSchema,
   updatePasswordSchema,
-  APP_CANONICAL_HOST,
   type ActionResult,
   type SessionContext,
 } from '@sincvete/shared';
@@ -16,6 +15,7 @@ import {
   acceptPendingInvitation,
   invitationActivated,
 } from '@/lib/auth/accept-pending-invitation';
+import { getAppOrigin } from '@/lib/app-origin';
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { getSessionContext as loadSessionContext } from '@/lib/session';
 import { headers } from 'next/headers';
@@ -80,7 +80,7 @@ export async function signIn(
       data: { user },
     } = await supabase.auth.getUser();
     if (user) {
-      const accepted = await acceptPendingInvitation(supabase, user.id);
+      const accepted = await acceptPendingInvitation(supabase, user.id, user.email);
       if (invitationActivated(accepted.status)) {
         const redirectTo = safeOwnerPortalRedirect(formData.get('redirectTo'));
         redirect(redirectTo || '/dashboard');
@@ -212,22 +212,6 @@ export async function signOut(): Promise<void> {
   redirect('/login');
 }
 
-function getAppOrigin(headerStore: Headers): string {
-  const configured = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '');
-  if (configured) return configured;
-
-  const forwardedHost = headerStore.get('x-forwarded-host');
-  const host = forwardedHost ?? headerStore.get('host');
-  const proto = headerStore.get('x-forwarded-proto') ?? 'https';
-  if (host && !host.includes('localhost')) return `${proto}://${host}`;
-
-  if (process.env.NODE_ENV === 'production') {
-    return `https://${APP_CANONICAL_HOST}`;
-  }
-
-  return 'http://localhost:3000';
-}
-
 export async function requestPasswordReset(
   _prevState: ActionResult | null,
   formData: FormData
@@ -322,7 +306,7 @@ export async function updatePassword(
     }
 
     // Invite emails land here first; bind the pending org invitation before routing.
-    const accepted = await acceptPendingInvitation(supabase, user.id);
+    const accepted = await acceptPendingInvitation(supabase, user.id, user.email);
     if (invitationActivated(accepted.status)) {
       redirect('/dashboard');
     }

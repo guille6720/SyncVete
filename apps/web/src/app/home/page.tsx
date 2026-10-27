@@ -25,7 +25,7 @@ export default async function HomeRouterPage() {
   if (user) {
     // Do not re-call cached getSessionContext() after accept — React.cache would
     // reuse the pre-accept null and bounce to incomplete_account.
-    const accepted = await acceptPendingInvitation(supabase, user.id);
+    const accepted = await acceptPendingInvitation(supabase, user.id, user.email);
     if (invitationActivated(accepted.status)) {
       redirect('/dashboard');
     }
