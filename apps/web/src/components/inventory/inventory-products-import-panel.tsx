@@ -79,6 +79,17 @@ export function InventoryProductsImportPanel({
     []
   );
 
+  const unmappedRequired = useMemo(
+    () =>
+      requiredFields.filter((field) => {
+        if (mapping[field.key]) return false;
+        // ID can be derived from SKU/Código once mapped
+        if (field.key === 'external_product_id' && mapping.sku) return false;
+        return true;
+      }),
+    [mapping, requiredFields]
+  );
+
   async function onDownloadTemplate() {
     setMessage(null);
     const form = new FormData();
@@ -143,7 +154,20 @@ export function InventoryProductsImportPanel({
     setBatchId(result.data.batchId);
     setMapping(result.data.mapping);
     setHeaders(result.data.headers);
-    setMessage(`Analizado · ${result.data.rowCount} filas · revisá el mapeo y validá`);
+    const missing = requiredFields.filter((field) => {
+      if (result.data!.mapping[field.key]) return false;
+      if (field.key === 'external_product_id' && result.data!.mapping.sku) return false;
+      return true;
+    });
+    if (missing.length > 0) {
+      setMessage(
+        `Analizado · ${result.data.rowCount} filas · faltan columnas: ${missing
+          .map((field) => field.label)
+          .join(', ')}. Elegilas abajo en el mapeo y validá.`
+      );
+    } else {
+      setMessage(`Analizado · ${result.data.rowCount} filas · mapeo listo, podés validar`);
+    }
   }
 
   async function onValidate() {
@@ -255,8 +279,9 @@ export function InventoryProductsImportPanel({
         <CardHeader>
           <CardTitle>Importar productos</CardTitle>
           <CardDescription>
-            Subí un CSV o Excel con el catálogo. Descargá la plantilla si no tenés el formato.
-            Campos obligatorios: {requiredFields.map((field) => field.label).join(', ')}.
+            Subí un CSV o Excel (coma o punto y coma). Si tu archivo tiene Código/Descripción, se
+            mapean solos. Obligatorios: {requiredFields.map((field) => field.label).join(', ')} —
+            el ID puede salir del Código/SKU.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -359,35 +384,48 @@ export function InventoryProductsImportPanel({
               <div>
                 <h3 className="font-medium">Mapeo de columnas</h3>
                 <p className="text-sm text-muted-foreground">
-                  Ajustá si el archivo usa otros nombres de columna.
+                  Columnas detectadas: {headers.join(' · ')}
                 </p>
+                {unmappedRequired.length > 0 && (
+                  <p className="mt-2 text-sm text-destructive">
+                    Falta mapear: {unmappedRequired.map((field) => field.label).join(', ')}. Sin
+                    eso la validación marca todas las filas en error.
+                  </p>
+                )}
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                {INVENTORY_PRODUCT_IMPORT_FIELDS.map((field) => (
-                  <div key={field.key} className="space-y-1">
-                    <Label htmlFor={`map_${field.key}`}>
-                      {field.label}
-                      {field.required ? ' *' : ''}
-                    </Label>
-                    <Select
-                      id={`map_${field.key}`}
-                      value={mapping[field.key] ?? ''}
-                      onChange={(e) =>
-                        setMapping((current) => ({
-                          ...current,
-                          [field.key]: e.target.value || null,
-                        }))
-                      }
-                    >
-                      <option value="">— no mapear —</option>
-                      {headers.map((header) => (
-                        <option key={header} value={header}>
-                          {header}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                ))}
+                {INVENTORY_PRODUCT_IMPORT_FIELDS.map((field) => {
+                  const missing =
+                    field.required &&
+                    !mapping[field.key] &&
+                    !(field.key === 'external_product_id' && mapping.sku);
+                  return (
+                    <div key={field.key} className="space-y-1">
+                      <Label htmlFor={`map_${field.key}`}>
+                        {field.label}
+                        {field.required ? ' *' : ''}
+                      </Label>
+                      <Select
+                        id={`map_${field.key}`}
+                        value={mapping[field.key] ?? ''}
+                        className={missing ? 'border-destructive' : undefined}
+                        onChange={(e) =>
+                          setMapping((current) => ({
+                            ...current,
+                            [field.key]: e.target.value || null,
+                          }))
+                        }
+                      >
+                        <option value="">— no mapear —</option>
+                        {headers.map((header) => (
+                          <option key={header} value={header}>
+                            {header}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

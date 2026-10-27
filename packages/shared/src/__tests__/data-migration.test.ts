@@ -49,6 +49,7 @@ import {
   parseStaffMapCsv,
   parseBranchMapCsv,
   resolveImportStaffUserId,
+  INVENTORY_PRODUCT_IMPORT_FIELDS,
   buildInventoryProductTemplateCsv,
   validateInventoryProductRows,
   buildInvoiceTemplateCsv,
@@ -481,6 +482,15 @@ describe('data-migration parseCsv', () => {
     expect(parsed.headers).toEqual(['nombre', 'email']);
     expect(parsed.rows[0]?.nombre).toBe('Juan Pérez');
   });
+
+  it('parses semicolon-delimited CSV (Excel es-AR)', () => {
+    const csv = 'Código;Descripción;Stock\nA-1;Amoxicilina;12\n';
+    const parsed = parseCsv(csv);
+    expect(parsed.headers).toEqual(['Código', 'Descripción', 'Stock']);
+    expect(parsed.rows[0]?.['Código']).toBe('A-1');
+    expect(parsed.rows[0]?.Descripción).toBe('Amoxicilina');
+    expect(parsed.rows[0]?.Stock).toBe('12');
+  });
 });
 
 describe('data-migration autoMapColumns', () => {
@@ -493,6 +503,17 @@ describe('data-migration autoMapColumns', () => {
     expect(mapping.document_number).toBe('DNI');
     expect(mapping.email).toBe('Correo');
     expect(mapping.phone).toBe('Celular');
+  });
+
+  it('maps catalog headers Código/Descripción to inventory fields', () => {
+    const mapping = autoMapColumns(
+      ['Código', 'Descripción', 'Stock', 'Precio'],
+      INVENTORY_PRODUCT_IMPORT_FIELDS
+    );
+    expect(mapping.external_product_id).toBe('Código');
+    expect(mapping.name).toBe('Descripción');
+    expect(mapping.quantity).toBe('Stock');
+    expect(mapping.unit_price).toBe('Precio');
   });
 });
 

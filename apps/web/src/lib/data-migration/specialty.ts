@@ -241,11 +241,28 @@ export function asInventoryProductRows(
 ): InventoryProductImportRow[] {
   return rawRows.map((raw, index) => {
     const mapped = mapRow(raw, mapping);
+    const name = (mapped.name ?? '').trim();
+    const sku = (mapped.sku ?? '').trim();
+    const explicitId = (mapped.external_product_id ?? '').trim();
+    // Catalog CSVs often only have Código + Descripción — derive a stable external id.
+    const externalProductId =
+      explicitId ||
+      sku ||
+      (name
+        ? `NAME-${name
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase()
+            .replace(/[^A-Z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .slice(0, 60)}`
+        : '') ||
+      `ROW-${index + 2}`;
     return {
       rowNumber: index + 2,
-      externalProductId: mapped.external_product_id ?? '',
-      name: mapped.name ?? '',
-      sku: mapped.sku || null,
+      externalProductId,
+      name,
+      sku: sku || explicitId || null,
       category: mapped.category || null,
       unit: mapped.unit || null,
       quantity: mapped.quantity || null,
