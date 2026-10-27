@@ -179,7 +179,7 @@ export function InventoryProductDetail({
               <CardTitle>Datos del producto</CardTitle>
             </CardHeader>
             <CardContent>
-              <form action={updateFormAction} className="grid max-w-3xl gap-4">
+              <form action={updateFormAction} onReset={(event) => event.preventDefault()} className="grid max-w-3xl gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Nombre *</Label>
                   <Input id="name" name="name" required defaultValue={product.name} />

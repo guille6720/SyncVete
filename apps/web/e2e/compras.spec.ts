@@ -68,6 +68,9 @@ test('CRUD through browser: parties, category, USD vaccine, sale catalog and rep
   await page.getByLabel('Nombre *', { exact: true }).fill(`QA Séxtuple editada ${qa.run}`);
   await page.getByRole('button', { name: 'Guardar', exact: true }).click();
   await expect(page.getByText('Producto actualizado.')).toBeVisible();
+  await expect(page.getByLabel('Categoría', { exact: true })).toHaveValue('vacuna');
+  await expect(page.getByLabel('Moneda del costo')).toHaveValue('USD');
+  await expect(page.getByLabel('Nombre *', { exact: true })).toHaveValue(`QA Séxtuple editada ${qa.run}`);
   await page.screenshot({ path: '../../test-results/compras-producto-desktop.png', fullPage: true });
   await page.getByRole('button', { name: 'Eliminar', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Eliminar', exact: true }).click();

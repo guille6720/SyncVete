@@ -282,7 +282,7 @@ export async function createInventoryProduct(
       catalogCategoryId: formData.get('catalogCategoryId'),
       manufacturer: formData.get('manufacturer'),
       notes: formData.get('notes'),
-      branchId: formData.get('branchId'),
+      branchId: formData.get('branchId') || undefined,
       isActive: formData.get('isActive') !== 'false',
     });
 
@@ -383,7 +383,7 @@ export async function updateInventoryProduct(
       catalogCategoryId: formData.get('catalogCategoryId'),
       manufacturer: formData.get('manufacturer'),
       notes: formData.get('notes'),
-      branchId: formData.get('branchId'),
+      branchId: formData.get('branchId') || undefined,
       isActive: formData.get('isActive') === 'on' || formData.get('isActive') === 'true',
     });
 
