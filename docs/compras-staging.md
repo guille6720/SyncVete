@@ -68,7 +68,7 @@ npx playwright test --config playwright.compras.config.ts
 
 La configuración permite únicamente localhost y dominios preview `sync-vete-staging-*.vercel.app`, usa Chrome instalado y desactiva trazas para no guardar credenciales de inicio de sesión. No ejecutar estas pruebas en producción. Al finalizar, ejecutar `test-results/cleanup-compras-qa.sql`: retira las cuentas y archiva las organizaciones de prueba, conservando los registros de auditoría.
 
-## Resultados comprobados
+## Verificación inicial del catálogo
 
 Fecha: 27 de octubre de 2026. Rama: `codex/compras-functional-staging`. Código de aplicación: `919f3cb8f695aabdd856cec57a23a2b7a395664a`.
 
@@ -95,3 +95,21 @@ El conector de Supabase rechazó las escrituras con `Invalid or expired requestS
 Preview verificado: https://sync-vete-staging-bun3qfkbz-guillermo-c-bmw.vercel.app/compras (`dpl_9GLWgpjRua9xh6Kicgk5ffj5gmnd`, estado READY, commit `919f3cb`). La corrida remota comprobó también que el contenido móvil estaba cargado y no desbordaba horizontalmente a 390 píxeles.
 
 Los resultados JSON y capturas quedan en `test-results/` local, ignorado por Git. Las cuentas descartables se retiran al finalizar. No se publicaron contraseñas ni archivos de sesión. No se integró la rama a producción ni se aplicaron cambios a la base productiva.
+
+## Adaptación a la maqueta adjunta
+
+Código de aplicación: `076848894ffc30aa5d0a744707b4e0f008a54a9b`. La ruta `/compras` muestra conjuntamente prestadores/proveedores, productos y vacunas, con la calculadora y el catálogo de venta a la derecha. El historial de recepción y anulación sigue disponible en `/compras?seccion=historial`.
+
+Las tablas tienen búsquedas y paginaciones independientes que consultan el servidor; no se filtra solamente la página cargada. Los productos admiten categorías generales o propias y proveedor; las vacunas solo ofrecen sus proveedores específicos. Los botones de limpieza restablecen sus filtros sin afectar las otras tablas.
+
+Cada fila permite guardar costo, moneda y porcentaje con validación en servidor y cálculo definitivo en la base. La calculadora lateral es una simulación y no modifica productos; para persistir valores se utiliza el botón de guardar de la fila o el formulario del producto. El ejemplo de la maqueta, ARS 12.500 con 30%, produce ARS 16.250.
+
+Se añadió CUIT opcional a proveedores/prestadores y su formulario, normalizando guiones y validando el formato de once dígitos, sin una verificación tributaria externa. Se mantienen las bajas lógicas y los controles de organización y permisos. Los usuarios lectores ven el detalle del proveedor sin formularios de edición.
+
+Se conserva la marca, el menú general y los datos reales de SyncVete. Los iconos de producto sustituyen las fotos de ejemplo cuando no hay fotografías disponibles. En pantallas pequeñas los paneles se apilan y cada tabla desplaza sus columnas dentro de su propio contenedor.
+
+Comprobaciones específicas: 35/35 aprobadas (18 de base, 8 de acciones, 9 compartidas). Tipos aprobados y lint sin errores; persisten las tres advertencias previas de agenda. Suites generales: web 161 aprobadas y 1 fallo previo; shared 491 aprobadas y 1 fallo previo. Son los mismos dos fallos reproducidos en el código base, no fallos nuevos del rediseño.
+
+Preview final verificado: https://sync-vete-staging-g8bxlxx85-guillermo-c-bmw.vercel.app/compras, despliegue `dpl_9xjRBBye5PpwTVyZuJYftoG8wfcd`, estado READY, código `0768488`.
+
+La corrida final remota aprobó 7/7 recorridos en 1,4 minutos, sin reintentos ni pruebas omitidas: CRUD, aislamiento por veterinaria, rol lector, recepción/anulación, edición repetida, maqueta con calculadora/CUIT/guardado en filas y vista móvil sin desborde horizontal. La última corrida local completa obtuvo 6/7 por una demora de recompilación durante el recorrido de bajas; los siete recorridos aprobaron posteriormente sobre la compilación remota estable. Las capturas finales son `test-results/compras-maqueta-desktop.png` y `test-results/compras-maqueta-mobile.png`.
