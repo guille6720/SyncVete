@@ -112,6 +112,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'patients:write',
     'appointments:read',
     'appointments:write',
+    'professionals:read',
     'clinical:read',
     'clinical:write',
     'inventory:read',

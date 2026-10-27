@@ -7,6 +7,10 @@ import {
   listProfessionalsWithSummary,
 } from '@/actions/professionals';
 import { getOrganization } from '@/actions/settings';
+import {
+  canReadProfessionalCompensation,
+  canReadProfessionalSettlements,
+} from '@/actions/professional-settlements';
 import { getSeatUsageMeters } from '@/lib/entitlements';
 import { getSessionContext } from '@/actions/auth';
 import { ProfessionalsList } from '@/components/professionals/professionals-list';
@@ -18,12 +22,15 @@ export default async function ProfesionalesPage() {
   if (!canRead) redirect('/dashboard');
 
   const session = await getSessionContext();
-  const [professionals, canWrite, seats, organization] = await Promise.all([
-    listProfessionalsWithSummary(),
-    canWriteProfessionals(),
-    session ? getSeatUsageMeters(session.organizationId).catch(() => []) : Promise.resolve([]),
-    getOrganization(),
-  ]);
+  const [professionals, canWrite, seats, organization, canReadCompensation, canReadSettlements] =
+    await Promise.all([
+      listProfessionalsWithSummary(),
+      canWriteProfessionals(),
+      session ? getSeatUsageMeters(session.organizationId).catch(() => []) : Promise.resolve([]),
+      getOrganization(),
+      canReadProfessionalCompensation(),
+      canReadProfessionalSettlements(),
+    ]);
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
   const professionalsSeat = seats.find((meter) => meter.featureKey === 'professionals.max');
@@ -58,7 +65,12 @@ export default async function ProfesionalesPage() {
         )}
       </div>
 
-      <ProfessionalsList professionals={professionals} currency={currency} />
+      <ProfessionalsList
+        professionals={professionals}
+        currency={currency}
+        canReadCompensation={canReadCompensation}
+        canReadSettlements={canReadSettlements}
+      />
     </div>
   );
 }

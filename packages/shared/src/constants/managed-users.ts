@@ -90,7 +90,7 @@ export const PERMISSION_MATRIX: PermissionMatrixModule[] = [
     id: 'professionals',
     label: 'Profesionales',
     actions: [
-      { permission: 'professionals:read', label: 'Ver' },
+      { permission: 'professionals:read', label: 'Ver profesionales y sus agendas' },
       { permission: 'professionals:write', label: 'Gestionar' },
       { permission: 'professional_compensation:read', label: 'Ver compensación' },
       { permission: 'professional_compensation:write', label: 'Gestionar compensación' },

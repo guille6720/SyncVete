@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -21,6 +21,16 @@ const MIGRATION = resolve(
   __dirname,
   '../../../../supabase/migrations/20261014120000_central_admin_managed_users.sql'
 );
+const migrationsDir = resolve(__dirname, '../../../../supabase/migrations');
+const agendaRoleSql = readFileSync(
+  resolve(
+    migrationsDir,
+    readdirSync(migrationsDir).find((name) =>
+      name.endsWith('_veterinarian_professional_agendas.sql')
+    )!
+  ),
+  'utf8'
+);
 
 function sqlArray(source: string, marker: string): string[] {
   const start = source.indexOf(marker);
@@ -31,6 +41,28 @@ function sqlArray(source: string, marker: string): string[] {
 }
 
 describe('getPermissionsForRole with restrictions', () => {
+  it('lets veterinarians consult colleagues and agendas without managing staff or finances', () => {
+    const permissions = getPermissionsForRole('veterinarian');
+    expect(permissions).toContain('appointments:read');
+    expect(permissions).toContain('professionals:read');
+    for (const permission of [
+      'professionals:write',
+      'professional_compensation:read',
+      'professional_compensation:write',
+      'professional_settlements:read',
+      'professional_settlements:approve',
+      'professional_settlements:pay',
+      'users:manage',
+    ]) {
+      expect(permissions).not.toContain(permission);
+    }
+    expect(getPermissionsForRole('veterinarian', null, ['professionals:read'])).not.toContain(
+      'professionals:read'
+    );
+    expect(getPermissionsForRole('veterinarian', ['appointments:read'])).not.toContain(
+      'professionals:read'
+    );
+  });
   it('removes denied permissions and never adds new ones', () => {
     const base = getPermissionsForRole('receptionist');
     const restricted = getPermissionsForRole('receptionist', null, ['whatsapp:send', 'audit:read']);
@@ -79,11 +111,14 @@ describe('SQL / TypeScript permission parity', () => {
     expect(catalog).toEqual([...PERMISSIONS].sort());
   });
 
-  it.each(ROLES.filter((r) => r !== 'owner'))('role_permissions(%s) matches ROLE_PERMISSIONS', (role) => {
-    const block = sql.slice(sql.indexOf('FUNCTION public.role_permissions('));
-    const sqlPerms = sqlArray(block, `WHEN '${role}'`);
-    expect(sqlPerms).toEqual([...ROLE_PERMISSIONS[role as Role]].sort());
-  });
+  it.each(ROLES.filter((r) => r !== 'owner'))(
+    'role_permissions(%s) matches ROLE_PERMISSIONS',
+    (role) => {
+      const block = agendaRoleSql.slice(agendaRoleSql.indexOf('FUNCTION public.role_permissions('));
+      const sqlPerms = sqlArray(block, `WHEN '${role}'`);
+      expect(sqlPerms).toEqual([...ROLE_PERMISSIONS[role as Role]].sort());
+    }
+  );
 
   it('owner holds the full catalog', () => {
     expect([...ROLE_PERMISSIONS.owner].sort()).toEqual([...PERMISSIONS].sort());
@@ -124,7 +159,9 @@ describe('managedUserErrorMessage', () => {
   });
 
   it('maps escalation and protection errors', () => {
-    expect(managedUserErrorMessage('CANNOT_GRANT_PERMISSION:billing:write')).toContain('billing:write');
+    expect(managedUserErrorMessage('CANNOT_GRANT_PERMISSION:billing:write')).toContain(
+      'billing:write'
+    );
     expect(managedUserErrorMessage('SELF_MODIFICATION_NOT_ALLOWED')).toMatch(/propio/);
     expect(managedUserErrorMessage('LAST_CENTRAL_ADMIN')).toMatch(/al menos un administrador/);
     expect(managedUserErrorMessage('PERMISSION_DENIED:appointments:cancel')).toContain(
@@ -141,7 +178,12 @@ describe('managedUserErrorMessage', () => {
 describe('activity helpers', () => {
   it('describes status changes and managed-user events', () => {
     expect(
-      describeActivity({ action: 'update', entityType: 'appointments', statusFrom: 'programada', statusTo: 'cancelada' })
+      describeActivity({
+        action: 'update',
+        entityType: 'appointments',
+        statusFrom: 'programada',
+        statusTo: 'cancelada',
+      })
     ).toBe('Canceló/anuló turno');
     expect(describeActivity({ action: 'permissions_updated', entityType: 'user' })).toBe(
       'Actualizó permisos'
