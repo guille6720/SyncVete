@@ -31,6 +31,7 @@ import {
   Briefcase,
   GraduationCap,
   ShoppingCart,
+  Upload,
   Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -91,6 +92,7 @@ const NAV_ITEMS = [
     icon: GraduationCap,
     keywords: 'tutorial tutoriales aprendizaje guia onboarding academia',
   },
+  { label: 'Importar datos', href: '/importar', icon: Upload, keywords: 'importar csv excel pdf tutores pacientes productos' },
   { label: 'Configuración', href: '/configuracion', icon: Settings, keywords: 'ajustes settings' },
   { label: 'Manual de uso', href: '/manual', icon: BookOpen, keywords: 'ayuda guia descargar pdf instrucciones' },
 ] as const;

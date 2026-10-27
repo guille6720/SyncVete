@@ -27,6 +27,7 @@ import {
   Sparkles,
   Stethoscope,
   Syringe,
+  Upload,
   UserCog,
   Users,
   Wallet,
@@ -105,6 +106,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
     requiresPermission: 'users:manage',
   },
 
+  { label: 'Importar datos', href: '/importar', icon: Upload, groupId: 'settings' },
   { label: 'Tutoriales', href: '/academia', icon: GraduationCap, groupId: 'settings', requiresAcademia: true },
   { label: 'Configuración', href: '/configuracion', icon: Settings, groupId: 'settings' },
 ];

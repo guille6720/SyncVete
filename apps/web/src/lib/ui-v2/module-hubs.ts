@@ -62,6 +62,7 @@ export const MODULE_ITEM_BLURB: Record<string, string> = {
   '/notificaciones': 'Bandeja interna',
   '/academia': 'Tutoriales guiados',
   '/configuracion': 'Ajustes de la clínica',
+  '/importar': 'Tutores, pacientes, historias o productos',
   '/usuarios': 'Invitaciones, roles y permisos por módulo',
 };
 

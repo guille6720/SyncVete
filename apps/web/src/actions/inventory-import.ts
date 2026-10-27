@@ -16,6 +16,8 @@ import {
   createImportBatch,
   dryRunImport,
 } from '@/lib/data-migration/import';
+import { pdfBufferToCsv } from '@/lib/data-migration/pdf';
+import { workbookFirstSheetToCsv } from '@/lib/data-migration/xlsx';
 import { createServerClient } from '@/lib/supabase/server';
 import {
   PermissionError,
@@ -70,6 +72,51 @@ export async function downloadInventoryProductTemplateAction(): Promise<
       data: {
         filename: 'SyncVete-Inventory-Template.csv',
         csv: buildInventoryProductTemplateCsv(),
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function convertInventoryPdfToCsvAction(formData: FormData): Promise<
+  ActionResult<{ csv: string; filename: string }>
+> {
+  try {
+    await requireProductImportAccess();
+    const base64 = String(formData.get('fileBase64') ?? '');
+    const filename = String(formData.get('filename') ?? 'productos.pdf');
+    if (!base64) return { success: false, error: 'Archivo vacío' };
+    const csv = await pdfBufferToCsv(Buffer.from(base64, 'base64'));
+    return {
+      success: true,
+      data: {
+        csv,
+        filename: filename.replace(/\.pdf$/i, '.csv'),
+      },
+    };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function convertInventorySpreadsheetToCsvAction(formData: FormData): Promise<
+  ActionResult<{ csv: string; filename: string }>
+> {
+  try {
+    await requireProductImportAccess();
+    const base64 = String(formData.get('fileBase64') ?? '');
+    const filename = String(formData.get('filename') ?? 'productos.xlsx');
+    if (!base64) return { success: false, error: 'Archivo vacío' };
+    const buffer = Buffer.from(base64, 'base64');
+    const csv = workbookFirstSheetToCsv(
+      buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+    );
+    return {
+      success: true,
+      data: {
+        csv,
+        filename: filename.replace(/\.(xlsx|xls)$/i, '.csv'),
       },
     };
   } catch (error) {

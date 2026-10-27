@@ -5,15 +5,14 @@ import { getPlanBillingState, cancelClinicCheckoutIntents } from '@/actions/plan
 import { getSeatUsageMeters } from '@/lib/entitlements';
 import { SettingsPageClient } from '@/components/settings/settings-page-client';
 import type { SettingsTab } from '@/components/settings/settings-tabs';
-import { hasPermission } from '@sincvete/shared';
+import { hasPermission, IMPORT_TYPES, type ImportType, type SeatUsageMeter } from '@sincvete/shared';
 import { canPermissionAndFeature } from '@/lib/permissions';
 import { FEATURES } from '@/lib/entitlements';
-import type { SeatUsageMeter } from '@sincvete/shared';
 import { getOwnerAppBrand } from '@/actions/owner-app';
 import { ownerAppEnabled, parseOwnerAppBrand } from '@/lib/owner-app';
 
 interface PageProps {
-  searchParams: Promise<{ tab?: string; checkout?: string }>;
+  searchParams: Promise<{ tab?: string; checkout?: string; import?: string }>;
 }
 
 export default async function ConfiguracionPage({ searchParams }: PageProps) {
@@ -39,6 +38,11 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
       : availableTabs.includes('clinica')
         ? 'clinica'
         : availableTabs[0];
+
+  const importParam = params.import?.trim() ?? '';
+  const initialImportType: ImportType = (IMPORT_TYPES as readonly string[]).includes(importParam)
+    ? (importParam as ImportType)
+    : 'owners';
 
   let clinicData;
   let planBilling;
@@ -99,6 +103,7 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
       }
       availableTabs={availableTabs}
       defaultTab={defaultTab}
+      initialImportType={initialImportType}
       canImportData={canImportData}
       canExportData={canExportData}
       clinic={clinicData}

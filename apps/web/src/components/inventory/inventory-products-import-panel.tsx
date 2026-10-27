@@ -14,10 +14,11 @@ import {
 import {
   analyzeInventoryProductImport,
   commitInventoryProductImport,
+  convertInventoryPdfToCsvAction,
+  convertInventorySpreadsheetToCsvAction,
   downloadInventoryProductTemplateAction,
   validateInventoryProductImport,
 } from '@/actions/inventory-import';
-import { convertSpreadsheetToCsvAction } from '@/actions/data-migration';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -109,7 +110,7 @@ export function InventoryProductsImportPanel({
       const form = new FormData();
       form.set('fileBase64', await fileToBase64(file));
       form.set('filename', file.name);
-      const result = await run(() => convertSpreadsheetToCsvAction(form));
+      const result = await run(() => convertInventorySpreadsheetToCsvAction(form));
       if (!result?.success || !result.data) {
         setMessage(result?.error ?? 'No se pudo leer el Excel');
         return;
@@ -117,6 +118,21 @@ export function InventoryProductsImportPanel({
       setCsvText(result.data.csv);
       setSourceFilename(result.data.filename);
       setMessage('Excel convertido a CSV (primera hoja)');
+      return;
+    }
+
+    if (lower.endsWith('.pdf')) {
+      const form = new FormData();
+      form.set('fileBase64', await fileToBase64(file));
+      form.set('filename', file.name);
+      const result = await run(() => convertInventoryPdfToCsvAction(form));
+      if (!result?.success || !result.data) {
+        setMessage(result?.error ?? 'No se pudo leer el PDF');
+        return;
+      }
+      setCsvText(result.data.csv);
+      setSourceFilename(result.data.filename);
+      setMessage('PDF convertido a tabla (texto extraíble)');
       return;
     }
 
@@ -254,14 +270,17 @@ export function InventoryProductsImportPanel({
         <CardHeader>
           <CardTitle>Importar productos de inventario</CardTitle>
           <CardDescription>
-            Solo catálogo de productos (no tutores ni pacientes). CSV/Excel con coma o punto y coma.
-            Código/Descripción se mapean solos.
+            Catálogo de productos únicamente. Acepta CSV, Excel o PDF con tabla de texto.
+            Tutores/pacientes/historias van en{' '}
+            <Link href="/importar" className="underline underline-offset-2">
+              Importar datos
+            </Link>
+            .
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <p className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-100">
-            Tipo fijo: <strong>Productos de inventario</strong>. No uses Configuración → Importar
-            tutores para este archivo.
+            Tipo fijo: <strong>Productos de inventario</strong>
           </p>
 
           {(message || progressLabel || importReport) && (
@@ -324,11 +343,11 @@ export function InventoryProductsImportPanel({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="productFile">Archivo CSV / Excel</Label>
+            <Label htmlFor="productFile">Archivo CSV / Excel / PDF</Label>
             <Input
               id="productFile"
               type="file"
-              accept=".csv,text/csv,.xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+              accept=".csv,text/csv,.xlsx,.xls,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
               onChange={(e) => void onFileSelected(e.target.files?.[0] ?? null)}
             />
             {csvText && (

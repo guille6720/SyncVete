@@ -15,6 +15,7 @@ import type { OwnerAppBrand } from '@/lib/owner-app';
 import type { PlanBillingState } from '@/actions/plan-billing';
 import type {
   Branch,
+  ImportType,
   OrganizationSettings,
   PaginatedResult,
   SeatUsageMeter,
@@ -24,6 +25,7 @@ interface SettingsPageClientProps {
   ownerApp?: { brand: OwnerAppBrand; branchId: string | null };
   availableTabs: SettingsTab[];
   defaultTab: SettingsTab;
+  initialImportType?: ImportType;
   canImportData?: boolean;
   canExportData?: boolean;
   clinic?: {
@@ -41,6 +43,7 @@ export function SettingsPageClient({
   ownerApp,
   availableTabs,
   defaultTab,
+  initialImportType = 'owners',
   canImportData = false,
   canExportData = false,
   clinic,
@@ -87,7 +90,11 @@ export function SettingsPageClient({
 
       {activeTab === 'roles' && <RolesPanel />}
       {activeTab === 'import-export' && (canImportData || canExportData) ? (
-        <DataMigrationPanel canImport={canImportData} canExport={canExportData} />
+        <DataMigrationPanel
+          canImport={canImportData}
+          canExport={canExportData}
+          initialImportType={initialImportType}
+        />
       ) : null}
       {activeTab === 'legal' && <SettingsLegalPanel />}
       {activeTab === 'guia-superadmin' && availableTabs.includes('guia-superadmin') ? (
