@@ -2,12 +2,16 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Suspense } from 'react';
 import { Package, Plus, ShoppingCart, Upload } from 'lucide-react';
+import { canManagePurchases, canReadPurchases, listInventoryPurchases } from '@/actions/purchases';
 import {
-  canManagePurchases,
-  canReadPurchases,
-  listInventoryPurchases,
-} from '@/actions/purchases';
-import { listCatalogProducts, listPurchaseParties } from '@/actions/purchase-catalog';
+  listCatalogProducts,
+  listPurchaseParties,
+  listPurchaseCategories,
+  listPurchasePartyOptions,
+  getPurchaseExchangeRate,
+} from '@/actions/purchase-catalog';
+import { CategoryManager, ExchangeRateForm } from '@/components/purchases/catalog-management';
+import { ComprasWorkspaceView } from '@/components/purchases/compras-workspace-view';
 import { listLowStock } from '@/actions/inventory';
 import { getSessionContext } from '@/actions/auth';
 import { getUserBranches } from '@/actions/settings';
@@ -20,6 +24,7 @@ import {
   PartyList,
   ProductCategoryNav,
   SalePriceList,
+  CatalogFilters,
 } from '@/components/purchases/compras-catalog';
 import { Button } from '@/components/ui/button';
 import { canPermissionAndFeature } from '@/lib/permissions';
@@ -44,6 +49,20 @@ interface ComprasPageProps {
     categoria?: string;
     pagina?: string;
     paginaPartes?: string;
+    grupo?: string;
+    proveedor?: string;
+    partesBuscar?: string;
+    partesPagina?: string;
+    tipo?: string;
+    productosBuscar?: string;
+    productosPagina?: string;
+    productoCategoria?: string;
+    productoProveedor?: string;
+    vacunasBuscar?: string;
+    vacunasPagina?: string;
+    vacunaProveedor?: string;
+    preciosBuscar?: string;
+    preciosPagina?: string;
   }>;
 }
 
@@ -65,32 +84,54 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
     ? (statusParam as InventoryPurchaseStatus)
     : undefined;
   const categoryParam = params.categoria?.trim() ?? '';
-  const category = INVENTORY_PRODUCT_CATEGORIES.includes(categoryParam as InventoryProductCategory)
-    && categoryParam !== 'vacuna'
-    ? (categoryParam as InventoryProductCategory)
-    : undefined;
+  const category =
+    INVENTORY_PRODUCT_CATEGORIES.includes(categoryParam as InventoryProductCategory) &&
+    categoryParam !== 'vacuna'
+      ? (categoryParam as InventoryProductCategory)
+      : undefined;
 
-  const [canWrite, canImport, session, branches] = await Promise.all([
-    canManagePurchases(),
-    canPermissionAndFeature('data:import', FEATURES.DATA_IMPORT_EXPORT),
-    getSessionContext(),
-    getUserBranches(),
-  ]);
+  const [canWrite, canImport, session, branches, categories, supplierOptions, exchangeRate] =
+    await Promise.all([
+      canManagePurchases(),
+      canPermissionAndFeature('data:import', FEATURES.DATA_IMPORT_EXPORT),
+      getSessionContext(),
+      getUserBranches(),
+      listPurchaseCategories(),
+      listPurchasePartyOptions(),
+      getPurchaseExchangeRate(),
+    ]);
 
+  if (section === 'compras')
+    return (
+      <Suspense
+        fallback={<p className="text-sm text-muted-foreground">Cargando el panel de compras…</p>}
+      >
+        <ComprasWorkspaceView
+          query={params}
+          categories={categories}
+          suppliers={supplierOptions}
+          exchangeRate={exchangeRate}
+          canWrite={canWrite}
+        />
+      </Suspense>
+    );
   const branchName = branches.find((branch) => branch.id === session?.branchId)?.name ?? null;
   const descriptions: Record<ComprasSection, string> = {
     compras: 'Adquirí productos y actualizá el stock',
+    historial: 'Adquirí productos y consultá tus compras recibidas o anuladas',
     proveedores: 'Proveedores de productos',
     prestadores: 'Prestadores de servicios',
     productos: 'Productos separados por categoría',
+    categorias: 'Organizá los productos con categorías propias de tu veterinaria',
     vacunas: 'Vacunas y sus proveedores',
     precios: 'Valores de venta calculados con el costo y el % de ganancia',
   };
 
-  const showParties = section === 'proveedores' || section === 'prestadores' || section === 'vacunas';
+  const showParties =
+    section === 'proveedores' || section === 'prestadores' || section === 'vacunas';
   const showProducts = section === 'productos' || section === 'vacunas' || section === 'precios';
   const [purchases, lowStockItems, parties, products] = await Promise.all([
-    section === 'compras'
+    section === 'historial'
       ? listInventoryPurchases({
           page,
           pageSize: 25,
@@ -98,7 +139,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
           status,
         })
       : Promise.resolve(null),
-    section === 'compras' ? listLowStock() : Promise.resolve([]),
+    section === 'historial' ? listLowStock() : Promise.resolve([]),
     showParties
       ? listPurchaseParties({
           page: partyPage,
@@ -113,9 +154,16 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
           page: productPage,
           pageSize: 25,
           search: buscar || undefined,
-        category: section === 'vacunas' ? 'vacuna' : section === 'productos' ? category : undefined,
-        excludeCategory: section === 'productos' && !category ? 'vacuna' : undefined,
-        pricedOnly: section === 'precios',
+          category:
+            section === 'vacunas' ? 'vacuna' : section === 'productos' ? category : undefined,
+          excludeCategory: section === 'productos' && !category ? 'vacuna' : undefined,
+          pricedOnly: section === 'precios',
+          catalogCategoryId: categories.some((item) => item.id === params.grupo)
+            ? params.grupo
+            : undefined,
+          supplierId: supplierOptions.some((item) => item.id === params.proveedor)
+            ? params.proveedor
+            : undefined,
         })
       : Promise.resolve(null),
   ]);
@@ -139,7 +187,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
             {branchName ? ` · ${branchName}` : ''}
           </p>
         </div>
-        {section === 'compras' ? (
+        {section === 'historial' ? (
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" asChild>
               <Link href="/inventario">
@@ -168,15 +216,29 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
       </div>
 
       <ComprasSectionNav active={section} />
+      {section === 'categorias' && <CategoryManager categories={categories} canWrite={canWrite} />}
+      {showProducts && (
+        <Suspense fallback={null}>
+          <CatalogFilters
+            categories={categories.filter(
+              (item) => section !== 'vacunas' || item.base_category === 'vacuna'
+            )}
+            suppliers={supplierOptions.filter(
+              (item) =>
+                item.kind === 'proveedor' && (section !== 'vacunas' || item.scope === 'vacunas')
+            )}
+          />
+        </Suspense>
+      )}
 
-      {section === 'compras' && purchases ? (
+      {section === 'historial' && purchases ? (
         <>
           <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">
             <div className="flex items-start gap-2">
               <ShoppingCart className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                Al recibir una compra se genera una entrada de stock por cada producto. El stock bajo
-                aparece abajo para reponer rápido.
+                Al recibir una compra se genera una entrada de stock por cada producto. El stock
+                bajo aparece abajo para reponer rápido.
               </p>
             </div>
           </div>
@@ -187,7 +249,9 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
             createHref="/compras/nueva"
             createLabel="Nueva compra"
           />
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando compras…</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">Cargando compras…</div>}
+          >
             <PurchasesList
               data={purchases}
               initialSearch={search}
@@ -202,7 +266,10 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Suspense fallback={null}>
-              <CatalogSearch initialSearch={buscar} placeholder="Buscar proveedor, teléfono o email..." />
+              <CatalogSearch
+                initialSearch={buscar}
+                placeholder="Buscar proveedor, teléfono o email..."
+              />
             </Suspense>
             {canWrite && (
               <Button asChild>
@@ -213,7 +280,9 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
               </Button>
             )}
           </div>
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando proveedores…</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">Cargando proveedores…</div>}
+          >
             <PartyList data={parties} emptyLabel="No hay proveedores con esa búsqueda." />
           </Suspense>
         </section>
@@ -223,7 +292,10 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
         <section className="space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Suspense fallback={null}>
-              <CatalogSearch initialSearch={buscar} placeholder="Buscar prestador, teléfono o email..." />
+              <CatalogSearch
+                initialSearch={buscar}
+                placeholder="Buscar prestador, teléfono o email..."
+              />
             </Suspense>
             {canWrite && (
               <Button asChild>
@@ -234,7 +306,9 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
               </Button>
             )}
           </div>
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando prestadores…</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">Cargando prestadores…</div>}
+          >
             <PartyList data={parties} emptyLabel="No hay prestadores con esa búsqueda." />
           </Suspense>
         </section>
@@ -245,7 +319,10 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
           <ProductCategoryNav active={category ?? ''} />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Suspense fallback={null}>
-              <CatalogSearch initialSearch={buscar} placeholder="Buscar producto, SKU o fabricante..." />
+              <CatalogSearch
+                initialSearch={buscar}
+                placeholder="Buscar producto, SKU o fabricante..."
+              />
             </Suspense>
             {canWrite && (
               <Button asChild>
@@ -256,11 +333,10 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
               </Button>
             )}
           </div>
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando productos…</div>}>
-            <CatalogProductList
-              data={products}
-              emptyLabel="No hay productos en esta categoría."
-            />
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">Cargando productos…</div>}
+          >
+            <CatalogProductList data={products} emptyLabel="No hay productos en esta categoría." />
           </Suspense>
         </section>
       ) : null}
@@ -269,10 +345,7 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
         <section className="space-y-8">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Suspense fallback={null}>
-              <CatalogSearch
-                initialSearch={buscar}
-                placeholder="Buscar vacuna o proveedor..."
-              />
+              <CatalogSearch initialSearch={buscar} placeholder="Buscar vacuna o proveedor..." />
             </Suspense>
             {canWrite && (
               <div className="flex flex-wrap gap-2">
@@ -293,14 +366,21 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
           </div>
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Vacunas</h2>
-            <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando vacunas…</div>}>
+            <Suspense
+              fallback={<div className="text-sm text-muted-foreground">Cargando vacunas…</div>}
+            >
               <CatalogProductList data={products} emptyLabel="No hay vacunas con esa búsqueda." />
             </Suspense>
           </div>
           <div className="space-y-3">
             <h2 className="text-lg font-semibold">Proveedores de vacunas</h2>
-            <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando proveedores…</div>}>
-              <PartyList data={parties} emptyLabel="No hay proveedores de vacunas con esa búsqueda." />
+            <Suspense
+              fallback={<div className="text-sm text-muted-foreground">Cargando proveedores…</div>}
+            >
+              <PartyList
+                data={parties}
+                emptyLabel="No hay proveedores de vacunas con esa búsqueda."
+              />
             </Suspense>
           </div>
         </section>
@@ -308,10 +388,16 @@ export default async function ComprasPage({ searchParams }: ComprasPageProps) {
 
       {section === 'precios' && products ? (
         <section className="space-y-4">
+          <ExchangeRateForm rate={exchangeRate} canWrite={canWrite} />
           <Suspense fallback={null}>
-            <CatalogSearch initialSearch={buscar} placeholder="Buscar producto para ver su precio de venta..." />
+            <CatalogSearch
+              initialSearch={buscar}
+              placeholder="Buscar producto para ver su precio de venta..."
+            />
           </Suspense>
-          <Suspense fallback={<div className="text-sm text-muted-foreground">Cargando precios…</div>}>
+          <Suspense
+            fallback={<div className="text-sm text-muted-foreground">Cargando precios…</div>}
+          >
             <SalePriceList data={products} />
           </Suspense>
         </section>

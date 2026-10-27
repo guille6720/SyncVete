@@ -256,6 +256,36 @@ export type NotificationKind =
 export interface Database {
   public: {
     Tables: {
+      purchase_categories: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          base_category: InventoryProductCategory;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          name: string;
+          base_category: InventoryProductCategory;
+          deleted_at?: string | null;
+        };
+        Update: {
+          name?: string;
+          base_category?: InventoryProductCategory;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      purchase_pricing_settings: {
+        Row: { organization_id: string; usd_ars: number; updated_at: string };
+        Insert: { organization_id: string; usd_ars: number };
+        Update: { usd_ars?: number };
+        Relationships: [];
+      };
       organizations: {
         Row: {
           id: string;
@@ -3834,6 +3864,7 @@ export interface Database {
           cost_currency: ProductCurrency;
           margin_percent: number | null;
           supplier_party_id: string | null;
+          catalog_category_id: string | null;
           manufacturer: string | null;
           notes: string | null;
           is_active: boolean;
@@ -3861,6 +3892,7 @@ export interface Database {
           cost_currency?: ProductCurrency;
           margin_percent?: number | null;
           supplier_party_id?: string | null;
+          catalog_category_id?: string | null;
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
@@ -3888,6 +3920,7 @@ export interface Database {
           cost_currency?: ProductCurrency;
           margin_percent?: number | null;
           supplier_party_id?: string | null;
+          catalog_category_id?: string | null;
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
@@ -3926,6 +3959,7 @@ export interface Database {
       };
       purchase_parties: {
         Row: {
+          cuit: string | null;
           id: string;
           organization_id: string;
           kind: PurchasePartyKind;
@@ -3941,6 +3975,7 @@ export interface Database {
           deleted_at: string | null;
         };
         Insert: {
+          cuit?: string | null;
           id?: string;
           organization_id: string;
           kind: PurchasePartyKind;
@@ -3956,6 +3991,7 @@ export interface Database {
           deleted_at?: string | null;
         };
         Update: {
+          cuit?: string | null;
           id?: string;
           organization_id?: string;
           kind?: PurchasePartyKind;

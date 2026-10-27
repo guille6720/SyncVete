@@ -8,7 +8,7 @@ import {
   PRODUCT_CURRENCIES,
   PRODUCT_CURRENCY_LABELS,
   formatProductAmount,
-  salePriceFromCost,
+  resolveProductSalePrice,
   type ProductCurrency,
 } from '@sincvete/shared';
 
@@ -17,6 +17,7 @@ interface ProductPricingFieldsProps {
   defaultPrice?: number | null;
   defaultCurrency?: ProductCurrency;
   defaultMargin?: number | null;
+  exchangeRate?: number | null;
 }
 
 export function ProductPricingFields({
@@ -24,6 +25,7 @@ export function ProductPricingFields({
   defaultPrice = null,
   defaultCurrency = 'ARS',
   defaultMargin = null,
+  exchangeRate = null,
 }: ProductPricingFieldsProps) {
   const [currency, setCurrency] = useState<ProductCurrency>(defaultCurrency);
   const [cost, setCost] = useState(defaultCost == null ? '' : String(defaultCost));
@@ -37,13 +39,18 @@ export function ProductPricingFields({
     marginNumber != null &&
     Number.isFinite(costNumber) &&
     Number.isFinite(marginNumber)
-      ? salePriceFromCost(costNumber, marginNumber)
+      ? resolveProductSalePrice({
+          unitCost: costNumber,
+          marginPercent: marginNumber,
+          costCurrency: currency,
+          exchangeRate,
+        })
       : null;
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <div className="space-y-2">
-        <Label htmlFor="costCurrency">Moneda</Label>
+        <Label htmlFor="costCurrency">Moneda del costo</Label>
         <Select
           id="costCurrency"
           name="costCurrency"
@@ -84,11 +91,15 @@ export function ProductPricingFields({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="unitPrice">Precio de venta</Label>
+        <Label htmlFor="unitPrice">Precio de venta (ARS)</Label>
         {computed != null ? (
           <>
-            <p className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm font-medium">
-              {formatProductAmount(computed, currency)}
+            <p
+              id="unitPrice"
+              role="status"
+              className="flex h-10 items-center rounded-md border bg-muted/40 px-3 text-sm font-medium"
+            >
+              {formatProductAmount(computed, 'ARS')}
             </p>
             <input type="hidden" name="unitPrice" value={computed} />
           </>
@@ -108,6 +119,13 @@ export function ProductPricingFields({
             ? 'Sale del costo más el porcentaje de ganancia.'
             : 'Si cargás un porcentaje, el precio de venta se calcula solo.'}
         </p>
+        {currency === 'USD' && (
+          <p className="text-xs text-muted-foreground">
+            {exchangeRate
+              ? `1 USD = ${formatProductAmount(exchangeRate)}. Ganancia sobre el costo convertido.`
+              : 'Configurá la cotización USD/ARS en Compras → Precios de venta antes de guardar.'}
+          </p>
+        )}
       </div>
     </div>
   );

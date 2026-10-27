@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { canManagePurchases } from '@/actions/purchases';
 import { listInventoryProducts } from '@/actions/inventory';
+import { getPurchaseExchangeRate } from '@/actions/purchase-catalog';
 import { getSessionContext } from '@/actions/auth';
 import { getUserBranches } from '@/actions/settings';
 import { PurchaseForm } from '@/components/purchases/purchase-form';
@@ -19,11 +20,12 @@ export default async function NuevaCompraPage({ searchParams }: NuevaCompraPageP
   const canWrite = await canManagePurchases();
   if (!canWrite) redirect('/compras');
 
-  const [params, session, branches, catalog] = await Promise.all([
+  const [params, session, branches, catalog, exchangeRate] = await Promise.all([
     searchParams,
     getSessionContext(),
     getUserBranches(),
     listInventoryProducts({ page: 1, pageSize: 100, activeOnly: true }),
+    getPurchaseExchangeRate(),
   ]);
 
   const listHref = resolveListHref('/compras', params.return);
@@ -39,6 +41,7 @@ export default async function NuevaCompraPage({ searchParams }: NuevaCompraPageP
       <PurchaseForm
         branches={branches}
         products={catalog.data}
+        exchangeRate={exchangeRate}
         defaultBranchId={session?.branchId}
         listHref={listHref}
       />

@@ -3,10 +3,22 @@
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { ChevronLeft, ChevronRight, Search } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Search,
+  Users,
+  Package,
+  Tags,
+  Syringe,
+  List,
+  ShoppingCart,
+  UserRound,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import {
   COMPRAS_SECTIONS,
@@ -19,19 +31,53 @@ import {
   type ComprasSection,
   type PaginatedResult,
   type PurchaseParty,
+  type PurchaseCategory,
 } from '@sincvete/shared';
 
 export function ComprasSectionNav({ active }: { active: ComprasSection }) {
+  const icons = {
+    compras: Users,
+    historial: ShoppingCart,
+    proveedores: Users,
+    prestadores: UserRound,
+    productos: Package,
+    categorias: Tags,
+    vacunas: Syringe,
+    precios: List,
+  };
+  const sections = COMPRAS_SECTIONS.filter(
+    (section) => section !== 'proveedores' && section !== 'prestadores'
+  );
   return (
-    <div className="flex flex-wrap gap-2">
-      {COMPRAS_SECTIONS.map((section) => (
-        <Button key={section} variant={section === active ? 'default' : 'outline'} asChild>
-          <Link href={section === 'compras' ? '/compras' : `/compras?seccion=${section}`}>
-            {COMPRAS_SECTION_LABELS[section]}
-          </Link>
-        </Button>
-      ))}
-    </div>
+    <nav
+      aria-label="Secciones de Compras"
+      className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6"
+    >
+      {sections.map((section) => {
+        const Icon = icons[section];
+        const selected =
+          section === active ||
+          (section === 'compras' && (active === 'proveedores' || active === 'prestadores'));
+        return (
+          <Button
+            className={`h-auto min-h-14 whitespace-normal border p-3 text-xs shadow-none ${selected ? 'border-primary bg-primary/10 text-primary hover:bg-primary/15' : 'bg-card'}`}
+            key={section}
+            variant="outline"
+            asChild
+          >
+            <Link
+              aria-current={selected ? 'page' : undefined}
+              href={section === 'compras' ? '/compras' : `/compras?seccion=${section}`}
+            >
+              <Icon className="h-6 w-6 shrink-0" />
+              {section === 'compras'
+                ? 'Prestadores / Proveedores'
+                : COMPRAS_SECTION_LABELS[section]}
+            </Link>
+          </Button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -89,6 +135,7 @@ export function CatalogSearch({
     <div className="relative max-w-md">
       <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
       <Input
+        aria-label={placeholder}
         placeholder={placeholder}
         value={search}
         onChange={(event) => setSearch(event.target.value)}
@@ -174,7 +221,8 @@ export function PartyList({
               {!party.is_active && <Badge variant="warning">Inactivo</Badge>}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {[party.contact_name, party.phone, party.email].filter(Boolean).join(' · ') || 'Sin contacto'}
+              {[party.contact_name, party.phone, party.email].filter(Boolean).join(' · ') ||
+                'Sin contacto'}
             </p>
           </Link>
         ))
@@ -211,13 +259,16 @@ function ProductRows({
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">{product.name}</p>
-                  <Badge variant="default">{INVENTORY_PRODUCT_CATEGORY_LABELS[product.category]}</Badge>
+                  <Badge variant="default">
+                    {INVENTORY_PRODUCT_CATEGORY_LABELS[product.category]}
+                  </Badge>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {[
                     product.sku ? `SKU ${product.sku}` : null,
                     product.manufacturer,
                     product.supplier_name,
+                    product.catalog_category_name,
                     `${Number(product.quantity).toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${INVENTORY_UNIT_LABELS[product.unit]}`,
                   ]
                     .filter(Boolean)
@@ -230,7 +281,7 @@ function ProductRows({
                   {product.margin_percent != null ? ` · ${product.margin_percent}%` : ''}
                 </p>
                 <p className={emphasizePrice ? 'text-base font-semibold' : 'font-medium'}>
-                  Venta {formatProductAmount(product.unit_price, product.cost_currency)}
+                  Venta {formatProductAmount(product.unit_price, 'ARS')}
                 </p>
               </div>
             </div>
@@ -259,5 +310,54 @@ export function SalePriceList({ data }: { data: PaginatedResult<CatalogProductRo
       emphasizePrice
       emptyLabel="Todavía no hay precios de venta. Cargá un costo y un % de ganancia en el producto."
     />
+  );
+}
+
+export function CatalogFilters({
+  categories,
+  suppliers,
+}: {
+  categories: PurchaseCategory[];
+  suppliers: Array<{ id: string; name: string }>;
+}) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const change = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set(key, value);
+    else params.delete(key);
+    params.delete('pagina');
+    router.push(`${pathname}?${params.toString()}`);
+  };
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Select
+        aria-label="Filtrar categoría personalizada"
+        className="max-w-xs"
+        value={searchParams.get('grupo') ?? ''}
+        onChange={(event) => change('grupo', event.target.value)}
+      >
+        <option value="">Todas las categorías personalizadas</option>
+        {categories.map((category) => (
+          <option key={category.id} value={category.id}>
+            {category.name}
+          </option>
+        ))}
+      </Select>
+      <Select
+        aria-label="Filtrar proveedor"
+        className="max-w-xs"
+        value={searchParams.get('proveedor') ?? ''}
+        onChange={(event) => change('proveedor', event.target.value)}
+      >
+        <option value="">Todos los proveedores</option>
+        {suppliers.map((supplier) => (
+          <option key={supplier.id} value={supplier.id}>
+            {supplier.name}
+          </option>
+        ))}
+      </Select>
+    </div>
   );
 }

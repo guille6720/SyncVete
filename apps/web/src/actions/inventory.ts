@@ -16,7 +16,12 @@ import {
   type PaginatedResult,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
-import { PermissionError, requirePermission, requirePermissionAndFeature, canPermissionAndFeature } from '@/lib/permissions';
+import {
+  PermissionError,
+  requirePermission,
+  requirePermissionAndFeature,
+  canPermissionAndFeature,
+} from '@/lib/permissions';
 import { getSessionContext } from '@/actions/auth';
 import { FEATURES, planRestrictionResult } from '@/lib/entitlements';
 
@@ -73,7 +78,11 @@ function pricingFromParsed(data: {
   supplierPartyId?: string;
 }): { error?: string; unitPrice: number | null; marginPercent: number | null } {
   if (data.marginPercent != null && data.unitCost == null) {
-    return { error: 'Para calcular la ganancia indicá el costo', unitPrice: null, marginPercent: null };
+    return {
+      error: 'Para calcular la ganancia indicá el costo',
+      unitPrice: null,
+      marginPercent: null,
+    };
   }
   return {
     unitPrice: resolveProductSalePrice({
@@ -88,11 +97,12 @@ function pricingFromParsed(data: {
 function comprasRedirect(formData: FormData, category: string): string | null {
   if (formData.get('next') !== 'compras') return null;
   const requested = String(formData.get('seccion') ?? '');
-  const seccion = category === 'vacuna'
-    ? 'vacunas'
-    : requested === 'vacunas' || requested === 'precios'
-      ? requested
-      : 'productos';
+  const seccion =
+    category === 'vacuna'
+      ? 'vacunas'
+      : requested === 'vacunas' || requested === 'precios'
+        ? requested
+        : 'productos';
   const params = new URLSearchParams({ seccion });
   const categoria = String(formData.get('categoria') ?? '');
   if (
@@ -168,8 +178,21 @@ export async function listInventoryProducts(
 
   const rows = data ?? [];
   const total = rows[0]?.total_count ?? 0;
+  const { data: pricing, error: pricingError } = rows.length
+    ? await supabase
+        .from('inventory_products')
+        .select('id, cost_currency, margin_percent, supplier_party_id, catalog_category_id')
+        .in(
+          'id',
+          rows.map((row) => row.id)
+        )
+    : { data: [], error: null };
+  if (pricingError) throw pricingError;
+  const pricingById = new Map((pricing ?? []).map((row) => [row.id, row]));
   const products = rows.map((row) =>
-    toProductRow(row as InventoryProductListRow & { total_count: number })
+    toProductRow({ ...row, ...pricingById.get(row.id) } as InventoryProductListRow & {
+      total_count: number;
+    })
   );
 
   return buildPaginatedResult(products, Number(total), parsed.page, parsed.pageSize);
@@ -255,10 +278,11 @@ export async function createInventoryProduct(
       unitPrice: formData.get('unitPrice'),
       costCurrency: formData.get('costCurrency') || 'ARS',
       marginPercent: formData.get('marginPercent'),
-      supplierPartyId: formData.get('supplierPartyId'),
+      supplierPartyId: formData.get('supplierPartyId') || '',
+      catalogCategoryId: formData.get('catalogCategoryId'),
       manufacturer: formData.get('manufacturer'),
       notes: formData.get('notes'),
-      branchId: formData.get('branchId'),
+      branchId: formData.get('branchId') || undefined,
       isActive: formData.get('isActive') !== 'false',
     });
 
@@ -302,6 +326,7 @@ export async function createInventoryProduct(
         cost_currency: parsed.data.costCurrency,
         margin_percent: pricing.marginPercent,
         supplier_party_id: parsed.data.supplierPartyId ?? null,
+        catalog_category_id: parsed.data.catalogCategoryId ?? null,
         manufacturer: parsed.data.manufacturer ?? null,
         notes: parsed.data.notes ?? null,
         is_active: parsed.data.isActive,
@@ -321,7 +346,10 @@ export async function createInventoryProduct(
         p_reason: 'Stock inicial',
       });
       if (movementError) {
-        return { success: false, error: movementError.message || 'No se pudo registrar el stock inicial' };
+        return {
+          success: false,
+          error: movementError.message || 'No se pudo registrar el stock inicial',
+        };
       }
     }
 
@@ -351,10 +379,11 @@ export async function updateInventoryProduct(
       unitPrice: formData.get('unitPrice'),
       costCurrency: formData.get('costCurrency') || 'ARS',
       marginPercent: formData.get('marginPercent'),
-      supplierPartyId: formData.get('supplierPartyId'),
+      supplierPartyId: formData.get('supplierPartyId') || '',
+      catalogCategoryId: formData.get('catalogCategoryId'),
       manufacturer: formData.get('manufacturer'),
       notes: formData.get('notes'),
-      branchId: formData.get('branchId'),
+      branchId: formData.get('branchId') || undefined,
       isActive: formData.get('isActive') === 'on' || formData.get('isActive') === 'true',
     });
 
@@ -377,7 +406,7 @@ export async function updateInventoryProduct(
     );
     if (supplierError) return { success: false, error: supplierError };
 
-    const { error } = await supabase
+    const { data: updated, error } = await supabase
       .from('inventory_products')
       .update({
         name: parsed.data.name,
@@ -390,17 +419,22 @@ export async function updateInventoryProduct(
         cost_currency: parsed.data.costCurrency,
         margin_percent: pricing.marginPercent,
         supplier_party_id: parsed.data.supplierPartyId ?? null,
+        catalog_category_id: parsed.data.catalogCategoryId ?? null,
         manufacturer: parsed.data.manufacturer ?? null,
         notes: parsed.data.notes ?? null,
         is_active: parsed.data.isActive,
       })
-      .eq('id', productId);
+      .eq('id', productId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       return { success: false, error: error.message || 'No se pudo actualizar el producto' };
     }
 
     revalidatePath('/inventario');
+    if (!updated) return { success: false, error: 'El producto no está disponible' };
     revalidatePath(`/inventario/${productId}`);
     revalidatePath('/compras');
     revalidatePath('/dashboard');
@@ -461,16 +495,21 @@ export async function softDeleteInventoryProduct(productId: string): Promise<Act
     await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
     const supabase = await createServerClient();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('inventory_products')
       .update({ deleted_at: new Date().toISOString(), is_active: false })
-      .eq('id', productId);
+      .eq('id', productId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       return { success: false, error: 'No se pudo eliminar el producto' };
     }
 
     revalidatePath('/inventario');
+    if (!data) return { success: false, error: 'El producto no está disponible' };
+    revalidatePath('/compras');
     revalidatePath('/dashboard');
     return { success: true };
   } catch (error) {

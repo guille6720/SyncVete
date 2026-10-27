@@ -1,4 +1,8 @@
-import type { InventoryProductCategory, InventoryUnit, ProductCurrency } from '../constants/inventory';
+import type {
+  InventoryProductCategory,
+  InventoryUnit,
+  ProductCurrency,
+} from '../constants/inventory';
 import type {
   InventoryPurchaseStatus,
   PurchasePartyKind,
@@ -6,6 +10,7 @@ import type {
 } from '../constants/purchases';
 
 export interface PurchaseParty {
+  cuit?: string | null;
   id: string;
   organization_id: string;
   kind: PurchasePartyKind;
@@ -34,6 +39,15 @@ export interface CatalogProductRow {
   manufacturer: string | null;
   supplier_party_id: string | null;
   supplier_name: string | null;
+  catalog_category_id: string | null;
+  catalog_category_name: string | null;
+}
+
+export interface PurchaseCategory {
+  id: string;
+  organization_id: string;
+  name: string;
+  base_category: InventoryProductCategory;
 }
 
 export interface InventoryPurchaseListRow {

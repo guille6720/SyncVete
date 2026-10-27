@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveProductSalePrice, salePriceFromCost } from '../constants/inventory';
-import {
-  inventoryMovementSchema,
-  inventoryProductSchema,
-} from '../schemas';
+import { inventoryMovementSchema, inventoryProductSchema, purchasePartySchema } from '../schemas';
 
 describe('inventoryProductSchema', () => {
   it('validates a product', () => {
@@ -52,6 +49,44 @@ describe('inventoryProductSchema', () => {
     }
   });
 
+  it('converts USD costs to ARS before applying markup and rounding', () => {
+    expect(
+      resolveProductSalePrice({
+        unitCost: 12.5,
+        marginPercent: 40,
+        costCurrency: 'USD',
+        exchangeRate: 1200,
+      })
+    ).toBe(21000);
+    expect(
+      resolveProductSalePrice({
+        unitCost: 0.1,
+        marginPercent: 25,
+        costCurrency: 'USD',
+        exchangeRate: 1234.5678,
+      })
+    ).toBe(154.32);
+    expect(
+      resolveProductSalePrice({ unitCost: 10, marginPercent: 0, costCurrency: 'USD' })
+    ).toBeNull();
+    expect(
+      resolveProductSalePrice({
+        unitCost: 10,
+        marginPercent: 0,
+        costCurrency: 'USD',
+        exchangeRate: 0,
+      })
+    ).toBeNull();
+    expect(
+      resolveProductSalePrice({
+        unitCost: 10,
+        unitPrice: 15000,
+        costCurrency: 'USD',
+        exchangeRate: 1200,
+      })
+    ).toBe(15000);
+  });
+
   it('rejects negative stock', () => {
     const result = inventoryProductSchema.safeParse({
       name: 'Jeringas',
@@ -62,6 +97,11 @@ describe('inventoryProductSchema', () => {
 });
 
 describe('inventoryMovementSchema', () => {
+  it('normalizes an optional CUIT without accepting malformed text', () => {
+    expect(purchasePartySchema.parse({ name: 'Proveedor', kind: 'proveedor', cuit: '30-12345678-9' }).cuit).toBe('30123456789');
+    expect(purchasePartySchema.parse({ name: 'Proveedor', kind: 'proveedor', cuit: '' }).cuit).toBeUndefined();
+    expect(purchasePartySchema.safeParse({ name: 'Proveedor', kind: 'proveedor', cuit: '123' }).success).toBe(false);
+  });
   it('accepts an entrada', () => {
     const result = inventoryMovementSchema.safeParse({
       movementType: 'entrada',

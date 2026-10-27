@@ -21,17 +21,21 @@ export const COMPRAS_SECTIONS = [
   'proveedores',
   'prestadores',
   'productos',
+  'categorias',
   'vacunas',
   'precios',
+  'historial',
 ] as const;
 
 export type ComprasSection = (typeof COMPRAS_SECTIONS)[number];
 
 export const COMPRAS_SECTION_LABELS: Record<ComprasSection, string> = {
   compras: 'Compras',
+  historial: 'Historial de compras',
   proveedores: 'Proveedores',
   prestadores: 'Prestadores',
   productos: 'Productos',
+  categorias: 'Categorías',
   vacunas: 'Vacunas',
   precios: 'Precios de venta',
 };

@@ -10,16 +10,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  INVENTORY_UNIT_LABELS,
-  type InventoryProductListRow,
-} from '@sincvete/shared';
+import { INVENTORY_UNIT_LABELS, type InventoryProductListRow } from '@sincvete/shared';
 
 interface PurchaseFormProps {
   branches: Array<{ id: string; name: string }>;
   products: InventoryProductListRow[];
   defaultBranchId?: string | null;
   listHref?: string;
+  exchangeRate?: number | null;
 }
 
 interface LineItem {
@@ -43,6 +41,7 @@ export function PurchaseForm({
   products,
   defaultBranchId,
   listHref = '/compras',
+  exchangeRate = null,
 }: PurchaseFormProps) {
   const [state, formAction, pending] = useActionState(receiveInventoryPurchaseAction, null);
   const [items, setItems] = useState<LineItem[]>([emptyLine()]);
@@ -69,8 +68,14 @@ export function PurchaseForm({
       productId,
       unitCost:
         product?.unit_cost != null && product.unit_cost >= 0
-          ? String(product.unit_cost)
-          : items[index]?.unitCost ?? '',
+          ? String(
+              Math.round(
+                product.unit_cost *
+                  (product.cost_currency === 'USD' ? (exchangeRate ?? 0) : 1) *
+                  100
+              ) / 100
+            )
+          : (items[index]?.unitCost ?? ''),
     });
   };
 
@@ -201,7 +206,7 @@ export function PurchaseForm({
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">
-                    <Label htmlFor={`unitCost_${index}`}>Costo unit.</Label>
+                    <Label htmlFor={`unitCost_${index}`}>Costo unit. (ARS)</Label>
                     <Input
                       id={`unitCost_${index}`}
                       name="unitCost"
@@ -227,9 +232,7 @@ export function PurchaseForm({
                       variant="ghost"
                       size="icon"
                       disabled={items.length <= 1}
-                      onClick={() =>
-                        setItems((current) => current.filter((_, i) => i !== index))
-                      }
+                      onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
                       aria-label="Quitar ítem"
                     >
                       <Trash2 className="h-4 w-4" />
@@ -247,7 +250,8 @@ export function PurchaseForm({
                   </div>
                   {product && (
                     <p className="text-xs text-muted-foreground sm:col-span-8">
-                      Stock actual: {product.quantity.toLocaleString('es-AR', { maximumFractionDigits: 3 })}
+                      Stock actual:{' '}
+                      {product.quantity.toLocaleString('es-AR', { maximumFractionDigits: 3 })}
                       {product.is_low_stock ? ' · stock bajo' : ''}
                     </p>
                   )}
