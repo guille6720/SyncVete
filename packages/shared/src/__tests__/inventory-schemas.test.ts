@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveProductSalePrice, salePriceFromCost } from '../constants/inventory';
 import {
   inventoryMovementSchema,
   inventoryProductSchema,
@@ -26,6 +27,29 @@ describe('inventoryProductSchema', () => {
       quantity: 1,
     });
     expect(result.success).toBe(false);
+  });
+
+  it('calculates the sale price from the margin', () => {
+    expect(salePriceFromCost(100, 30)).toBe(130);
+    expect(resolveProductSalePrice({ unitCost: 10, marginPercent: 50, unitPrice: 1 })).toBe(15);
+    expect(resolveProductSalePrice({ unitCost: 10, unitPrice: 18 })).toBe(18);
+  });
+
+  it('accepts a cost in USD with margin', () => {
+    const result = inventoryProductSchema.safeParse({
+      name: 'Vacuna séxtuple',
+      category: 'vacuna',
+      unit: 'dosis',
+      quantity: 0,
+      unitCost: '12.5',
+      costCurrency: 'USD',
+      marginPercent: '40',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.costCurrency).toBe('USD');
+      expect(result.data.marginPercent).toBe(40);
+    }
   });
 
   it('rejects negative stock', () => {

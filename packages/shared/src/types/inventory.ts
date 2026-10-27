@@ -2,6 +2,7 @@ import type {
   InventoryMovementType,
   InventoryProductCategory,
   InventoryUnit,
+  ProductCurrency,
 } from '../constants/inventory';
 
 export interface InventoryProduct {
@@ -16,6 +17,9 @@ export interface InventoryProduct {
   min_quantity: number;
   unit_cost: number | null;
   unit_price: number | null;
+  cost_currency: ProductCurrency;
+  margin_percent: number | null;
+  supplier_party_id: string | null;
   manufacturer: string | null;
   notes: string | null;
   is_active: boolean;

@@ -8,6 +8,7 @@ import {
   inventoryProductListSchema,
   inventoryProductSchema,
   inventoryProductUpdateSchema,
+  resolveProductSalePrice,
   type ActionResult,
   type InventoryMovementListRow,
   type InventoryProduct,
@@ -40,6 +41,71 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
   return { success: false, error: 'Ocurrió un error inesperado' };
 }
 
+async function assertProductSupplier(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  supplierId: string | undefined,
+  category: string
+): Promise<string | null> {
+  if (!supplierId) return null;
+  const { data, error } = await supabase
+    .from('purchase_parties')
+    .select('id, kind, scope, is_active')
+    .eq('id', supplierId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error || !data || !data.is_active) return 'El proveedor no está disponible';
+  if (category === 'vacuna') {
+    if (data.kind !== 'proveedor' || data.scope !== 'vacunas') {
+      return 'Las vacunas usan un proveedor del apartado de vacunas';
+    }
+  } else if (data.kind !== 'proveedor' || data.scope !== 'general') {
+    return 'Elegí un proveedor de productos';
+  }
+  return null;
+}
+
+function pricingFromParsed(data: {
+  unitCost?: number;
+  unitPrice?: number;
+  marginPercent?: number;
+  costCurrency: 'ARS' | 'USD';
+  supplierPartyId?: string;
+}): { error?: string; unitPrice: number | null; marginPercent: number | null } {
+  if (data.marginPercent != null && data.unitCost == null) {
+    return { error: 'Para calcular la ganancia indicá el costo', unitPrice: null, marginPercent: null };
+  }
+  return {
+    unitPrice: resolveProductSalePrice({
+      unitCost: data.unitCost,
+      unitPrice: data.unitPrice,
+      marginPercent: data.marginPercent,
+    }),
+    marginPercent: data.marginPercent ?? null,
+  };
+}
+
+function comprasRedirect(formData: FormData, category: string): string | null {
+  if (formData.get('next') !== 'compras') return null;
+  const requested = String(formData.get('seccion') ?? '');
+  const seccion = category === 'vacuna'
+    ? 'vacunas'
+    : requested === 'vacunas' || requested === 'precios'
+      ? requested
+      : 'productos';
+  const params = new URLSearchParams({ seccion });
+  const categoria = String(formData.get('categoria') ?? '');
+  if (
+    seccion === 'productos' &&
+    categoria &&
+    categoria !== 'vacuna' &&
+    ['medicamento', 'insumo', 'alimento', 'laboratorio', 'otro'].includes(categoria)
+  ) {
+    params.set('categoria', categoria);
+  }
+  return `/compras?${params.toString()}`;
+}
+
 function toProductRow(
   row: InventoryProductListRow & { total_count?: number }
 ): InventoryProductListRow {
@@ -51,6 +117,9 @@ function toProductRow(
     min_quantity: Number(entry.min_quantity ?? 0),
     unit_cost: entry.unit_cost == null ? null : Number(entry.unit_cost),
     unit_price: entry.unit_price == null ? null : Number(entry.unit_price),
+    cost_currency: entry.cost_currency === 'USD' ? 'USD' : 'ARS',
+    margin_percent: entry.margin_percent == null ? null : Number(entry.margin_percent),
+    supplier_party_id: entry.supplier_party_id ?? null,
     is_low_stock: Boolean(entry.is_low_stock),
     deleted_at: entry.deleted_at ?? null,
   };
@@ -154,6 +223,9 @@ export async function getInventoryProduct(id: string): Promise<{
       min_quantity: Number(typed.min_quantity ?? 0),
       unit_cost: typed.unit_cost == null ? null : Number(typed.unit_cost),
       unit_price: typed.unit_price == null ? null : Number(typed.unit_price),
+      cost_currency: typed.cost_currency === 'USD' ? 'USD' : 'ARS',
+      margin_percent: typed.margin_percent == null ? null : Number(typed.margin_percent),
+      supplier_party_id: typed.supplier_party_id ?? null,
       is_low_stock: typed.is_active && Number(typed.quantity) <= Number(typed.min_quantity),
     },
     movements: (movements ?? []).map((m) => ({
@@ -181,6 +253,9 @@ export async function createInventoryProduct(
       minQuantity: formData.get('minQuantity') || 0,
       unitCost: formData.get('unitCost'),
       unitPrice: formData.get('unitPrice'),
+      costCurrency: formData.get('costCurrency') || 'ARS',
+      marginPercent: formData.get('marginPercent'),
+      supplierPartyId: formData.get('supplierPartyId'),
       manufacturer: formData.get('manufacturer'),
       notes: formData.get('notes'),
       branchId: formData.get('branchId'),
@@ -200,7 +275,17 @@ export async function createInventoryProduct(
       return { success: false, error: 'Seleccioná una sucursal activa' };
     }
 
+    const pricing = pricingFromParsed(parsed.data);
+    if (pricing.error) return { success: false, error: pricing.error };
+
     const supabase = await createServerClient();
+    const supplierError = await assertProductSupplier(
+      supabase,
+      parsed.data.supplierPartyId,
+      parsed.data.category
+    );
+    if (supplierError) return { success: false, error: supplierError };
+
     const { data, error } = await supabase
       .from('inventory_products')
       .insert({
@@ -213,7 +298,10 @@ export async function createInventoryProduct(
         quantity: 0,
         min_quantity: parsed.data.minQuantity,
         unit_cost: parsed.data.unitCost ?? null,
-        unit_price: parsed.data.unitPrice ?? null,
+        unit_price: pricing.unitPrice,
+        cost_currency: parsed.data.costCurrency,
+        margin_percent: pricing.marginPercent,
+        supplier_party_id: parsed.data.supplierPartyId ?? null,
         manufacturer: parsed.data.manufacturer ?? null,
         notes: parsed.data.notes ?? null,
         is_active: parsed.data.isActive,
@@ -238,8 +326,9 @@ export async function createInventoryProduct(
     }
 
     revalidatePath('/inventario');
+    revalidatePath('/compras');
     revalidatePath('/dashboard');
-    redirect(`/inventario/${data.id}`);
+    redirect(comprasRedirect(formData, parsed.data.category) ?? `/inventario/${data.id}`);
   } catch (error) {
     return actionError(error);
   }
@@ -260,6 +349,9 @@ export async function updateInventoryProduct(
       minQuantity: formData.get('minQuantity') || 0,
       unitCost: formData.get('unitCost'),
       unitPrice: formData.get('unitPrice'),
+      costCurrency: formData.get('costCurrency') || 'ARS',
+      marginPercent: formData.get('marginPercent'),
+      supplierPartyId: formData.get('supplierPartyId'),
       manufacturer: formData.get('manufacturer'),
       notes: formData.get('notes'),
       branchId: formData.get('branchId'),
@@ -274,7 +366,17 @@ export async function updateInventoryProduct(
       };
     }
 
+    const pricing = pricingFromParsed(parsed.data);
+    if (pricing.error) return { success: false, error: pricing.error };
+
     const supabase = await createServerClient();
+    const supplierError = await assertProductSupplier(
+      supabase,
+      parsed.data.supplierPartyId,
+      parsed.data.category
+    );
+    if (supplierError) return { success: false, error: supplierError };
+
     const { error } = await supabase
       .from('inventory_products')
       .update({
@@ -284,7 +386,10 @@ export async function updateInventoryProduct(
         unit: parsed.data.unit,
         min_quantity: parsed.data.minQuantity,
         unit_cost: parsed.data.unitCost ?? null,
-        unit_price: parsed.data.unitPrice ?? null,
+        unit_price: pricing.unitPrice,
+        cost_currency: parsed.data.costCurrency,
+        margin_percent: pricing.marginPercent,
+        supplier_party_id: parsed.data.supplierPartyId ?? null,
         manufacturer: parsed.data.manufacturer ?? null,
         notes: parsed.data.notes ?? null,
         is_active: parsed.data.isActive,
@@ -297,6 +402,7 @@ export async function updateInventoryProduct(
 
     revalidatePath('/inventario');
     revalidatePath(`/inventario/${productId}`);
+    revalidatePath('/compras');
     revalidatePath('/dashboard');
     return { success: true };
   } catch (error) {

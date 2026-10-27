@@ -1,5 +1,40 @@
-import type { InventoryPurchaseStatus } from '../constants/purchases';
-import type { InventoryUnit } from '../constants/inventory';
+import type { InventoryProductCategory, InventoryUnit, ProductCurrency } from '../constants/inventory';
+import type {
+  InventoryPurchaseStatus,
+  PurchasePartyKind,
+  PurchasePartyScope,
+} from '../constants/purchases';
+
+export interface PurchaseParty {
+  id: string;
+  organization_id: string;
+  kind: PurchasePartyKind;
+  scope: PurchasePartyScope;
+  name: string;
+  contact_name: string | null;
+  phone: string | null;
+  email: string | null;
+  notes: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CatalogProductRow {
+  id: string;
+  name: string;
+  sku: string | null;
+  category: InventoryProductCategory;
+  unit: InventoryUnit;
+  quantity: number;
+  unit_cost: number | null;
+  unit_price: number | null;
+  cost_currency: ProductCurrency;
+  margin_percent: number | null;
+  manufacturer: string | null;
+  supplier_party_id: string | null;
+  supplier_name: string | null;
+}
 
 export interface InventoryPurchaseListRow {
   id: string;

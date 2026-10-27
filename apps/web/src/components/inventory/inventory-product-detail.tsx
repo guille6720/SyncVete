@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { ProductPricingFields } from '@/components/inventory/product-pricing-fields';
 import {
   INVENTORY_MOVEMENT_TYPES,
   INVENTORY_MOVEMENT_TYPE_LABELS,
@@ -27,24 +28,33 @@ import {
   INVENTORY_UNITS,
   INVENTORY_UNIT_LABELS,
   formatClinicalEntryDateTime,
+  formatProductAmount,
+  suppliersForProductCategory,
   type InventoryMovementListRow,
   type InventoryProductListRow,
+  type PurchasePartyKind,
+  type PurchasePartyScope,
 } from '@sincvete/shared';
+
+interface ProductSupplierOption {
+  id: string;
+  name: string;
+  kind: PurchasePartyKind;
+  scope: PurchasePartyScope;
+  is_active: boolean;
+}
 
 interface InventoryProductDetailProps {
   product: InventoryProductListRow;
   movements: InventoryMovementListRow[];
   canWrite: boolean;
   listHref?: string;
+  backLabel?: string;
+  suppliers?: ProductSupplierOption[];
 }
 
 function formatQty(value: number): string {
   return Number(value).toLocaleString('es-AR', { maximumFractionDigits: 3 });
-}
-
-function formatMoney(value: number | null): string {
-  if (value == null) return '—';
-  return value.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function InventoryProductDetail({
@@ -52,12 +62,18 @@ export function InventoryProductDetail({
   movements,
   canWrite,
   listHref = '/inventario',
+  backLabel = 'Volver a inventario',
+  suppliers = [],
 }: InventoryProductDetailProps) {
   const router = useRouter();
   const updateAction = updateInventoryProduct.bind(null, product.id);
   const movementAction = recordInventoryMovementAction.bind(null, product.id);
   const [updateState, updateFormAction, updatePending] = useActionState(updateAction, null);
   const [movementState, movementFormAction, movementPending] = useActionState(movementAction, null);
+  const [category, setCategory] = useState(product.category);
+  const [supplierId, setSupplierId] = useState(product.supplier_party_id ?? '');
+  const supplierOptions = suppliersForProductCategory(suppliers, category, product.supplier_party_id);
+  const supplierName = suppliers.find((item) => item.id === product.supplier_party_id)?.name ?? null;
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [deletePending, setDeletePending] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -102,7 +118,7 @@ export function InventoryProductDetail({
         <Button variant="ghost" size="sm" asChild>
           <Link href={listHref}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Volver a inventario
+            {backLabel}
           </Link>
         </Button>
       </div>
@@ -125,8 +141,19 @@ export function InventoryProductDetail({
         {!canWrite && (
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <DetailField label="Fabricante" value={product.manufacturer} />
-            <DetailField label="Costo" value={formatMoney(product.unit_cost)} />
-            <DetailField label="Precio" value={formatMoney(product.unit_price)} />
+            <DetailField label="Proveedor" value={supplierName} />
+            <DetailField
+              label="Costo"
+              value={formatProductAmount(product.unit_cost, product.cost_currency)}
+            />
+            <DetailField
+              label="Ganancia"
+              value={product.margin_percent == null ? null : `${product.margin_percent}%`}
+            />
+            <DetailField
+              label="Precio de venta"
+              value={formatProductAmount(product.unit_price, product.cost_currency)}
+            />
             <div className="sm:col-span-2">
               <DetailField label="Notas" value={product.notes} />
             </div>
@@ -163,7 +190,19 @@ export function InventoryProductDetail({
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="category">Categoría</Label>
-                    <Select id="category" name="category" defaultValue={product.category}>
+                    <Select
+                      id="category"
+                      name="category"
+                      value={category}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        setCategory(next as typeof category);
+                        const stillValid = suppliersForProductCategory(suppliers, next).some(
+                          (item) => item.id === supplierId
+                        );
+                        if (!stillValid) setSupplierId('');
+                      }}
+                    >
                       {INVENTORY_PRODUCT_CATEGORIES.map((item) => (
                         <option key={item} value={item}>
                           {INVENTORY_PRODUCT_CATEGORY_LABELS[item]}
@@ -182,41 +221,42 @@ export function InventoryProductDetail({
                     </Select>
                   </div>
                 </div>
-                <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="space-y-2">
-                    <Label htmlFor="minQuantity">Stock mínimo</Label>
-                    <Input
-                      id="minQuantity"
-                      name="minQuantity"
-                      type="number"
-                      min="0"
-                      step="any"
-                      defaultValue={product.min_quantity}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unitCost">Costo</Label>
-                    <Input
-                      id="unitCost"
-                      name="unitCost"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue={product.unit_cost ?? ''}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="unitPrice">Precio</Label>
-                    <Input
-                      id="unitPrice"
-                      name="unitPrice"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      defaultValue={product.unit_price ?? ''}
-                    />
-                  </div>
+                <div className="space-y-2">
+                  <Label htmlFor="minQuantity">Stock mínimo</Label>
+                  <Input
+                    id="minQuantity"
+                    name="minQuantity"
+                    type="number"
+                    min="0"
+                    step="any"
+                    defaultValue={product.min_quantity}
+                  />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="supplierPartyId">
+                    {category === 'vacuna' ? 'Proveedor de vacunas' : 'Proveedor'}
+                  </Label>
+                  <Select
+                    id="supplierPartyId"
+                    name="supplierPartyId"
+                    value={supplierId}
+                    onChange={(event) => setSupplierId(event.target.value)}
+                  >
+                    <option value="">—</option>
+                    {supplierOptions.map((supplier) => (
+                      <option key={supplier.id} value={supplier.id}>
+                        {supplier.name}
+                        {supplier.is_active ? '' : ' (inactivo)'}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <ProductPricingFields
+                  defaultCost={product.unit_cost}
+                  defaultPrice={product.unit_price}
+                  defaultCurrency={product.cost_currency}
+                  defaultMargin={product.margin_percent}
+                />
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notas</Label>
                   <Textarea id="notes" name="notes" rows={2} defaultValue={product.notes ?? ''} />

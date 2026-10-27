@@ -987,6 +987,15 @@ export const inventoryProductSchema = z.object({
   minQuantity: z.coerce.number().min(0, 'Mínimo inválido').default(0),
   unitCost: optionalNonNegNumber,
   unitPrice: optionalNonNegNumber,
+  costCurrency: z.enum(['ARS', 'USD']).default('ARS'),
+  marginPercent: optionalNonNegNumber.refine(
+    (value) => value === undefined || value <= 1000,
+    'El margen no puede superar 1000%'
+  ),
+  supplierPartyId: z
+    .union([z.string().uuid('Proveedor inválido'), z.literal('')])
+    .optional()
+    .transform((value) => (value === '' || value === undefined ? undefined : value)),
   manufacturer: optionalShortText(120),
   notes: optionalClinicalText,
   branchId: z
@@ -1045,6 +1054,33 @@ export const inventoryPurchaseListSchema = paginationSchema.extend({
   branchId: z.string().uuid().optional(),
   status: z.enum(['recibida', 'anulada']).optional(),
 });
+
+export const purchasePartySchema = z.object({
+  name: z
+    .string()
+    .min(2, 'Indicá el nombre')
+    .max(160)
+    .transform((value) => value.trim()),
+  kind: z.enum(['proveedor', 'prestador']),
+  scope: z.enum(['general', 'vacunas']).default('general'),
+  contactName: optionalShortText(120),
+  phone: optionalShortText(40),
+  email: z
+    .union([z.string().trim().email('Email inválido').max(160), z.literal('')])
+    .optional()
+    .transform((value) => (value ? value.toLowerCase() : undefined)),
+  notes: optionalClinicalText,
+  isActive: z.coerce.boolean().default(true),
+});
+
+export type PurchasePartyInput = z.infer<typeof purchasePartySchema>;
+
+export const purchasePartyListSchema = paginationSchema.extend({
+  kind: z.enum(['proveedor', 'prestador']).optional(),
+  scope: z.enum(['general', 'vacunas']).optional(),
+});
+
+export type PurchasePartyListInput = z.infer<typeof purchasePartyListSchema>;
 
 export type InventoryPurchaseItemInput = z.infer<typeof inventoryPurchaseItemSchema>;
 export type InventoryPurchaseInput = z.infer<typeof inventoryPurchaseSchema>;

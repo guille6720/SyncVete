@@ -141,6 +141,12 @@ export type InventoryUnit =
   | 'dosis'
   | 'otro';
 
+export type ProductCurrency = 'ARS' | 'USD';
+
+export type PurchasePartyKind = 'proveedor' | 'prestador';
+
+export type PurchasePartyScope = 'general' | 'vacunas';
+
 export type InventoryMovementType = 'entrada' | 'salida' | 'ajuste' | 'descarte';
 
 export type InvoiceStatus = 'borrador' | 'emitida' | 'pagada' | 'anulada';
@@ -3825,6 +3831,9 @@ export interface Database {
           min_quantity: number;
           unit_cost: number | null;
           unit_price: number | null;
+          cost_currency: ProductCurrency;
+          margin_percent: number | null;
+          supplier_party_id: string | null;
           manufacturer: string | null;
           notes: string | null;
           is_active: boolean;
@@ -3849,6 +3858,9 @@ export interface Database {
           min_quantity?: number;
           unit_cost?: number | null;
           unit_price?: number | null;
+          cost_currency?: ProductCurrency;
+          margin_percent?: number | null;
+          supplier_party_id?: string | null;
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
@@ -3873,6 +3885,9 @@ export interface Database {
           min_quantity?: number;
           unit_cost?: number | null;
           unit_price?: number | null;
+          cost_currency?: ProductCurrency;
+          margin_percent?: number | null;
+          supplier_party_id?: string | null;
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
@@ -3898,6 +3913,69 @@ export interface Database {
             columns: ['branch_id'];
             isOneToOne: false;
             referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'inventory_products_supplier_party_id_fkey',
+            columns: ['supplier_party_id'];
+            isOneToOne: false;
+            referencedRelation: 'purchase_parties';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      purchase_parties: {
+        Row: {
+          id: string;
+          organization_id: string;
+          kind: PurchasePartyKind;
+          scope: PurchasePartyScope;
+          name: string;
+          contact_name: string | null;
+          phone: string | null;
+          email: string | null;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          kind: PurchasePartyKind;
+          scope?: PurchasePartyScope;
+          name: string;
+          contact_name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          kind?: PurchasePartyKind;
+          scope?: PurchasePartyScope;
+          name?: string;
+          contact_name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'purchase_parties_organization_id_fkey',
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
         ];

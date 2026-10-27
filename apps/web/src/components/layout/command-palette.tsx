@@ -58,7 +58,7 @@ const NAV_ITEMS = [
   { label: 'Cirugías', href: '/cirugias', icon: Scissors, keywords: 'quirófano operacion castracion' },
   { label: 'Laboratorio', href: '/laboratorio', icon: FlaskConical, keywords: 'lab hemograma analisis resultados' },
   { label: 'Inventario', href: '/inventario', icon: Package, keywords: 'stock farmacia productos insumos' },
-  { label: 'Compras', href: '/compras', icon: ShoppingCart, keywords: 'compra proveedor stock reponer entrada' },
+  { label: 'Compras', href: '/compras', icon: ShoppingCart, keywords: 'compra proveedor prestador stock reponer entrada vacuna precio' },
   { label: 'Farmacia', href: '/farmacia', icon: Pill, keywords: 'receta recetar medicamento dispensar' },
   { label: 'Facturación', href: '/facturacion', icon: Receipt, keywords: 'factura cobro caja pagos' },
   { label: 'Caja', href: '/caja', icon: Banknote, keywords: 'caja turno efectivo cierre cobros' },
