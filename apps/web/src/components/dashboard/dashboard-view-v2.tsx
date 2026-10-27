@@ -2,6 +2,7 @@ import { Suspense } from 'react';
 import {
   formatDateParam,
   getWeekStartDate,
+  INVITABLE_ROLES,
   isClinicPathEntitled,
   type AppointmentListRow,
 } from '@sincvete/shared';
@@ -22,7 +23,6 @@ import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity
 import { DashboardRecentLists } from '@/components/dashboard/dashboard-recent-lists';
 import { DashboardSpeciesBreakdown } from '@/components/dashboard/dashboard-species-breakdown';
 import { DashboardWaitingRoomSnapshot } from '@/components/dashboard/dashboard-waiting-room-snapshot';
-import { DashboardConsultationAlert } from '@/components/dashboard/dashboard-consultation-alert';
 import { DashboardHeaderV2 } from '@/components/dashboard/ui-v2/dashboard-header-v2';
 import { DashboardQuickActionsV2 } from '@/components/dashboard/ui-v2/dashboard-quick-actions-v2';
 import { DashboardStatCardsV2 } from '@/components/dashboard/ui-v2/stat-cards-v2';
@@ -114,14 +114,26 @@ async function DashboardAppointmentsSection({ entitledHrefs }: { entitledHrefs: 
     );
   }
 
+  const session = await getSessionContext();
   const today = formatDateParam(new Date());
   const weekStart = getWeekStartDate(today);
   const appointments = await listAppointments({ weekStart }).catch(() => [] as AppointmentListRow[]);
   const todays = appointments
     .filter((row) => formatDateParam(new Date(row.starts_at)) === today)
     .sort((a, b) => new Date(a.starts_at).getTime() - new Date(b.starts_at).getTime());
+  const showAlert = Boolean(
+    session?.kind === 'staff' && session.role && INVITABLE_ROLES.includes(session.role)
+  );
 
-  return <AppointmentsSummaryPanel appointments={todays} todayLabel={getClinicTodayLabel()} />;
+  return (
+    <AppointmentsSummaryPanel
+      appointments={todays}
+      todayLabel={getClinicTodayLabel()}
+      today={today}
+      weekStart={weekStart}
+      showAlert={showAlert}
+    />
+  );
 }
 
 async function DashboardPendingStrip({ entitledHrefs }: { entitledHrefs: string[] | null }) {
@@ -194,10 +206,6 @@ export async function DashboardViewV2() {
   return (
     <div className="mx-auto min-w-0 max-w-[90rem] space-y-4 md:space-y-5">
       <DashboardHeaderV2 session={session} context={context} />
-
-      <Suspense fallback={null}>
-        <DashboardConsultationAlert entitledHrefs={commercial.entitledHrefs} />
-      </Suspense>
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-2">
         <Suspense
