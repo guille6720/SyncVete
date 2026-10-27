@@ -34,11 +34,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: '/favicon.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icons/syncvete-192.png', sizes: '192x192', type: 'image/png' },
-      { url: '/icons/syncvete.svg', type: 'image/svg+xml' },
+      { url: '/favicon.png?v=brand-20261027', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/syncvete-192.png?v=brand-20261027', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/syncvete.svg?v=brand-20261027', type: 'image/svg+xml' },
     ],
-    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+    apple: [{ url: '/icons/apple-touch-icon.png?v=brand-20261027', sizes: '180x180', type: 'image/png' }],
   },
 };
 
