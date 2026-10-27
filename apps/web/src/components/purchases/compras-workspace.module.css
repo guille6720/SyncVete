@@ -1,18 +1,5 @@
 .root {
-  font-family: Arial, Helvetica, sans-serif;
   color: var(--color-foreground);
-}
-.root :global(.sv-neon) {
-  box-shadow: none;
-  border: 1px solid var(--color-border);
-}
-.root :global(.sv-neon-hover):hover {
-  box-shadow: none;
-}
-.root h1,
-.root h2,
-.root h3 {
-  font-family: inherit;
 }
 .root a[aria-current='page'] {
   border-color: var(--color-primary);
@@ -25,11 +12,22 @@
 }
 .panel {
   min-width: 0;
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--sv-neon-border);
   border-radius: 9px;
   background: var(--color-card);
-  box-shadow: 0 2px 10px rgb(15 23 42 / 3%);
+  box-shadow:
+    0 0 0 1px var(--sv-neon-ring),
+    0 0 16px var(--sv-neon-glow);
   padding: 14px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.panel:hover {
+  border-color: var(--clinic);
+  box-shadow:
+    0 0 0 1px var(--sv-neon-ring),
+    0 0 24px var(--sv-neon-glow-strong);
 }
 .table {
   width: 100%;
