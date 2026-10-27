@@ -1020,6 +1020,36 @@ export type InventoryProductUpdateInput = z.infer<typeof inventoryProductUpdateS
 export type InventoryMovementInput = z.infer<typeof inventoryMovementSchema>;
 export type InventoryProductListInput = z.infer<typeof inventoryProductListSchema>;
 
+export const inventoryPurchaseItemSchema = z.object({
+  productId: z.string().uuid('Producto inválido'),
+  quantity: z.coerce.number().positive('La cantidad debe ser mayor a 0'),
+  unitCost: optionalNonNegNumber,
+  lotNumber: optionalShortText(80),
+  expiresAt: optionalIsoDate,
+});
+
+export const inventoryPurchaseSchema = z.object({
+  branchId: z.string().uuid('Sucursal inválida'),
+  supplierName: z
+    .string()
+    .min(1, 'Indicá el proveedor')
+    .max(160)
+    .transform((v) => v.trim()),
+  invoiceNumber: optionalShortText(80),
+  purchasedAt: optionalIsoDate,
+  notes: optionalClinicalText,
+  items: z.array(inventoryPurchaseItemSchema).min(1, 'Agregá al menos un producto').max(100),
+});
+
+export const inventoryPurchaseListSchema = paginationSchema.extend({
+  branchId: z.string().uuid().optional(),
+  status: z.enum(['recibida', 'anulada']).optional(),
+});
+
+export type InventoryPurchaseItemInput = z.infer<typeof inventoryPurchaseItemSchema>;
+export type InventoryPurchaseInput = z.infer<typeof inventoryPurchaseSchema>;
+export type InventoryPurchaseListInput = z.infer<typeof inventoryPurchaseListSchema>;
+
 const invoiceItemSchema = z.object({
   description: z
     .string()

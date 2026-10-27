@@ -30,6 +30,7 @@ import {
   Hourglass,
   Briefcase,
   GraduationCap,
+  ShoppingCart,
   Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -56,6 +57,7 @@ const NAV_ITEMS = [
   { label: 'Cirugías', href: '/cirugias', icon: Scissors, keywords: 'quirófano operacion castracion' },
   { label: 'Laboratorio', href: '/laboratorio', icon: FlaskConical, keywords: 'lab hemograma analisis resultados' },
   { label: 'Inventario', href: '/inventario', icon: Package, keywords: 'stock farmacia productos insumos' },
+  { label: 'Compras', href: '/compras', icon: ShoppingCart, keywords: 'compra proveedor stock reponer entrada' },
   { label: 'Farmacia', href: '/farmacia', icon: Pill, keywords: 'receta recetar medicamento dispensar' },
   { label: 'Facturación', href: '/facturacion', icon: Receipt, keywords: 'factura cobro caja pagos' },
   { label: 'Caja', href: '/caja', icon: Banknote, keywords: 'caja turno efectivo cierre cobros' },
@@ -104,6 +106,7 @@ const QUICK_ACTIONS = [
   { label: 'Programar cirugía', href: '/cirugias/nueva', keywords: 'operar quirofano castracion' },
   { label: 'Nueva orden de laboratorio', href: '/laboratorio/nueva', keywords: 'lab hemograma bioquimica' },
   { label: 'Nuevo producto de inventario', href: '/inventario/nuevo', keywords: 'stock farmacia producto' },
+  { label: 'Nueva compra', href: '/compras/nueva', keywords: 'comprar proveedor stock entrada remito' },
   { label: 'Nueva receta', href: '/farmacia/nueva', keywords: 'prescribir medicamento farmacia recetar' },
   { label: 'Subir imagen', href: '/imagenes/nueva', keywords: 'foto radiografia ecografia documento galeria' },
   { label: 'Nueva factura', href: '/facturacion/nueva', keywords: 'cobrar factura caja' },

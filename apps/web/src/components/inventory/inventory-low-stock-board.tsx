@@ -15,6 +15,8 @@ interface InventoryLowStockBoardProps {
   items: InventoryProductListRow[];
   canWrite: boolean;
   listQuery?: string;
+  createHref?: string;
+  createLabel?: string;
 }
 
 function formatQty(value: number): string {
@@ -25,7 +27,10 @@ export function InventoryLowStockBoard({
   items,
   canWrite,
   listQuery = '',
+  createHref = '/inventario/nuevo',
+  createLabel = 'Nuevo producto',
 }: InventoryLowStockBoardProps) {
+  const createUrl = withListReturn(createHref, listQuery);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -37,9 +42,9 @@ export function InventoryLowStockBoard({
         </div>
         {canWrite && (
           <Button asChild>
-            <Link href={withListReturn('/inventario/nuevo', listQuery)}>
+            <Link href={createUrl}>
               <Plus className="mr-2 h-4 w-4" />
-              Nuevo producto
+              {createLabel}
             </Link>
           </Button>
         )}
@@ -50,7 +55,7 @@ export function InventoryLowStockBoard({
           <p className="text-muted-foreground">No hay productos con stock bajo.</p>
           {canWrite && (
             <Button asChild className="mt-4">
-              <Link href={withListReturn('/inventario/nuevo', listQuery)}>Agregar producto</Link>
+              <Link href={createUrl}>{createLabel}</Link>
             </Button>
           )}
         </div>

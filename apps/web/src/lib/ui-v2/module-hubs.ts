@@ -49,6 +49,7 @@ export const MODULE_ITEM_BLURB: Record<string, string> = {
   '/recordatorios': 'Avisos pendientes',
   '/internacion': 'Internados y altas',
   '/inventario': 'Stock y productos',
+  '/compras': 'Compras a proveedores y reposición',
   '/facturacion': 'Facturas y cobros',
   '/caja': 'Sesiones de caja',
   '/profesionales': 'Equipo clínico',

@@ -101,6 +101,7 @@ export const NAV_FEATURE_BY_HREF: Record<string, FeatureKey> = {
   '/cirugias': FEATURES.SURGERY,
   '/laboratorio': FEATURES.LABORATORY,
   '/inventario': FEATURES.INVENTORY,
+  '/compras': FEATURES.INVENTORY,
   '/farmacia': FEATURES.PHARMACY,
   '/facturacion': FEATURES.BILLING,
   '/caja': FEATURES.CASH_REGISTER,

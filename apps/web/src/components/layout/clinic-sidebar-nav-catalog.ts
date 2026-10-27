@@ -19,6 +19,7 @@ import {
   PawPrint,
   Pill,
   Receipt,
+  ShoppingCart,
   Scissors,
   GraduationCap,
   ScrollText,
@@ -75,6 +76,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Internación', href: '/internacion', icon: BedDouble, groupId: 'hospitalization' },
 
   { label: 'Inventario', href: '/inventario', icon: Package, groupId: 'management' },
+  { label: 'Compras', href: '/compras', icon: ShoppingCart, groupId: 'management' },
   { label: 'Facturación', href: '/facturacion', icon: Receipt, groupId: 'management' },
   { label: 'Caja', href: '/caja', icon: Banknote, groupId: 'management' },
 

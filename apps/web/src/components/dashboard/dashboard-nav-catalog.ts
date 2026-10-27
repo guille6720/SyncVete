@@ -12,6 +12,7 @@ import {
   PawPrint,
   Pill,
   Receipt,
+  ShoppingCart,
   Banknote,
   Bell,
   ScrollText,
@@ -43,6 +44,7 @@ export type DashboardNavActionId =
   | 'reminders'
   | 'admit-hospitalization'
   | 'new-product'
+  | 'new-purchase'
   | 'new-invoice'
   | 'cash-register'
   | 'professionals'
@@ -285,6 +287,15 @@ export const DASHBOARD_NAV_ACTIONS: DashboardNavAction[] = [
     icon: Package,
     requiresWrite: false,
     tone: 'bg-slate-100 text-slate-800 ring-slate-200 hover:bg-slate-200/80 dark:bg-slate-900 dark:text-slate-200 dark:ring-slate-700',
+    groupId: 'management',
+  },
+  {
+    id: 'new-purchase',
+    label: 'Nueva compra',
+    href: '/compras/nueva',
+    icon: ShoppingCart,
+    requiresWrite: false,
+    tone: 'bg-sky-100 text-sky-800 ring-sky-200 hover:bg-sky-200/80 dark:bg-sky-950 dark:text-sky-200 dark:ring-sky-800',
     groupId: 'management',
   },
   {
