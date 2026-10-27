@@ -298,6 +298,7 @@ export async function createAppointment(
     const endsAt = computeEndTime(startsAt, parsed.data.durationMinutes);
 
     const supabase = await createServerClient();
+    const isOverbook = formData.get('isOverbook') === 'on' || formData.get('isOverbook') === 'true';
     const { data, error } = await supabase
       .from('appointments')
       .insert({
@@ -312,6 +313,7 @@ export async function createAppointment(
         title: parsed.data.title ?? null,
         notes: parsed.data.notes ?? null,
         status: 'programada',
+        is_overbook: isOverbook,
         ...appointmentWritePayload(parsed.data),
       })
       .select('id')
@@ -330,6 +332,109 @@ export async function createAppointment(
     revalidateAgenda(data.id);
     revalidateDashboard();
     redirect(`/agenda/${data.id}`);
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+/** Create a referral appointment from an open consultation without leaving the SOAP screen. */
+export async function createReferralFromConsultation(
+  _prev: ActionResult<{ appointmentId: string }> | null,
+  formData: FormData
+): Promise<ActionResult<{ appointmentId: string }>> {
+  try {
+    const session = await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
+    const consultationId = formString(formData, 'consultationId');
+    if (!consultationId) {
+      return { success: false, error: 'Consulta inválida' };
+    }
+
+    const isOverbook = formData.has('isOverbook');
+    const overbookNote = formString(formData, 'overbookNote')?.trim();
+    const baseNotes = formString(formData, 'notes')?.trim() ?? '';
+    const notesParts = [
+      `Derivación desde consulta ${consultationId}`,
+      isOverbook ? 'Sobreturno' : null,
+      overbookNote ? `Motivo sobreturno: ${overbookNote}` : null,
+      baseNotes || null,
+    ].filter(Boolean);
+
+    const referralForm = new FormData();
+    for (const [key, value] of formData.entries()) {
+      if (typeof value === 'string') referralForm.set(key, value);
+    }
+    referralForm.set('notes', notesParts.join(' · '));
+    referralForm.set('title', formString(formData, 'title') || 'Derivación');
+    referralForm.set('appointmentType', formString(formData, 'appointmentType') || 'consulta');
+    if (isOverbook) referralForm.set('isOverbook', 'true');
+
+    const parsed = parseAppointmentForm(referralForm);
+    if (!parsed.success) {
+      const fieldErrors = parsed.error.flatten().fieldErrors as Record<string, string[]>;
+      const firstError = Object.values(fieldErrors).flat()[0];
+      return {
+        success: false,
+        error: firstError ?? 'Datos inválidos',
+        fieldErrors,
+      };
+    }
+
+    if (!parsed.data.assignedUserId) {
+      return { success: false, error: 'Seleccioná un profesional' };
+    }
+    if (!parsed.data.startsAt) {
+      return { success: false, error: 'Seleccioná un horario' };
+    }
+
+    const branchId = parsed.data.branchId ?? session.branchId;
+    if (!branchId) {
+      return { success: false, error: 'Seleccioná una sucursal activa' };
+    }
+
+    const startsAt = parsed.data.startsAt;
+    const endsAt = computeEndTime(startsAt, parsed.data.durationMinutes);
+    const supabase = await createServerClient();
+    const baseRow = {
+      organization_id: session.organizationId,
+      branch_id: branchId,
+      patient_id: parsed.data.patientId,
+      owner_id: parsed.data.ownerId,
+      assigned_user_id: parsed.data.assignedUserId,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      appointment_type: parsed.data.appointmentType,
+      title: parsed.data.title ?? 'Derivación',
+      notes: parsed.data.notes ?? null,
+      status: 'programada' as const,
+      ...appointmentWritePayload(parsed.data),
+    };
+
+    let { data, error } = await supabase
+      .from('appointments')
+      .insert({ ...baseRow, is_overbook: isOverbook })
+      .select('id')
+      .single();
+
+    // Staging may lag the is_overbook migration; retry without the column.
+    if (
+      error &&
+      (error.code === 'PGRST204' || /is_overbook/i.test(error.message ?? ''))
+    ) {
+      ({ data, error } = await supabase.from('appointments').insert(baseRow).select('id').single());
+    }
+
+    if (error) {
+      console.error('[createReferralFromConsultation]', error);
+      return {
+        success: false,
+        error: rpcErrorMessage(error, 'No se pudo crear la derivación'),
+      };
+    }
+
+    await enqueueReminderJobsSoft(data.id);
+    revalidateAgenda(data.id);
+    revalidateDashboard();
+    return { success: true, data: { appointmentId: data.id } };
   } catch (error) {
     return actionError(error);
   }

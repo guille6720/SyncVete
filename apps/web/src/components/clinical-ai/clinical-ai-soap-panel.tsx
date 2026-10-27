@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { applySoapSuggestion, generateClinicalAi } from '@/actions/clinical-ai';
 import { ClinicalAiResult } from '@/components/clinical-ai/clinical-ai-result';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   CLINICAL_AI_DISCLAIMER,
   type ClinicalAiSoapAssist,
@@ -54,12 +53,15 @@ export function ClinicalAiSoapPanel({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Asistente SOAP</CardTitle>
-        <CardDescription>{CLINICAL_AI_DISCLAIMER}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <details className="sv-neon rounded-lg bg-card open:pb-3">
+      <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-foreground marker:content-none [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center justify-between gap-3">
+          <span>Asistente SOAP</span>
+          <span className="text-xs font-normal text-muted-foreground">Abrir / cerrar</span>
+        </span>
+      </summary>
+      <div className="space-y-3 border-t border-border px-4 pt-3">
+        <p className="text-xs text-muted-foreground">{CLINICAL_AI_DISCLAIMER}</p>
         {!configured && (
           <p className="text-sm text-amber-800">
             Configurá <code>OPENAI_API_KEY</code> para generar sugerencias.
@@ -75,7 +77,7 @@ export function ClinicalAiSoapPanel({
         </form>
         {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
         {soap && state?.data && (
-          <div className="space-y-3 rounded-lg border p-4">
+          <div className="space-y-3 rounded-lg border p-3">
             <ClinicalAiResult kind="soap_assist" output={soap} />
             <Button size="sm" onClick={handleApply} disabled={applying}>
               {applying ? 'Aplicando...' : 'Aplicar a la consulta'}
@@ -83,7 +85,7 @@ export function ClinicalAiSoapPanel({
             {applyError && <p className="text-sm text-destructive">{applyError}</p>}
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </details>
   );
 }

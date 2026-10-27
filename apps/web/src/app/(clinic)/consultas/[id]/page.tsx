@@ -12,6 +12,7 @@ import { ClinicalAiSoapPanel } from '@/components/clinical-ai/clinical-ai-soap-p
 import { Button } from '@/components/ui/button';
 import { canManageBilling } from '@/actions/billing';
 import { getClinicalAiStatus } from '@/actions/clinical-ai';
+import { canManageAppointments, getAssignableStaff } from '@/actions/appointments';
 import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
@@ -27,13 +28,15 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
   if (!canRead) redirect('/consultas');
 
   const { id } = await params;
-  const [consultation, canWrite, canWriteBilling, aiStatus, settlementAccess] = await Promise.all([
-    getConsultation(id),
-    canManageConsultations(),
-    canManageBilling(),
-    getClinicalAiStatus(),
-    canReadSettlementSourceClaims(),
-  ]);
+  const [consultation, canWrite, canWriteBilling, aiStatus, settlementAccess, canRefer] =
+    await Promise.all([
+      getConsultation(id),
+      canManageConsultations(),
+      canManageBilling(),
+      getClinicalAiStatus(),
+      canReadSettlementSourceClaims(),
+      canManageAppointments(),
+    ]);
 
   if (!consultation) notFound();
 
@@ -42,19 +45,25 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
       ? await getSettlementClaimForSource('consultation', consultation.id)
       : null;
   const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
+  const staff = canRefer ? await getAssignableStaff().catch(() => []) : [];
 
   const isOpen = consultation.status === 'en_curso' || consultation.status === 'en_espera';
 
   if (isOpen && canWrite) {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-6xl space-y-3">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/consultas">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Volver a consultas
           </Link>
         </Button>
-        <ConsultationSoapForm consultation={consultation} canWriteBilling={canWriteBilling} />
+        <ConsultationSoapForm
+          consultation={consultation}
+          canWriteBilling={canWriteBilling}
+          canRefer={canRefer}
+          staff={staff}
+        />
         {aiStatus.soapEntitled ? (
           <ClinicalAiSoapPanel
             consultationId={consultation.id}

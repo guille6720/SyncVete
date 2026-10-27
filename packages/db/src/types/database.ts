@@ -2287,6 +2287,7 @@ export interface Database {
           remind_24h: boolean;
           remind_2h: boolean;
           remind_confirmation: boolean;
+          is_overbook: boolean;
           source_system: string | null;
           source_record_id: string | null;
           import_batch_id: string | null;
@@ -2316,6 +2317,7 @@ export interface Database {
           remind_24h?: boolean;
           remind_2h?: boolean;
           remind_confirmation?: boolean;
+          is_overbook?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
@@ -2345,6 +2347,7 @@ export interface Database {
           remind_24h?: boolean;
           remind_2h?: boolean;
           remind_confirmation?: boolean;
+          is_overbook?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
