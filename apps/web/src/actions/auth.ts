@@ -12,6 +12,10 @@ import {
   type ActionResult,
   type SessionContext,
 } from '@sincvete/shared';
+import {
+  acceptPendingInvitation,
+  invitationActivated,
+} from '@/lib/auth/accept-pending-invitation';
 import { createServerClient, createServiceClient } from '@/lib/supabase/server';
 import { getSessionContext as loadSessionContext } from '@/lib/session';
 import { headers } from 'next/headers';
@@ -72,7 +76,16 @@ export async function signIn(
       };
     }
 
-    await supabase.rpc('accept_pending_invitation');
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user) {
+      const accepted = await acceptPendingInvitation(supabase, user.id);
+      if (invitationActivated(accepted.status)) {
+        const redirectTo = safeOwnerPortalRedirect(formData.get('redirectTo'));
+        redirect(redirectTo || '/dashboard');
+      }
+    }
 
     const redirectTo = safeOwnerPortalRedirect(formData.get('redirectTo'));
     if (redirectTo) {
@@ -308,8 +321,11 @@ export async function updatePassword(
       };
     }
 
-    // Invite emails land here first; bind the pending org invitation before /home.
-    await supabase.rpc('accept_pending_invitation');
+    // Invite emails land here first; bind the pending org invitation before routing.
+    const accepted = await acceptPendingInvitation(supabase, user.id);
+    if (invitationActivated(accepted.status)) {
+      redirect('/dashboard');
+    }
 
     redirect('/home');
   } catch (error) {
