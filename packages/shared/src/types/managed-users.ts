@@ -37,7 +37,8 @@ export interface ManagedInvitationRow {
 }
 
 export interface ManagedUsersOverview {
-  limit: number;
+  /** null means no managed-user quota for a platform admin in their own clinic. */
+  limit: number | null;
   seatsUsed: number;
   totalUsers: number;
   centralAdmins: number;

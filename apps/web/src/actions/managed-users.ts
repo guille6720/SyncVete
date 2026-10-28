@@ -162,9 +162,9 @@ function mapUser(row: RpcUserRow): ManagedUserRow {
 }
 
 function toOverview(raw: unknown): ManagedUsersOverview {
-  const o = (raw ?? {}) as Record<string, number | undefined>;
+  const o = (raw ?? {}) as Record<string, number | null | undefined>;
   return {
-    limit: Number(o.limit ?? 0),
+    limit: o.limit === null ? null : Number(o.limit ?? 0),
     seatsUsed: Number(o.seats_used ?? 0),
     totalUsers: Number(o.total_users ?? 0),
     centralAdmins: Number(o.central_admins ?? 0),
