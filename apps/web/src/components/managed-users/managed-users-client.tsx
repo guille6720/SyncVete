@@ -57,8 +57,8 @@ export function ManagedUsersClient({
   const [revokeTarget, setRevokeTarget] = useState<ManagedInvitationRow | null>(null);
   const [, startTransition] = useTransition();
 
-  const limitReached = overview.seatsUsed >= overview.limit;
-  const available = Math.max(0, overview.limit - overview.seatsUsed);
+  const limitReached = overview.limit !== null && overview.seatsUsed >= overview.limit;
+  const available = overview.limit === null ? null : Math.max(0, overview.limit - overview.seatsUsed);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -198,13 +198,16 @@ export function ManagedUsersClient({
       <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <OverviewCard
           label="Usuarios activos"
-          value={`${overview.activeManaged} / ${overview.limit}`}
+          value={`${overview.activeManaged} / ${overview.limit ?? 'Sin límite'}`}
           hint={`${overview.seatsUsed} cupos en uso`}
         />
         <OverviewCard label="Total de usuarios" value={String(overview.totalUsers)} />
         <OverviewCard label="Invitaciones pendientes" value={String(overview.pendingInvitations)} />
         <OverviewCard label="Suspendidos" value={String(overview.suspended)} />
-        <OverviewCard label="Cupos disponibles" value={String(available)} />
+        <OverviewCard
+          label="Cupos disponibles"
+          value={available === null ? 'Sin límite' : String(available)}
+        />
       </div>
 
       <Card>
