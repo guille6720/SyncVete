@@ -91,15 +91,17 @@ function downloadText(filename: string, text: string, type = 'text/csv;charset=u
 export function DataMigrationPanel({
   canImport,
   canExport,
+  initialImportType = 'owners',
 }: {
   canImport: boolean;
   canExport: boolean;
+  initialImportType?: ImportType;
 }) {
   const [pending, run] = usePendingAction();
   const [section, setSection] = useState<Section>(canImport ? 'import' : 'export');
   const [message, setMessage] = useState<string | null>(null);
 
-  const [importType, setImportType] = useState<ImportType>('owners');
+  const [importType, setImportType] = useState<ImportType>(initialImportType);
   const [sourceSystem, setSourceSystem] = useState('VetLegacy');
   const [idempotencyMode, setIdempotencyMode] = useState<IdempotencyMode>('off');
   const [csvText, setCsvText] = useState('');

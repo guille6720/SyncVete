@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { CalendarClock, ClipboardList, Plus, Search, X } from 'lucide-react';
+import { CalendarClock, ClipboardList, Search, X } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -499,14 +499,9 @@ export function AppointmentsAgenda({
               Disponibilidad
             </Link>
           </Button>
-          {canWrite && (
-            <Button asChild>
-              <Link href={`/agenda/nueva?date=${selectedDate}`}>
-                <Plus className="mr-2 h-4 w-4" />
-                Nuevo turno
-              </Link>
-            </Button>
-          )}
+          <Button variant="outline" size="sm" asChild>
+            <Link href="/agenda/turnos">Turnos</Link>
+          </Button>
         </div>
       </div>
 

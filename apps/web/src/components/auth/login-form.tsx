@@ -18,9 +18,16 @@ interface LoginFormProps {
   brand?: OwnerAppBrand;
   redirectTo?: string;
   errorCode?: string;
+  errorReason?: string;
 }
 
-export function LoginForm({ redirectTo, errorCode, brand, ownerAccess = false }: LoginFormProps) {
+export function LoginForm({
+  redirectTo,
+  errorCode,
+  errorReason,
+  brand,
+  ownerAccess = false,
+}: LoginFormProps) {
   const [state, formAction, pending] = useActionState(signIn, null);
 
   return (
@@ -88,8 +95,11 @@ export function LoginForm({ redirectTo, errorCode, brand, ownerAccess = false }:
           )}
           {errorCode === 'incomplete_account' && (
             <p className="text-sm text-destructive">
-              Tu usuario existe pero la clínica no quedó configurada. Volvé a registrarte con un
-              identificador nuevo, o pedí soporte para reparar la cuenta.
+              {errorReason === 'no_invitation'
+                ? 'Tu usuario existe pero no hay una invitación pendiente. Pedile al administrador que te vuelva a invitar.'
+                : errorReason === 'other_organization'
+                  ? 'Ese email ya está asociado a otra clínica. Pedí soporte para mover o reparar la cuenta.'
+                  : 'Tu usuario existe pero la clínica no quedó configurada. Pedile al administrador que reenvíe la invitación, o pedí soporte.'}
             </p>
           )}
 

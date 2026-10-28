@@ -1,0 +1,11 @@
+---
+description: Entorno y rama compartidos entre Cursor y ChatGPT/Codex
+alwaysApply: true
+---
+
+Leer y cumplir `AGENTS.md` y `docs/entornos-y-ramas.md` del repositorio.
+Trabajar directamente en `feature/ui-v2-shell-dashboard-staging`, con origen `https://github.com/guille6720/SyncVete.git`.
+No crear ramas adicionales. Verificar rama, cambios locales y novedades remotas antes de editar; conservar trabajo concurrente y publicar sin reescribir historial.
+`main` es producción y solo recibe versiones autorizadas mediante una solicitud desde staging.
+Las cuentas de acceso son `micuenta66667@gmail.com` (staging) y `guille67c@gmail.com` (producción); no cambiar el autor de Git por estas cuentas.
+Probar solo contra Supabase staging `owmcrqvnfubyjxrlyhlc` y la dirección de staging indicada en `AGENTS.md`.

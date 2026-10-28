@@ -18,7 +18,9 @@ import {
 import { cn } from '@/lib/utils';
 
 const controlClass =
-  'inline-flex h-9 items-center gap-1.5 rounded-md border border-teal-700/30 bg-white px-2.5 text-sm font-semibold text-teal-900 shadow-sm transition hover:bg-teal-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
+  'sv-neon sv-neon-hover inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-md bg-white px-2 text-sm font-semibold text-teal-900 hover:bg-teal-50 sm:px-2.5 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800';
+
+const labelClass = 'hidden lg:inline';
 
 function readPrefs(): ThemePreferences {
   if (typeof window === 'undefined') return DEFAULT_THEME;
@@ -76,15 +78,24 @@ export function ThemeControls() {
     writePrefs(next);
   }
 
+  const accentSwatch =
+    COLOR_PRESETS.find((p) => p.id === accent)?.swatch ??
+    COLOR_PRESETS.find((p) => p.id === DEFAULT_THEME.accent)?.swatch;
+
   return (
     <div
-      className="flex shrink-0 items-center gap-1.5 rounded-lg bg-teal-600/10 p-1 dark:bg-teal-400/10"
+      className="flex max-w-full shrink-0 items-center gap-0.5 rounded-lg bg-teal-600/10 p-0.5 sm:gap-1 sm:p-1 dark:bg-teal-400/10"
       data-testid="theme-controls"
       aria-label="Manual, tema y configuración"
     >
-      <Link href="/configuracion" className={controlClass} title="Configuración">
-        <Settings className="h-4 w-4" />
-        <span>Config</span>
+      <Link
+        href="/configuracion"
+        className={controlClass}
+        title="Configuración"
+        aria-label="Configuración"
+      >
+        <Settings className="h-4 w-4" aria-hidden />
+        <span className={labelClass}>Config</span>
       </Link>
 
       <div className="relative" ref={paletteRef}>
@@ -97,14 +108,13 @@ export function ThemeControls() {
           title="Paleta de colores"
           onClick={() => setPaletteOpen((open) => !open)}
         >
-          <Palette className="h-4 w-4" />
+          <Palette className="h-4 w-4" aria-hidden />
           <span
             className="h-3.5 w-3.5 rounded-full border border-black/10"
-            style={{
-              backgroundColor: COLOR_PRESETS.find((p) => p.id === accent)?.swatch,
-            }}
+            style={{ backgroundColor: accentSwatch }}
+            aria-hidden
           />
-          <span>Color</span>
+          <span className={labelClass}>Color</span>
         </button>
 
         {paletteOpen ? (
@@ -154,8 +164,13 @@ export function ThemeControls() {
         title={mode === 'dark' ? 'Modo claro' : 'Modo oscuro'}
         onClick={() => persist({ mode: mode === 'dark' ? 'light' : 'dark', accent })}
       >
-        {mounted && mode === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-        <span>{mounted && mode === 'dark' ? 'Claro' : 'Oscuro'}</span>
+        {/* Keep SSR/first paint identical; swap icon after mount when prefs are known. */}
+        {mounted && mode === 'dark' ? (
+          <Sun className="h-4 w-4" aria-hidden />
+        ) : (
+          <Moon className="h-4 w-4" aria-hidden />
+        )}
+        <span className={labelClass}>{mounted && mode === 'dark' ? 'Claro' : 'Oscuro'}</span>
       </button>
 
       <a
@@ -164,8 +179,8 @@ export function ThemeControls() {
         aria-label="Descargar manual de uso en PDF"
         title="Descargar manual de uso en PDF"
       >
-        <BookOpen className="h-4 w-4" />
-        <span>Manual</span>
+        <BookOpen className="h-4 w-4" aria-hidden />
+        <span className={labelClass}>Manual</span>
       </a>
     </div>
   );

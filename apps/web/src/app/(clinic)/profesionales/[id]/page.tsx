@@ -1,4 +1,7 @@
 import { notFound, redirect } from 'next/navigation';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { ProfessionalSchedulePanel } from '@/components/appointments/professional-schedule-panel';
 import {
   canReadProfessionalCompensation,
   canReadProfessionalSettlements,
@@ -16,7 +19,7 @@ import {
   listProfessionalBranches,
 } from '@/actions/professionals';
 import { ProfessionalSummaryStrip } from '@/components/professionals/professional-summary-strip';
-import { getAssignableStaff } from '@/actions/appointments';
+import { canReadAppointments, getAssignableStaff } from '@/actions/appointments';
 import { getOrganization, getUserBranches } from '@/actions/settings';
 import { CompensationPanel } from '@/components/professionals/compensation-panel';
 import { ProfessionalSettlementsLink } from '@/components/professionals/professional-settlements-link';
@@ -35,23 +38,35 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
   const professional = await getProfessional(id);
   if (!professional) notFound();
 
-  const [branches, professionalBranches, staff, canWrite, canReadComp, canWriteComp, canReadSettlements, organization, settlementSummary, schedules] =
-    await Promise.all([
-      getUserBranches(),
-      listProfessionalBranches(id),
-      getAssignableStaff(),
-      canWriteProfessionals(),
-      canReadProfessionalCompensation(),
-      canWriteProfessionalCompensation(),
-      canReadProfessionalSettlements(),
-      getOrganization(),
-      canReadProfessionalSettlements().then((allowed) =>
-        allowed ? getProfessionalSettlementSummary(id) : null
-      ),
-      professional.user_id
-        ? listProfessionalSchedules({ userId: professional.user_id }).catch(() => [])
-        : Promise.resolve([]),
-    ]);
+  const canReadAgenda = await canReadAppointments();
+
+  const [
+    branches,
+    professionalBranches,
+    staff,
+    canWrite,
+    canReadComp,
+    canWriteComp,
+    canReadSettlements,
+    organization,
+    settlementSummary,
+    schedules,
+  ] = await Promise.all([
+    getUserBranches(),
+    listProfessionalBranches(id),
+    getAssignableStaff(),
+    canWriteProfessionals(),
+    canReadProfessionalCompensation(),
+    canWriteProfessionalCompensation(),
+    canReadProfessionalSettlements(),
+    getOrganization(),
+    canReadProfessionalSettlements().then((allowed) =>
+      allowed ? getProfessionalSettlementSummary(id) : null
+    ),
+    professional.user_id && canReadAgenda
+      ? listProfessionalSchedules({ userId: professional.user_id }).catch(() => [])
+      : Promise.resolve([]),
+  ]);
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
   const branchIds = professionalBranches.map((row) => row.branch_id);
@@ -99,6 +114,38 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
           canCalculate={canWriteComp}
         />
       ) : null}
+
+      {canReadAgenda && (
+        <section className="space-y-3" aria-labelledby="professional-agenda-heading">
+          <h2 id="professional-agenda-heading" className="text-lg font-semibold">
+            Agenda del profesional
+          </h2>
+          {professional.user_id ? (
+            <>
+              <ProfessionalSchedulePanel
+                fullName={`${professional.first_name} ${professional.last_name}`}
+                specialty={professional.specialty}
+                schedules={schedules}
+                editHref={null}
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" asChild>
+                  <Link href={`/agenda?assigned=${professional.user_id}`}>
+                    Ver turnos de este profesional
+                  </Link>
+                </Button>
+                <Button variant="outline" asChild>
+                  <Link href="/agenda/disponibilidad">Consultar disponibilidad</Link>
+                </Button>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Este profesional todavía no tiene un usuario vinculado a la agenda.
+            </p>
+          )}
+        </section>
+      )}
 
       {canWrite && (
         <ProfessionalForm

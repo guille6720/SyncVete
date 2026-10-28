@@ -6,6 +6,7 @@ import {
   Bell,
   Briefcase,
   Calendar,
+  CalendarPlus,
   ClipboardList,
   FlaskConical,
   Hourglass,
@@ -18,6 +19,7 @@ import {
   PawPrint,
   Pill,
   Receipt,
+  ShoppingCart,
   Scissors,
   GraduationCap,
   ScrollText,
@@ -25,9 +27,12 @@ import {
   Sparkles,
   Stethoscope,
   Syringe,
+  Upload,
+  UserCog,
   Users,
   Wallet,
 } from 'lucide-react';
+import type { Permission } from '@sincvete/shared';
 import {
   DASHBOARD_NAV_GROUPS,
   type DashboardNavGroup,
@@ -42,6 +47,8 @@ export interface ClinicSidebarNavItem {
   groupId: DashboardNavGroupId | null;
   /** Only show when AppShell enables my-settlements nav. */
   requiresMySettlements?: boolean;
+  /** Hide unless the session holds this permission (pages still enforce it server-side). */
+  requiresPermission?: Permission;
   /** Only show when Academia / Tutoriales is enabled for this deployment. */
   requiresAcademia?: boolean;
 }
@@ -62,6 +69,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, groupId: 'patients' },
 
   { label: 'Agenda', href: '/agenda', icon: Calendar, groupId: 'agenda' },
+  { label: 'Turnos', href: '/agenda/turnos', icon: CalendarPlus, groupId: 'agenda' },
   { label: 'Vacunación', href: '/vacunacion', icon: Syringe, groupId: 'agenda' },
   { label: 'Cirugías', href: '/cirugias', icon: Scissors, groupId: 'agenda' },
   { label: 'Recordatorios', href: '/recordatorios', icon: Bell, groupId: 'agenda' },
@@ -69,6 +77,7 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Internación', href: '/internacion', icon: BedDouble, groupId: 'hospitalization' },
 
   { label: 'Inventario', href: '/inventario', icon: Package, groupId: 'management' },
+  { label: 'Compras', href: '/compras', icon: ShoppingCart, groupId: 'management' },
   { label: 'Facturación', href: '/facturacion', icon: Receipt, groupId: 'management' },
   { label: 'Caja', href: '/caja', icon: Banknote, groupId: 'management' },
 
@@ -89,6 +98,15 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'WhatsApp', href: '/whatsapp', icon: MessageCircle, groupId: 'communication' },
   { label: 'Notificaciones', href: '/notificaciones', icon: Inbox, groupId: 'communication' },
 
+  {
+    label: 'Usuarios y permisos',
+    href: '/usuarios',
+    icon: UserCog,
+    groupId: 'users',
+    requiresPermission: 'users:manage',
+  },
+
+  { label: 'Importar datos', href: '/importar', icon: Upload, groupId: 'settings' },
   { label: 'Tutoriales', href: '/academia', icon: GraduationCap, groupId: 'settings', requiresAcademia: true },
   { label: 'Configuración', href: '/configuracion', icon: Settings, groupId: 'settings' },
 ];
@@ -100,11 +118,15 @@ export function filterClinicSidebarNavItems(
     showMySettlementsNav: boolean;
     academiaEnabled?: boolean;
     isEntitled: (href: string) => boolean;
+    permissions?: readonly string[];
   }
 ): ClinicSidebarNavItem[] {
   return items.filter((item) => {
     if (item.requiresMySettlements && !opts.showMySettlementsNav) return false;
     if (item.requiresAcademia && !opts.academiaEnabled) return false;
+    if (item.requiresPermission && !opts.permissions?.includes(item.requiresPermission)) {
+      return false;
+    }
     return opts.isEntitled(item.href);
   });
 }
@@ -124,17 +146,45 @@ export function groupClinicSidebarNavItems(
   return { topLevel, groups };
 }
 
-export function isSidebarNavItemActive(pathname: string, href: string): boolean {
-  return pathname === href || pathname.startsWith(`${href}/`);
+/**
+ * Active when this href is the longest catalog match for the pathname.
+ * Avoids `/agenda` staying active on `/agenda/turnos`.
+ */
+export function isSidebarNavItemActive(
+  pathname: string,
+  href: string,
+  catalogHrefs: readonly string[] = CLINIC_SIDEBAR_NAV_ITEMS.map((item) => item.href)
+): boolean {
+  const matches = catalogHrefs
+    .filter((candidate) => pathname === candidate || pathname.startsWith(`${candidate}/`))
+    .sort((a, b) => b.length - a.length);
+  if (matches.length === 0) {
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+  return matches[0] === href;
 }
 
 export function findActiveSidebarGroupId(
   pathname: string,
-  items: readonly ClinicSidebarNavItem[]
+  items: readonly ClinicSidebarNavItem[],
+  resolveHubGroupId?: (pathname: string) => DashboardNavGroupId | null
 ): DashboardNavGroupId | null {
+  const fromHub = resolveHubGroupId?.(pathname) ?? null;
+  if (fromHub) return fromHub;
+
   // Prefer longest matching href so /liquidaciones/mis-liquidaciones wins over /liquidaciones.
   const matches = items
     .filter((item) => item.groupId != null && isSidebarNavItemActive(pathname, item.href))
     .sort((a, b) => b.href.length - a.href.length);
   return matches[0]?.groupId ?? null;
+}
+
+/** Destination for a sidebar group: hub page, or the only child when there is one. */
+export function getSidebarGroupDestination(
+  groupId: DashboardNavGroupId,
+  items: readonly ClinicSidebarNavItem[],
+  hubPath: (groupId: DashboardNavGroupId) => string
+): string {
+  if (items.length === 1) return items[0]!.href;
+  return hubPath(groupId);
 }

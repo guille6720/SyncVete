@@ -11,9 +11,16 @@ import {
 interface ProfessionalsListProps {
   professionals: ProfessionalListRow[];
   currency?: string;
+  canReadCompensation?: boolean;
+  canReadSettlements?: boolean;
 }
 
-export function ProfessionalsList({ professionals, currency = 'ARS' }: ProfessionalsListProps) {
+export function ProfessionalsList({
+  professionals,
+  currency = 'ARS',
+  canReadCompensation = false,
+  canReadSettlements = false,
+}: ProfessionalsListProps) {
   if (professionals.length === 0) {
     return (
       <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
@@ -38,39 +45,45 @@ export function ProfessionalsList({ professionals, currency = 'ARS' }: Professio
               {PROFESSIONAL_RELATIONSHIP_LABELS[professional.relationship_type]}
               {professional.specialty ? ` · ${professional.specialty}` : ''}
             </p>
-            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span>
-                Esquema:{' '}
-                {professional.activeSchemeName ? (
-                  <span className="text-foreground">{professional.activeSchemeName}</span>
-                ) : (
-                  'Sin esquema vigente'
-                )}
-              </span>
-              {professional.openBalance > 0 ? (
-                <span>
-                  Saldo:{' '}
-                  <span className="font-medium text-foreground">
-                    {formatMoney(professional.openBalance, currency)}
+            {(canReadCompensation || canReadSettlements) && (
+              <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                {canReadCompensation && (
+                  <span>
+                    Esquema:{' '}
+                    {professional.activeSchemeName ? (
+                      <span className="text-foreground">{professional.activeSchemeName}</span>
+                    ) : (
+                      'Sin esquema vigente'
+                    )}
                   </span>
-                </span>
-              ) : null}
-              {professional.pendingSettlementCount > 0 ? (
-                <span>{professional.pendingSettlementCount} en borrador/revisión</span>
-              ) : null}
-              {professional.lastPaymentAmount != null && professional.lastPaymentDate ? (
-                <span>
-                  Último pago:{' '}
-                  <span className="text-foreground">
-                    {formatMoney(professional.lastPaymentAmount, currency)}
-                  </span>{' '}
-                  ({professional.lastPaymentDate.slice(0, 10)})
-                </span>
-              ) : null}
-            </div>
+                )}
+                {canReadSettlements && professional.openBalance > 0 ? (
+                  <span>
+                    Saldo:{' '}
+                    <span className="font-medium text-foreground">
+                      {formatMoney(professional.openBalance, currency)}
+                    </span>
+                  </span>
+                ) : null}
+                {canReadSettlements && professional.pendingSettlementCount > 0 ? (
+                  <span>{professional.pendingSettlementCount} en borrador/revisión</span>
+                ) : null}
+                {canReadSettlements &&
+                professional.lastPaymentAmount != null &&
+                professional.lastPaymentDate ? (
+                  <span>
+                    Último pago:{' '}
+                    <span className="text-foreground">
+                      {formatMoney(professional.lastPaymentAmount, currency)}
+                    </span>{' '}
+                    ({professional.lastPaymentDate.slice(0, 10)})
+                  </span>
+                ) : null}
+              </div>
+            )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {professional.openBalance > 0 ? (
+            {canReadSettlements && professional.openBalance > 0 ? (
               <Badge variant="warning">{formatMoney(professional.openBalance, currency)}</Badge>
             ) : null}
             <Badge variant={professional.is_active ? 'success' : 'default'}>

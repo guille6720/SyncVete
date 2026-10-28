@@ -1,15 +1,16 @@
 import { notFound, redirect } from 'next/navigation';
+import { canManageInventory, canReadInventory, getInventoryProduct } from '@/actions/inventory';
 import {
-  canManageInventory,
-  canReadInventory,
-  getInventoryProduct,
-} from '@/actions/inventory';
+  listPurchasePartyOptions,
+  listPurchaseCategories,
+  getPurchaseExchangeRate,
+} from '@/actions/purchase-catalog';
 import { InventoryProductDetail } from '@/components/inventory/inventory-product-detail';
 import { resolveListHref } from '@/lib/list-return';
 
 interface InventarioDetailPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ return?: string }>;
+  searchParams: Promise<{ return?: string; from?: string }>;
 }
 
 export default async function InventarioDetailPage({
@@ -21,7 +22,14 @@ export default async function InventarioDetailPage({
 
   const { id } = await params;
   const query = await searchParams;
-  const [data, canWrite] = await Promise.all([getInventoryProduct(id), canManageInventory()]);
+  const fromCompras = query.from === 'compras';
+  const [data, canWrite, suppliers, categories, exchangeRate] = await Promise.all([
+    getInventoryProduct(id),
+    canManageInventory(),
+    listPurchasePartyOptions(),
+    listPurchaseCategories(),
+    getPurchaseExchangeRate(),
+  ]);
 
   if (!data) notFound();
 
@@ -30,7 +38,11 @@ export default async function InventarioDetailPage({
       product={data.product}
       movements={data.movements}
       canWrite={canWrite}
-      listHref={resolveListHref('/inventario', query.return)}
+      suppliers={suppliers}
+      categories={categories}
+      exchangeRate={exchangeRate}
+      listHref={resolveListHref(fromCompras ? '/compras' : '/inventario', query.return)}
+      backLabel={fromCompras ? 'Volver a compras' : 'Volver a inventario'}
     />
   );
 }

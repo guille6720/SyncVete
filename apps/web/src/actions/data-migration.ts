@@ -537,6 +537,8 @@ export async function commitDataImport(formData: FormData): Promise<
     revalidatePath('/agenda');
     revalidatePath('/consultas');
     revalidatePath('/facturacion');
+    revalidatePath('/inventario');
+    revalidatePath('/compras');
     return { success: true, data: result };
   } catch (error) {
     return actionError(error);

@@ -30,6 +30,8 @@ import {
   Hourglass,
   Briefcase,
   GraduationCap,
+  ShoppingCart,
+  Upload,
   Wallet,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -56,6 +58,7 @@ const NAV_ITEMS = [
   { label: 'Cirugías', href: '/cirugias', icon: Scissors, keywords: 'quirófano operacion castracion' },
   { label: 'Laboratorio', href: '/laboratorio', icon: FlaskConical, keywords: 'lab hemograma analisis resultados' },
   { label: 'Inventario', href: '/inventario', icon: Package, keywords: 'stock farmacia productos insumos' },
+  { label: 'Compras', href: '/compras', icon: ShoppingCart, keywords: 'compra proveedor prestador stock reponer entrada vacuna precio' },
   { label: 'Farmacia', href: '/farmacia', icon: Pill, keywords: 'receta recetar medicamento dispensar' },
   { label: 'Facturación', href: '/facturacion', icon: Receipt, keywords: 'factura cobro caja pagos' },
   { label: 'Caja', href: '/caja', icon: Banknote, keywords: 'caja turno efectivo cierre cobros' },
@@ -89,6 +92,7 @@ const NAV_ITEMS = [
     icon: GraduationCap,
     keywords: 'tutorial tutoriales aprendizaje guia onboarding academia',
   },
+  { label: 'Importar datos', href: '/importar', icon: Upload, keywords: 'importar csv excel pdf tutores pacientes productos' },
   { label: 'Configuración', href: '/configuracion', icon: Settings, keywords: 'ajustes settings' },
   { label: 'Manual de uso', href: '/manual', icon: BookOpen, keywords: 'ayuda guia descargar pdf instrucciones' },
 ] as const;
@@ -104,6 +108,8 @@ const QUICK_ACTIONS = [
   { label: 'Programar cirugía', href: '/cirugias/nueva', keywords: 'operar quirofano castracion' },
   { label: 'Nueva orden de laboratorio', href: '/laboratorio/nueva', keywords: 'lab hemograma bioquimica' },
   { label: 'Nuevo producto de inventario', href: '/inventario/nuevo', keywords: 'stock farmacia producto' },
+  { label: 'Importar productos', href: '/inventario/importar', keywords: 'importar csv excel catalogo stock inventario' },
+  { label: 'Nueva compra', href: '/compras/nueva', keywords: 'comprar proveedor stock entrada remito' },
   { label: 'Nueva receta', href: '/farmacia/nueva', keywords: 'prescribir medicamento farmacia recetar' },
   { label: 'Subir imagen', href: '/imagenes/nueva', keywords: 'foto radiografia ecografia documento galeria' },
   { label: 'Nueva factura', href: '/facturacion/nueva', keywords: 'cobrar factura caja' },
@@ -255,14 +261,18 @@ export function CommandPaletteTrigger() {
   return (
     <button
       type="button"
-      className="flex items-center gap-2 rounded-md border border-border bg-background px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
+      className="inline-flex h-9 shrink-0 items-center gap-2 rounded-md border border-border bg-background px-2 text-sm text-muted-foreground hover:bg-accent sm:px-3"
+      aria-label="Buscar en la clínica"
+      title="Buscar (Ctrl+K)"
       onClick={() => {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
       }}
     >
-      <Search className="h-4 w-4" />
-      <span className="hidden sm:inline">Buscar...</span>
-      <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 text-xs md:inline">⌘K</kbd>
+      <Search className="h-4 w-4" aria-hidden />
+      <span className="hidden md:inline">Buscar...</span>
+      <kbd className="hidden rounded border border-border bg-muted px-1.5 py-0.5 text-xs xl:inline">
+        ⌘K
+      </kbd>
     </button>
   );
 }

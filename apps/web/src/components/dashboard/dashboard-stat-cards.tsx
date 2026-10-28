@@ -16,7 +16,6 @@ import {
   Banknote,
   Images,
   Inbox,
-  ScrollText,
   Stethoscope,
 } from 'lucide-react';
 import { getCurrentMonthLabel, isClinicPathEntitled, type DashboardSummary } from '@sincvete/shared';
@@ -245,15 +244,6 @@ export function DashboardStatCards({
       icon: Inbox,
       href: '/notificaciones',
       tone: 'rose',
-      group: 'secondary',
-    },
-    {
-      label: 'Auditoría hoy',
-      value: String(summary.auditEventsToday),
-      description: 'Eventos registrados',
-      icon: ScrollText,
-      href: '/auditoria',
-      tone: 'slate',
       group: 'secondary',
     },
     {

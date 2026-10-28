@@ -12,6 +12,11 @@ import {
 import { AUDIT_LIQUIDACIONES_FAMILY } from '../constants/audit';
 
 describe('auditLogListSchema', () => {
+  it('accepts an exact member identity and rejects names as identities', () => {
+    const userId = 'a0000000-0000-4000-8000-000000000001';
+    expect(auditLogListSchema.parse({ userId }).userId).toBe(userId);
+    expect(auditLogListSchema.safeParse({ userId: 'Ana Pérez' }).success).toBe(false);
+  });
   it('accepts filters', () => {
     const result = auditLogListSchema.safeParse({
       action: 'update',

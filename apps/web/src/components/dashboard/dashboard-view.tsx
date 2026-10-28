@@ -5,7 +5,7 @@ import {
   isClinicPathEntitled,
   type AppointmentListRow,
 } from '@sincvete/shared';
-import { getDashboardActivity, getDashboardContext, getDashboardSummary } from '@/actions/dashboard';
+import { getDashboardContext, getDashboardSummary } from '@/actions/dashboard';
 import { listAppointments } from '@/actions/appointments';
 import { canReadWaitingRoom, listWaitingRoom } from '@/actions/waiting-room';
 import {
@@ -17,13 +17,14 @@ import { parseOrganizationSettings } from '@sincvete/shared';
 import { DashboardSettlementsSnapshot } from '@/components/dashboard/dashboard-settlements-snapshot';
 import { getSessionContext } from '@/lib/session';
 import { getClinicCommercialShell } from '@/lib/entitlements';
-import { DashboardActivityFeed } from '@/components/dashboard/dashboard-activity-feed';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { DashboardQuickActions } from '@/components/dashboard/dashboard-quick-actions';
 import { DashboardRecentLists } from '@/components/dashboard/dashboard-recent-lists';
 import { DashboardSpeciesBreakdown } from '@/components/dashboard/dashboard-species-breakdown';
 import { DashboardStatCards } from '@/components/dashboard/dashboard-stat-cards';
 import { DashboardWaitingRoomSnapshot } from '@/components/dashboard/dashboard-waiting-room-snapshot';
+import { DashboardViewV2 } from '@/components/dashboard/dashboard-view-v2';
+import { isUiV2Enabled } from '@/lib/ui-v2/feature-flag';
 
 function DashboardPrioritySkeleton() {
   return (
@@ -138,26 +139,21 @@ async function DashboardWaitingRoomSection({
   );
 }
 
-/** Ops of the day — awaits summary only (activity deferred). */
+/** Ops of the day — awaits the dashboard summary. */
 async function DashboardPrioritySection({ entitledHrefs }: { entitledHrefs: string[] | null }) {
   const session = await getSessionContext();
   const summary = await getDashboardSummary(session?.branchId ?? null);
   return <DashboardStatCards summary={summary} entitledHrefs={entitledHrefs} variant="priority" />;
 }
 
-/** Secondary widgets — reuses cached summary; activity runs in parallel. */
+/** Secondary widgets — reuses the cached summary. */
 async function DashboardSecondarySection({
-  canViewActivity,
   entitledHrefs,
 }: {
-  canViewActivity: boolean;
   entitledHrefs: string[] | null;
 }) {
   const session = await getSessionContext();
-  const [summary, activity] = await Promise.all([
-    getDashboardSummary(session?.branchId ?? null),
-    canViewActivity ? getDashboardActivity() : Promise.resolve([]),
-  ]);
+  const summary = await getDashboardSummary(session?.branchId ?? null);
 
   return (
     <div className="space-y-6">
@@ -165,31 +161,26 @@ async function DashboardSecondarySection({
       <div className="grid gap-4 xl:grid-cols-3">
         <DashboardSpeciesBreakdown summary={summary} />
         <div className="xl:col-span-2">
-          {canViewActivity ? (
-            <DashboardActivityFeed activity={activity} />
-          ) : (
-            <DashboardRecentLists
-              recentPatients={summary.recentPatients}
-              recentOwners={summary.recentOwners}
-            />
-          )}
+          <DashboardRecentLists
+            recentPatients={summary.recentPatients}
+            recentOwners={summary.recentOwners}
+          />
         </div>
       </div>
-      {canViewActivity && (
-        <DashboardRecentLists
-          recentPatients={summary.recentPatients}
-          recentOwners={summary.recentOwners}
-        />
-      )}
     </div>
   );
 }
 
 /**
  * First paint: header + quick actions (session/org already request-cached).
- * Then stream priority KPIs, then secondary widgets / activity.
+ * Then stream priority KPIs, then secondary widgets.
+ * When NEXT_PUBLIC_UI_V2_ENABLED=true, renders the UI V2 dashboard layout.
  */
 export async function DashboardView() {
+  if (isUiV2Enabled()) {
+    return <DashboardViewV2 />;
+  }
+
   const session = await getSessionContext();
   if (!session) return null;
 
@@ -223,7 +214,6 @@ export async function DashboardView() {
       </Suspense>
       <Suspense fallback={<DashboardSecondarySkeleton />}>
         <DashboardSecondarySection
-          canViewActivity={context?.canViewActivity ?? false}
           entitledHrefs={commercial.entitledHrefs}
         />
       </Suspense>

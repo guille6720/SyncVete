@@ -141,6 +141,12 @@ export type InventoryUnit =
   | 'dosis'
   | 'otro';
 
+export type ProductCurrency = 'ARS' | 'USD';
+
+export type PurchasePartyKind = 'proveedor' | 'prestador';
+
+export type PurchasePartyScope = 'general' | 'vacunas';
+
 export type InventoryMovementType = 'entrada' | 'salida' | 'ajuste' | 'descarte';
 
 export type InvoiceStatus = 'borrador' | 'emitida' | 'pagada' | 'anulada';
@@ -250,6 +256,36 @@ export type NotificationKind =
 export interface Database {
   public: {
     Tables: {
+      purchase_categories: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          base_category: InventoryProductCategory;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          name: string;
+          base_category: InventoryProductCategory;
+          deleted_at?: string | null;
+        };
+        Update: {
+          name?: string;
+          base_category?: InventoryProductCategory;
+          deleted_at?: string | null;
+        };
+        Relationships: [];
+      };
+      purchase_pricing_settings: {
+        Row: { organization_id: string; usd_ars: number; updated_at: string };
+        Insert: { organization_id: string; usd_ars: number };
+        Update: { usd_ars?: number };
+        Relationships: [];
+      };
       organizations: {
         Row: {
           id: string;
@@ -2251,6 +2287,7 @@ export interface Database {
           remind_24h: boolean;
           remind_2h: boolean;
           remind_confirmation: boolean;
+          is_overbook: boolean;
           source_system: string | null;
           source_record_id: string | null;
           import_batch_id: string | null;
@@ -2280,6 +2317,7 @@ export interface Database {
           remind_24h?: boolean;
           remind_2h?: boolean;
           remind_confirmation?: boolean;
+          is_overbook?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
@@ -2309,6 +2347,7 @@ export interface Database {
           remind_24h?: boolean;
           remind_2h?: boolean;
           remind_confirmation?: boolean;
+          is_overbook?: boolean;
           source_system?: string | null;
           source_record_id?: string | null;
           import_batch_id?: string | null;
@@ -3825,6 +3864,10 @@ export interface Database {
           min_quantity: number;
           unit_cost: number | null;
           unit_price: number | null;
+          cost_currency: ProductCurrency;
+          margin_percent: number | null;
+          supplier_party_id: string | null;
+          catalog_category_id: string | null;
           manufacturer: string | null;
           notes: string | null;
           is_active: boolean;
@@ -3849,6 +3892,10 @@ export interface Database {
           min_quantity?: number;
           unit_cost?: number | null;
           unit_price?: number | null;
+          cost_currency?: ProductCurrency;
+          margin_percent?: number | null;
+          supplier_party_id?: string | null;
+          catalog_category_id?: string | null;
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
@@ -3873,6 +3920,10 @@ export interface Database {
           min_quantity?: number;
           unit_cost?: number | null;
           unit_price?: number | null;
+          cost_currency?: ProductCurrency;
+          margin_percent?: number | null;
+          supplier_party_id?: string | null;
+          catalog_category_id?: string | null;
           manufacturer?: string | null;
           notes?: string | null;
           is_active?: boolean;
@@ -3898,6 +3949,72 @@ export interface Database {
             columns: ['branch_id'];
             isOneToOne: false;
             referencedRelation: 'branches';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'inventory_products_supplier_party_id_fkey',
+            columns: ['supplier_party_id'];
+            isOneToOne: false;
+            referencedRelation: 'purchase_parties';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      purchase_parties: {
+        Row: {
+          cuit: string | null;
+          id: string;
+          organization_id: string;
+          kind: PurchasePartyKind;
+          scope: PurchasePartyScope;
+          name: string;
+          contact_name: string | null;
+          phone: string | null;
+          email: string | null;
+          notes: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+          deleted_at: string | null;
+        };
+        Insert: {
+          cuit?: string | null;
+          id?: string;
+          organization_id: string;
+          kind: PurchasePartyKind;
+          scope?: PurchasePartyScope;
+          name: string;
+          contact_name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Update: {
+          cuit?: string | null;
+          id?: string;
+          organization_id?: string;
+          kind?: PurchasePartyKind;
+          scope?: PurchasePartyScope;
+          name?: string;
+          contact_name?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          notes?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+          deleted_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'purchase_parties_organization_id_fkey',
+            columns: ['organization_id'];
+            isOneToOne: false;
+            referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
         ];
@@ -4252,6 +4369,33 @@ export interface Database {
           },
         ];
       };
+      user_permission_overrides: {
+        Row: {
+          id: string;
+          organization_id: string;
+          user_id: string;
+          permission_key: string;
+          enabled: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          user_id: string;
+          permission_key: string;
+          enabled?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          enabled?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       organization_invitations: {
         Row: {
           id: string;
@@ -4263,6 +4407,11 @@ export interface Database {
           status: string;
           expires_at: string;
           accepted_at: string | null;
+          full_name: string | null;
+          phone: string | null;
+          denied_permissions: string[];
+          last_sent_at: string;
+          send_count: number;
           created_at: string;
           updated_at: string;
           deleted_at: string | null;
@@ -5350,6 +5499,125 @@ export interface Database {
       };
       get_session_bootstrap: {
         Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      accept_pending_invitation: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      list_managed_users: {
+        Args: { p_user_id?: string | null };
+        Returns: {
+          user_id: string;
+          full_name: string;
+          email: string | null;
+          phone: string | null;
+          role: UserRole;
+          branch_id: string | null;
+          branch_name: string | null;
+          branch_count: number;
+          account_status: string;
+          is_central_admin: boolean;
+          last_sign_in_at: string | null;
+          last_activity_at: string | null;
+          denied_permissions: string[];
+          status_reason: string | null;
+          status_changed_at: string | null;
+          created_at: string;
+        }[];
+      };
+      list_managed_invitations: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          email: string;
+          full_name: string | null;
+          phone: string | null;
+          role: UserRole;
+          branch_id: string | null;
+          branch_name: string | null;
+          status: string;
+          expires_at: string;
+          last_sent_at: string;
+          send_count: number;
+          denied_permissions: string[];
+          created_at: string;
+        }[];
+      };
+      get_managed_users_overview: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      search_user_activity: {
+        Args: {
+          p_user_id?: string | null;
+          p_from?: string | null;
+          p_to?: string | null;
+          p_action?: string | null;
+          p_entity_types?: string[] | null;
+          p_branch_id?: string | null;
+          p_page?: number;
+          p_page_size?: number;
+        };
+        Returns: {
+          id: string;
+          created_at: string;
+          user_id: string;
+          user_name: string | null;
+          action: string;
+          entity_type: string;
+          entity_id: string | null;
+          branch_id: string | null;
+          branch_name: string | null;
+          status_from: string | null;
+          status_to: string | null;
+          details: Json | null;
+          total_count: number;
+        }[];
+      };
+      get_managed_user_access: {
+        Args: { p_user_id: string };
+        Returns: Json;
+      };
+      create_managed_invitation: {
+        Args: {
+          p_email: string;
+          p_full_name: string | null;
+          p_phone: string | null;
+          p_branch_id: string;
+          p_role: UserRole;
+          p_denied_permissions?: string[];
+        };
+        Returns: string;
+      };
+      resend_managed_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: Json;
+      };
+      revoke_managed_invitation: {
+        Args: { p_invitation_id: string };
+        Returns: undefined;
+      };
+      update_managed_user: {
+        Args: {
+          p_user_id: string;
+          p_full_name: string | null;
+          p_phone: string | null;
+          p_role: UserRole;
+          p_branch_id: string | null;
+        };
+        Returns: undefined;
+      };
+      set_managed_user_status: {
+        Args: { p_user_id: string; p_status: string; p_reason?: string | null };
+        Returns: undefined;
+      };
+      revoke_managed_user_sessions: {
+        Args: { p_user_id: string };
+        Returns: number;
+      };
+      set_user_permission_restrictions: {
+        Args: { p_user_id: string; p_denied_permissions: string[] };
         Returns: Json;
       };
       expire_due_subscriptions_job: {
@@ -7125,6 +7393,12 @@ export interface Database {
         Args: Record<string, never>;
         Returns: number;
       };
+      count_my_pending_consultations: {
+        Args: {
+          p_branch_id?: string | null;
+        };
+        Returns: number;
+      };
       mark_notification_read: {
         Args: {
           p_id: string;
@@ -7159,6 +7433,21 @@ export interface Database {
           created_at: string;
           total_count: number;
         }[];
+      };
+      list_audit_members: {
+        Args: Record<string, never>;
+        Returns: {
+          user_id: string;
+          full_name: string;
+          roles: string[];
+          is_active: boolean;
+        }[];
+      };
+      search_audit_logs_by_member: {
+        Args: Database['public']['Functions']['search_audit_logs']['Args'] & {
+          p_user_id?: string | null;
+        };
+        Returns: Database['public']['Functions']['search_audit_logs']['Returns'];
       };
       count_audit_logs_today: {
         Args: Record<string, never>;

@@ -1,0 +1,555 @@
+'use server';
+
+import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
+import { z } from 'zod';
+import {
+  buildPaginatedResult,
+  INVENTORY_PRODUCT_CATEGORIES,
+  inventoryProductListSchema,
+  purchasePartyListSchema,
+  purchasePartySchema,
+  type ActionResult,
+  type CatalogProductRow,
+  type InventoryProductCategory,
+  type PaginatedResult,
+  type PurchaseParty,
+  type PurchasePartyKind,
+  type PurchasePartyScope,
+  type PurchaseCategory,
+} from '@sincvete/shared';
+import { createServerClient } from '@/lib/supabase/server';
+import { getSessionContext } from '@/actions/auth';
+import { FEATURES, planRestrictionResult } from '@/lib/entitlements';
+import { PermissionError, requirePermissionAndFeature } from '@/lib/permissions';
+
+function isNextRedirect(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'digest' in error &&
+    typeof (error as { digest?: string }).digest === 'string' &&
+    (error as { digest: string }).digest.startsWith('NEXT_REDIRECT')
+  );
+}
+
+function actionError<T = void>(error: unknown): ActionResult<T> {
+  if (isNextRedirect(error)) throw error;
+  const planError = planRestrictionResult<T>(error);
+  if (planError) return planError;
+  if (error instanceof PermissionError) {
+    return { success: false, error: error.message };
+  }
+  console.error(error);
+  return { success: false, error: 'Ocurrió un error inesperado' };
+}
+
+function ilikeFilter(columns: string[], search: string | undefined): string | null {
+  const safe = (search ?? '')
+    .replace(/[%_"\\,()]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!safe) return null;
+  const pattern = `"%${safe}%"`;
+  return columns.map((column) => `${column}.ilike.${pattern}`).join(',');
+}
+
+function partyListHref(kind: PurchasePartyKind, scope: PurchasePartyScope): string {
+  if (scope === 'vacunas') return '/compras?seccion=vacunas';
+  if (kind === 'prestador') return '/compras?seccion=prestadores';
+  return '/compras?seccion=proveedores';
+}
+
+function toParty(row: PurchaseParty): PurchaseParty {
+  return {
+    ...row,
+    contact_name: row.contact_name ?? null,
+    phone: row.phone ?? null,
+    email: row.email ?? null,
+    notes: row.notes ?? null,
+    is_active: Boolean(row.is_active),
+  };
+}
+
+export async function updateCatalogPricing(
+  productId: string,
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = z
+      .object({
+        id: z.string().uuid(),
+        cost: z.union([z.literal(''), z.coerce.number().finite().min(0).max(999999999999.99)]),
+        currency: z.enum(['ARS', 'USD']),
+        margin: z.union([z.literal(''), z.coerce.number().finite().min(0).max(1000)]),
+      })
+      .safeParse({
+        id: productId,
+        cost: formData.get('unitCost'),
+        currency: formData.get('costCurrency'),
+        margin: formData.get('marginPercent'),
+      });
+    if (!parsed.success)
+      return { success: false, error: 'Revisá costo, moneda y porcentaje (0 a 1000%)' };
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('inventory_products')
+      .update({
+        unit_cost: parsed.data.cost === '' ? null : parsed.data.cost,
+        cost_currency: parsed.data.currency,
+        margin_percent: parsed.data.margin === '' ? null : parsed.data.margin,
+      })
+      .eq('id', parsed.data.id)
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'El producto no está disponible' };
+    revalidatePath('/compras');
+    revalidatePath(`/inventario/${productId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listPurchaseParties(
+  input: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    kind?: PurchasePartyKind;
+    scope?: PurchasePartyScope;
+  } = {}
+): Promise<PaginatedResult<PurchaseParty>> {
+  const session = await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const parsed = purchasePartyListSchema.parse(input);
+  const supabase = await createServerClient();
+  const from = (parsed.page - 1) * parsed.pageSize;
+  const to = from + parsed.pageSize - 1;
+
+  let query = supabase
+    .from('purchase_parties')
+    .select(
+      'id, organization_id, kind, scope, name, cuit, contact_name, phone, email, notes, is_active, created_at, updated_at',
+      { count: 'exact' }
+    )
+    .eq('organization_id', session.organizationId)
+    .is('deleted_at', null)
+    .order('is_active', { ascending: false })
+    .order('name', { ascending: true });
+
+  if (parsed.kind) query = query.eq('kind', parsed.kind);
+  if (parsed.scope) query = query.eq('scope', parsed.scope);
+
+  const filter = ilikeFilter(['name', 'cuit', 'contact_name', 'phone', 'email'], parsed.search);
+  const cuitDigits = (parsed.search ?? '').replace(/[\s-]/g, '');
+  if (filter)
+    query = query.or(
+      /^\d{2,11}$/.test(cuitDigits) ? `${filter},cuit.ilike.%${cuitDigits}%` : filter
+    );
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) throw error;
+
+  return buildPaginatedResult(
+    (data ?? []).map((row) => toParty(row as PurchaseParty)),
+    count ?? 0,
+    parsed.page,
+    parsed.pageSize
+  );
+}
+
+export async function listPurchasePartyOptions(): Promise<
+  Array<Pick<PurchaseParty, 'id' | 'name' | 'kind' | 'scope' | 'is_active'>>
+> {
+  await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from('purchase_parties')
+    .select('id, name, kind, scope, is_active')
+    .is('deleted_at', null)
+    .order('name', { ascending: true })
+    .limit(300);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getPurchaseParty(id: string): Promise<PurchaseParty | null> {
+  await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from('purchase_parties')
+    .select(
+      'id, organization_id, kind, scope, name, cuit, contact_name, phone, email, notes, is_active, created_at, updated_at'
+    )
+    .eq('id', id)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? toParty(data as PurchaseParty) : null;
+}
+
+export async function listCatalogProducts(
+  input: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+    category?: string;
+    excludeCategory?: string;
+    pricedOnly?: boolean;
+    catalogCategoryId?: string;
+    supplierId?: string;
+  } = {}
+): Promise<PaginatedResult<CatalogProductRow>> {
+  await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const parsed = inventoryProductListSchema.parse({
+    page: input.page,
+    pageSize: input.pageSize,
+    search: input.search,
+    category: input.category,
+  });
+  const session = await getSessionContext();
+  const supabase = await createServerClient();
+  const from = (parsed.page - 1) * parsed.pageSize;
+  const to = from + parsed.pageSize - 1;
+
+  let query = supabase
+    .from('inventory_products')
+    .select(
+      'id, name, sku, category, unit, quantity, unit_cost, unit_price, cost_currency, margin_percent, manufacturer, supplier_party_id, catalog_category_id',
+      { count: 'exact' }
+    )
+    .is('deleted_at', null)
+    .eq('is_active', true)
+    .order('name', { ascending: true });
+
+  if (session?.branchId) query = query.eq('branch_id', session.branchId);
+  if (parsed.category) query = query.eq('category', parsed.category);
+  else if (
+    input.excludeCategory &&
+    INVENTORY_PRODUCT_CATEGORIES.includes(input.excludeCategory as InventoryProductCategory)
+  ) {
+    query = query.neq('category', input.excludeCategory as InventoryProductCategory);
+  }
+  if (input.pricedOnly) query = query.not('unit_price', 'is', null);
+  if (input.catalogCategoryId)
+    query = query.eq('catalog_category_id', z.string().uuid().parse(input.catalogCategoryId));
+  if (input.supplierId)
+    query = query.eq('supplier_party_id', z.string().uuid().parse(input.supplierId));
+
+  const filter = ilikeFilter(['name', 'sku', 'manufacturer'], parsed.search);
+  if (filter) query = query.or(filter);
+
+  const { data, error, count } = await query.range(from, to);
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const categories = await listPurchaseCategories();
+  const supplierIds = [
+    ...new Set(rows.map((row) => row.supplier_party_id).filter((id): id is string => Boolean(id))),
+  ];
+  const supplierNames = new Map<string, string>();
+  if (supplierIds.length > 0) {
+    const { data: parties } = await supabase
+      .from('purchase_parties')
+      .select('id, name')
+      .in('id', supplierIds);
+    for (const party of parties ?? []) supplierNames.set(party.id, party.name);
+  }
+
+  const products: CatalogProductRow[] = rows.map((row) => ({
+    id: row.id,
+    name: row.name,
+    sku: row.sku,
+    category: row.category,
+    unit: row.unit,
+    quantity: Number(row.quantity ?? 0),
+    unit_cost: row.unit_cost == null ? null : Number(row.unit_cost),
+    unit_price: row.unit_price == null ? null : Number(row.unit_price),
+    cost_currency: row.cost_currency === 'USD' ? 'USD' : 'ARS',
+    margin_percent: row.margin_percent == null ? null : Number(row.margin_percent),
+    manufacturer: row.manufacturer,
+    supplier_party_id: row.supplier_party_id,
+    supplier_name: row.supplier_party_id
+      ? (supplierNames.get(row.supplier_party_id) ?? null)
+      : null,
+    catalog_category_id: row.catalog_category_id,
+    catalog_category_name:
+      categories.find((category) => category.id === row.catalog_category_id)?.name ?? null,
+  }));
+
+  return buildPaginatedResult(products, count ?? 0, parsed.page, parsed.pageSize);
+}
+
+export async function createPurchaseParty(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = purchasePartySchema.safeParse({
+      cuit: formData.get('cuit'),
+      name: formData.get('name'),
+      kind: formData.get('kind'),
+      scope: formData.get('scope') || 'general',
+      contactName: formData.get('contactName'),
+      phone: formData.get('phone'),
+      email: formData.get('email'),
+      notes: formData.get('notes'),
+      isActive: true,
+    });
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    if (parsed.data.scope === 'vacunas' && parsed.data.kind !== 'proveedor') {
+      return { success: false, error: 'Las vacunas se cargan con un proveedor' };
+    }
+
+    const supabase = await createServerClient();
+    const { error } = await supabase.from('purchase_parties').insert({
+      organization_id: session.organizationId,
+      kind: parsed.data.kind,
+      cuit: parsed.data.cuit ?? null,
+      scope: parsed.data.scope,
+      name: parsed.data.name,
+      contact_name: parsed.data.contactName ?? null,
+      phone: parsed.data.phone ?? null,
+      email: parsed.data.email ?? null,
+      notes: parsed.data.notes ?? null,
+      is_active: true,
+    });
+
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'Ya existe un registro con ese nombre' };
+      }
+      return { success: false, error: error.message || 'No se pudo guardar' };
+    }
+
+    revalidatePath('/compras');
+    redirect(partyListHref(parsed.data.kind, parsed.data.scope));
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function updatePurchaseParty(
+  partyId: string,
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = purchasePartySchema.safeParse({
+      cuit: formData.get('cuit'),
+      name: formData.get('name'),
+      kind: formData.get('kind'),
+      scope: formData.get('scope') || 'general',
+      contactName: formData.get('contactName'),
+      phone: formData.get('phone'),
+      email: formData.get('email'),
+      notes: formData.get('notes'),
+      isActive: formData.get('isActive') === 'on' || formData.get('isActive') === 'true',
+    });
+
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: 'Datos inválidos',
+        fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]>,
+      };
+    }
+
+    if (parsed.data.scope === 'vacunas' && parsed.data.kind !== 'proveedor') {
+      return { success: false, error: 'Las vacunas se cargan con un proveedor' };
+    }
+
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('purchase_parties')
+      .update({
+        name: parsed.data.name,
+        cuit: parsed.data.cuit ?? null,
+        contact_name: parsed.data.contactName ?? null,
+        phone: parsed.data.phone ?? null,
+        email: parsed.data.email ?? null,
+        notes: parsed.data.notes ?? null,
+        is_active: parsed.data.isActive,
+      })
+      .eq('id', z.string().uuid().parse(partyId))
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
+
+    if (error) {
+      if (error.code === '23505') {
+        return { success: false, error: 'Ya existe un registro con ese nombre' };
+      }
+      return { success: false, error: error.message || 'No se pudo actualizar' };
+    }
+
+    if (!data) return { success: false, error: 'El registro no está disponible' };
+    revalidatePath('/compras');
+    revalidatePath(`/compras/partes/${partyId}`);
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deletePurchaseParty(partyId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('purchase_parties')
+      .update({ deleted_at: new Date().toISOString(), is_active: false })
+      .eq('id', z.string().uuid().parse(partyId))
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'El registro no está disponible' };
+    revalidatePath('/compras');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function listPurchaseCategories(): Promise<PurchaseCategory[]> {
+  const session = await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from('purchase_categories')
+    .select('id, organization_id, name, base_category')
+    .eq('organization_id', session.organizationId)
+    .is('deleted_at', null)
+    .order('name');
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function savePurchaseCategory(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = z
+      .object({
+        id: z.string().uuid().or(z.literal('')),
+        name: z.string().trim().min(2).max(80),
+        baseCategory: z.enum(INVENTORY_PRODUCT_CATEGORIES),
+      })
+      .safeParse({
+        id: formData.get('id') || '',
+        name: formData.get('name'),
+        baseCategory: formData.get('baseCategory'),
+      });
+    if (!parsed.success)
+      return { success: false, error: 'Revisá el nombre y el tipo de categoría' };
+    const supabase = await createServerClient();
+    const payload = { name: parsed.data.name, base_category: parsed.data.baseCategory };
+    const result = parsed.data.id
+      ? await supabase
+          .from('purchase_categories')
+          .update(payload)
+          .eq('id', parsed.data.id)
+          .eq('organization_id', session.organizationId)
+          .is('deleted_at', null)
+          .select('id')
+          .maybeSingle()
+      : await supabase
+          .from('purchase_categories')
+          .insert({ ...payload, organization_id: session.organizationId })
+          .select('id')
+          .single();
+    if (result.error)
+      return {
+        success: false,
+        error:
+          result.error.code === '23505'
+            ? 'Ya existe una categoría con ese nombre'
+            : result.error.message,
+      };
+    if (!result.data) return { success: false, error: 'La categoría no está disponible' };
+    revalidatePath('/compras');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function deletePurchaseCategory(categoryId: string): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from('purchase_categories')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', z.string().uuid().parse(categoryId))
+      .eq('organization_id', session.organizationId)
+      .is('deleted_at', null)
+      .select('id')
+      .maybeSingle();
+    if (error) return { success: false, error: error.message };
+    if (!data) return { success: false, error: 'La categoría no está disponible' };
+    revalidatePath('/compras');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}
+
+export async function getPurchaseExchangeRate(): Promise<number | null> {
+  const session = await requirePermissionAndFeature('inventory:read', FEATURES.INVENTORY);
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from('purchase_pricing_settings')
+    .select('usd_ars')
+    .eq('organization_id', session.organizationId)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? Number(data.usd_ars) : null;
+}
+
+export async function savePurchaseExchangeRate(
+  _prev: ActionResult | null,
+  formData: FormData
+): Promise<ActionResult> {
+  try {
+    const session = await requirePermissionAndFeature('inventory:write', FEATURES.INVENTORY);
+    const parsed = z.coerce
+      .number()
+      .finite()
+      .positive()
+      .lt(1000000000)
+      .safeParse(formData.get('usdArs'));
+    if (!parsed.success) return { success: false, error: 'Ingresá una cotización mayor que cero' };
+    const supabase = await createServerClient();
+    const { error } = await supabase
+      .from('purchase_pricing_settings')
+      .upsert({ organization_id: session.organizationId, usd_ars: parsed.data });
+    if (error) return { success: false, error: error.message };
+    revalidatePath('/compras');
+    revalidatePath('/inventario', 'layout');
+    return { success: true };
+  } catch (error) {
+    return actionError(error);
+  }
+}

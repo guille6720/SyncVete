@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { isAcademiaEnabled } from '@/lib/tutorials/feature-flag';
-import { getKokoroClipPath, hasKokoroClips } from '@/lib/tutorials/kokoro-clips';
+import {
+  getTutorialTtsProvider,
+  isTutorialNeuralTtsConfigured,
+  synthesizeTutorialSpeech,
+} from '@/lib/tutorials/tutorial-tts';
 import { NARRATION_VOICE_PROFILES, type NarrationVoiceProfileId } from '@sincvete/shared';
 
 export const runtime = 'nodejs';
@@ -8,29 +12,37 @@ export const dynamic = 'force-dynamic';
 
 function isVoiceProfile(value: unknown): value is NarrationVoiceProfileId {
   return (
-    typeof value === 'string' && (NARRATION_VOICE_PROFILES as readonly string[]).includes(value)
+    typeof value === 'string' &&
+    (NARRATION_VOICE_PROFILES as readonly string[]).includes(value)
   );
 }
 
+/** Lightweight probe — does not spend ElevenLabs credits. */
 export async function GET() {
   if (!isAcademiaEnabled()) {
     return NextResponse.json({ configured: false }, { status: 404 });
   }
-  const provider = hasKokoroClips() ? 'kokoro' : null;
+  const provider = getTutorialTtsProvider();
   return NextResponse.json({
     configured: Boolean(provider),
     provider,
     voices: ['brian', 'horacio'],
-    voiceNames: { brian: 'Alex', horacio: 'Santa' },
   });
 }
 
+/**
+ * Tutoriales TTS — ElevenLabs Brian/Horacio, or free Edge neural stand-ins.
+ * Only tutorial narration scripts (no patient payloads).
+ */
 export async function POST(request: Request) {
   if (!isAcademiaEnabled()) {
     return NextResponse.json({ error: 'Tutoriales no habilitado' }, { status: 404 });
   }
-  if (!hasKokoroClips()) {
-    return NextResponse.json({ error: 'Narración neural no configurada' }, { status: 503 });
+  if (!isTutorialNeuralTtsConfigured()) {
+    return NextResponse.json(
+      { error: 'Narración neural no configurada' },
+      { status: 503 }
+    );
   }
 
   let body: unknown;
@@ -45,7 +57,10 @@ export async function POST(request: Request) {
       ? body.text
       : '';
   const voiceProfile =
-    typeof body === 'object' && body && 'voiceProfile' in body && isVoiceProfile(body.voiceProfile)
+    typeof body === 'object' &&
+    body &&
+    'voiceProfile' in body &&
+    isVoiceProfile(body.voiceProfile)
       ? body.voiceProfile
       : null;
 
@@ -56,12 +71,24 @@ export async function POST(request: Request) {
     );
   }
 
-  const path = getKokoroClipPath(text, voiceProfile);
-  if (!path) {
-    return NextResponse.json({ error: 'Guion de tutorial no disponible' }, { status: 404 });
+  try {
+    const { audio, contentType, provider } = await synthesizeTutorialSpeech({
+      text,
+      voiceProfile,
+    });
+    return new NextResponse(audio, {
+      status: 200,
+      headers: {
+        'Content-Type': contentType,
+        'Cache-Control': 'private, max-age=300',
+        'X-Syncvete-Tts-Provider': provider,
+      },
+    });
+  } catch (error) {
+    console.error('[tutorials/tts]', error);
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : 'Error de narración' },
+      { status: 502 }
+    );
   }
-  return new NextResponse(null, {
-    status: 303,
-    headers: { Location: path, 'X-Syncvete-Tts-Provider': 'kokoro' },
-  });
 }

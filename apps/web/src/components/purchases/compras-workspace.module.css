@@ -1,0 +1,74 @@
+.root {
+  color: var(--color-foreground);
+}
+.root a[aria-current='page'] {
+  border-color: var(--color-primary);
+}
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+.panel {
+  min-width: 0;
+  border: 2px solid var(--sv-neon-border);
+  border-radius: 9px;
+  background: var(--color-card);
+  box-shadow:
+    0 0 0 1px var(--sv-neon-ring),
+    0 0 16px var(--sv-neon-glow);
+  padding: 14px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+.panel:hover {
+  border-color: var(--clinic);
+  box-shadow:
+    0 0 0 1px var(--sv-neon-ring),
+    0 0 24px var(--sv-neon-glow-strong);
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+.table th {
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+  font-weight: 600;
+  font-size: 11px;
+}
+.table th,
+.table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.table tbody tr:hover {
+  background: color-mix(in srgb, var(--color-primary) 3%, transparent);
+}
+.table input,
+.table select {
+  height: 29px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+.table input {
+  min-width: 66px;
+}
+.calculator {
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-card));
+  border-radius: 6px;
+  padding: 12px;
+}
+@media (min-width: 1280px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr) 308px;
+  }
+}

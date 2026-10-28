@@ -987,6 +987,21 @@ export const inventoryProductSchema = z.object({
   minQuantity: z.coerce.number().min(0, 'Mínimo inválido').default(0),
   unitCost: optionalNonNegNumber,
   unitPrice: optionalNonNegNumber,
+  costCurrency: z.enum(['ARS', 'USD']).default('ARS'),
+  marginPercent: optionalNonNegNumber.refine(
+    (value) => value === undefined || value <= 1000,
+    'El margen no puede superar 1000%'
+  ),
+  supplierPartyId: z
+    .union([z.string().uuid('Proveedor inválido'), z.literal('')])
+    .optional()
+    .transform((value) => (value === '' || value === undefined ? undefined : value)),
+  catalogCategoryId: z
+    .string()
+    .uuid()
+    .nullish()
+    .or(z.literal(''))
+    .transform((value) => value || undefined),
   manufacturer: optionalShortText(120),
   notes: optionalClinicalText,
   branchId: z
@@ -1019,6 +1034,64 @@ export type InventoryProductInput = z.infer<typeof inventoryProductSchema>;
 export type InventoryProductUpdateInput = z.infer<typeof inventoryProductUpdateSchema>;
 export type InventoryMovementInput = z.infer<typeof inventoryMovementSchema>;
 export type InventoryProductListInput = z.infer<typeof inventoryProductListSchema>;
+
+export const inventoryPurchaseItemSchema = z.object({
+  productId: z.string().uuid('Producto inválido'),
+  quantity: z.coerce.number().positive('La cantidad debe ser mayor a 0'),
+  unitCost: optionalNonNegNumber,
+  lotNumber: optionalShortText(80),
+  expiresAt: optionalIsoDate,
+});
+
+export const inventoryPurchaseSchema = z.object({
+  branchId: z.string().uuid('Sucursal inválida'),
+  supplierName: z
+    .string()
+    .min(1, 'Indicá el proveedor')
+    .max(160)
+    .transform((v) => v.trim()),
+  invoiceNumber: optionalShortText(80),
+  purchasedAt: optionalIsoDate,
+  notes: optionalClinicalText,
+  items: z.array(inventoryPurchaseItemSchema).min(1, 'Agregá al menos un producto').max(100),
+});
+
+export const inventoryPurchaseListSchema = paginationSchema.extend({
+  branchId: z.string().uuid().optional(),
+  status: z.enum(['recibida', 'anulada']).optional(),
+});
+
+export const purchasePartySchema = z.object({
+  cuit: z.string().trim().regex(/^(?:\d{11}|\d{2}-\d{8}-\d|)$/, 'Ingresá 11 dígitos de CUIT').nullish().transform((value) => value ? value.replace(/-/g, '') : undefined),
+  name: z
+    .string()
+    .min(2, 'Indicá el nombre')
+    .max(160)
+    .transform((value) => value.trim()),
+  kind: z.enum(['proveedor', 'prestador']),
+  scope: z.enum(['general', 'vacunas']).default('general'),
+  contactName: optionalShortText(120),
+  phone: optionalShortText(40),
+  email: z
+    .union([z.string().trim().email('Email inválido').max(160), z.literal('')])
+    .optional()
+    .transform((value) => (value ? value.toLowerCase() : undefined)),
+  notes: optionalClinicalText,
+  isActive: z.coerce.boolean().default(true),
+});
+
+export type PurchasePartyInput = z.infer<typeof purchasePartySchema>;
+
+export const purchasePartyListSchema = paginationSchema.extend({
+  kind: z.enum(['proveedor', 'prestador']).optional(),
+  scope: z.enum(['general', 'vacunas']).optional(),
+});
+
+export type PurchasePartyListInput = z.infer<typeof purchasePartyListSchema>;
+
+export type InventoryPurchaseItemInput = z.infer<typeof inventoryPurchaseItemSchema>;
+export type InventoryPurchaseInput = z.infer<typeof inventoryPurchaseSchema>;
+export type InventoryPurchaseListInput = z.infer<typeof inventoryPurchaseListSchema>;
 
 const invoiceItemSchema = z.object({
   description: z
@@ -1310,6 +1383,7 @@ export type NotificationIdInput = z.infer<typeof notificationIdSchema>;
 
 export const auditLogListSchema = paginationSchema
   .extend({
+    userId: z.string().uuid('Integrante inválido').optional(),
     action: z.enum(['create', 'update', 'delete']).optional(),
     entityType: z.string().max(60).optional(),
     from: optionalIsoDate,

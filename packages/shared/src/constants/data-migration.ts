@@ -1282,59 +1282,95 @@ export const INVENTORY_PRODUCT_IMPORT_FIELDS: ImportFieldDef[] = [
     key: 'external_product_id',
     label: 'ID externo producto',
     required: true,
-    aliases: ['external_product_id', 'product_id', 'id_producto', 'sku_externo'],
+    aliases: [
+      'external_product_id',
+      'product_id',
+      'id_producto',
+      'id_articulo',
+      'id_artículo',
+      'sku_externo',
+      'id',
+      'codigo',
+      'código',
+      'cod',
+      'cod_art',
+      'cod_articulo',
+      'codigo_articulo',
+      'código_artículo',
+      'codigo_producto',
+      'código_producto',
+      'ean',
+      'barcode',
+      'barra',
+      'codigo_barra',
+      'código_barra',
+    ],
   },
   EXTERNAL_BRANCH_IMPORT_FIELD,
   {
     key: 'name',
     label: 'Nombre',
     required: true,
-    aliases: ['name', 'nombre', 'producto', 'product_name'],
+    aliases: [
+      'name',
+      'nombre',
+      'producto',
+      'product_name',
+      'descripcion',
+      'descripción',
+      'detalle',
+      'articulo',
+      'artículo',
+      'item',
+      'nombre_producto',
+      'nombre_articulo',
+      'nombre_artículo',
+    ],
   },
   {
     key: 'sku',
     label: 'SKU',
-    aliases: ['sku', 'codigo', 'código', 'code'],
+    aliases: ['sku', 'codigo_sku', 'código_sku', 'code', 'ref', 'referencia'],
   },
   {
     key: 'category',
     label: 'Categoría',
-    aliases: ['category', 'categoria', 'categoría', 'tipo'],
+    aliases: ['category', 'categoria', 'categoría', 'tipo', 'rubro', 'familia'],
   },
   {
     key: 'unit',
     label: 'Unidad',
-    aliases: ['unit', 'unidad', 'uom'],
+    aliases: ['unit', 'unidad', 'uom', 'medida'],
   },
   {
     key: 'quantity',
     label: 'Cantidad',
-    aliases: ['quantity', 'cantidad', 'stock', 'qty'],
+    aliases: ['quantity', 'cantidad', 'stock', 'qty', 'existencia', 'existencias', 'saldo'],
   },
   {
     key: 'min_quantity',
     label: 'Stock mínimo',
-    aliases: ['min_quantity', 'stock_minimo', 'stock_mínimo', 'min'],
+    aliases: ['min_quantity', 'stock_minimo', 'stock_mínimo', 'minimo', 'mínimo', 'punto_pedido'],
   },
   {
     key: 'unit_cost',
     label: 'Costo unitario',
-    aliases: ['unit_cost', 'costo', 'cost'],
+    aliases: ['unit_cost', 'costo', 'cost', 'costo_unitario', 'precio_costo', 'precio_compra'],
   },
   {
     key: 'unit_price',
     label: 'Precio unitario',
-    aliases: ['unit_price', 'precio', 'price'],
+    aliases: ['unit_price', 'precio', 'price', 'precio_unitario', 'precio_venta', 'pvp'],
   },
   {
     key: 'manufacturer',
     label: 'Fabricante',
-    aliases: ['manufacturer', 'fabricante', 'laboratorio', 'marca'],
+    aliases: ['manufacturer', 'fabricante', 'laboratorio', 'marca', 'laboratorio_fabricante'],
   },
   {
     key: 'notes',
     label: 'Notas',
-    aliases: ['notes', 'notas', 'observaciones'],
+    aliases: ['notes', 'notas', 'observaciones', 'comentario', 'comentarios'],
   },
   {
     key: 'source_system',
@@ -1599,12 +1635,41 @@ export function normalizeHeader(value: string): string {
     .replace(/[\s\-]+/g, '_');
 }
 
+function countDelimiterOutsideQuotes(line: string, delimiter: string): number {
+  let count = 0;
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+    if (!inQuotes && ch === delimiter) count += 1;
+  }
+  return count;
+}
+
+export function detectCsvDelimiter(headerLine: string): ',' | ';' | '\t' {
+  const commas = countDelimiterOutsideQuotes(headerLine, ',');
+  const semis = countDelimiterOutsideQuotes(headerLine, ';');
+  const tabs = countDelimiterOutsideQuotes(headerLine, '\t');
+  if (tabs > commas && tabs > semis) return '\t';
+  if (semis > commas) return ';';
+  return ',';
+}
+
 export function autoMapColumns(
   headers: string[],
   fields: ImportFieldDef[]
 ): Record<string, string | null> {
   const mapping: Record<string, string | null> = {};
   const used = new Set<string>();
+
+  // Pass 1: exact alias matches only (avoids "Precio" being stolen by "precio_costo").
   for (const field of fields) {
     const aliasSet = new Set(field.aliases.map(normalizeHeader));
     const match = headers.find((header) => {
@@ -1614,7 +1679,93 @@ export function autoMapColumns(
     mapping[field.key] = match ?? null;
     if (match) used.add(match);
   }
+
+  // Pass 2: fuzzy contains for still-unmapped fields.
+  for (const field of fields) {
+    if (mapping[field.key]) continue;
+    const aliases = field.aliases.map(normalizeHeader).filter((alias) => alias.length >= 4);
+    const match = headers.find((header) => {
+      if (used.has(header)) return false;
+      const normalized = normalizeHeader(header);
+      return aliases.some(
+        (alias) =>
+          normalized === alias ||
+          (normalized.includes(alias) && normalized.length - alias.length <= 8) ||
+          (alias.includes(normalized) && alias.length - normalized.length <= 8)
+      );
+    });
+    if (match) {
+      mapping[field.key] = match;
+      used.add(match);
+    }
+  }
+
   return mapping;
+}
+
+/**
+ * Last-resort mapping for product catalogs with unknown headers.
+ * Prefer first unused column as ID and the "most name-like" unused column as name.
+ */
+export function completeInventoryProductMapping(
+  headers: string[],
+  mapping: Record<string, string | null>
+): Record<string, string | null> {
+  const next: Record<string, string | null> = { ...mapping };
+  const used = new Set(
+    Object.values(next).filter((value): value is string => typeof value === 'string' && value.length > 0)
+  );
+  const unused = headers.filter((header) => header.trim() && !used.has(header));
+
+  const looksNumeric = (header: string) =>
+    /^(stock|cantidad|qty|precio|costo|price|cost|min|existencia|saldo)/i.test(
+      normalizeHeader(header)
+    );
+
+  if (!next.external_product_id && !next.sku) {
+    const idCandidate =
+      unused.find((header) =>
+        /^(id|cod|sku|ean|barra|art|ref)/i.test(normalizeHeader(header))
+      ) ?? unused[0];
+    if (idCandidate) {
+      next.external_product_id = idCandidate;
+      used.add(idCandidate);
+    }
+  }
+
+  if (!next.name) {
+    const remaining = headers.filter((header) => header.trim() && !used.has(header));
+    const nameCandidate =
+      remaining.find((header) =>
+        /(nombre|desc|detalle|producto|articulo|item)/i.test(normalizeHeader(header))
+      ) ??
+      remaining.find((header) => !looksNumeric(header)) ??
+      remaining[0];
+    if (nameCandidate) {
+      next.name = nameCandidate;
+      used.add(nameCandidate);
+    }
+  }
+
+  if (!next.quantity) {
+    const remaining = headers.filter((header) => header.trim() && !used.has(header));
+    const qtyCandidate = remaining.find((header) =>
+      /(stock|cantidad|qty|existencia|saldo)/i.test(normalizeHeader(header))
+    );
+    if (qtyCandidate) next.quantity = qtyCandidate;
+  }
+
+  if (!next.unit_price) {
+    const remaining = headers.filter(
+      (header) => header.trim() && header !== next.quantity && !used.has(header)
+    );
+    const priceCandidate = remaining.find((header) =>
+      /(precio|price|pvp|venta)/i.test(normalizeHeader(header))
+    );
+    if (priceCandidate) next.unit_price = priceCandidate;
+  }
+
+  return next;
 }
 
 export function parseCsv(text: string): { headers: string[]; rows: Record<string, string>[] } {
@@ -1623,6 +1774,8 @@ export function parseCsv(text: string): { headers: string[]; rows: Record<string
     .split(/\r?\n/)
     .filter((line) => line.trim().length > 0);
   if (lines.length === 0) return { headers: [], rows: [] };
+
+  const delimiter = detectCsvDelimiter(lines[0]!);
 
   const parseLine = (line: string): string[] => {
     const cells: string[] = [];
@@ -1639,7 +1792,7 @@ export function parseCsv(text: string): { headers: string[]; rows: Record<string
         }
         continue;
       }
-      if (ch === ',' && !inQuotes) {
+      if (ch === delimiter && !inQuotes) {
         cells.push(current.trim());
         current = '';
         continue;
@@ -3555,16 +3708,17 @@ export function validateInventoryProductRows(
   const issues: ValidationIssue[] = [];
   const seen = new Set<string>();
   for (const row of rows) {
-    if (!row.externalProductId) {
+    const externalId = row.externalProductId?.trim() ?? '';
+    if (!externalId) {
       issues.push({
         rowNumber: row.rowNumber,
         entityType: 'inventory_products',
         field: 'external_product_id',
         code: 'required',
-        message: 'Falta ID externo de producto',
+        message: 'Falta ID externo de producto (o Código/SKU)',
         severity: 'error',
       });
-    } else if (seen.has(row.externalProductId)) {
+    } else if (seen.has(externalId)) {
       issues.push({
         rowNumber: row.rowNumber,
         entityType: 'inventory_products',
@@ -3574,7 +3728,7 @@ export function validateInventoryProductRows(
         severity: 'error',
       });
     } else {
-      seen.add(row.externalProductId);
+      seen.add(externalId);
     }
     pushUnmappedBranchIssue(
       issues,
@@ -3590,7 +3744,7 @@ export function validateInventoryProductRows(
         entityType: 'inventory_products',
         field: 'name',
         code: 'required',
-        message: 'Falta nombre de producto',
+        message: 'Falta nombre de producto (o Descripción)',
         severity: 'error',
       });
     }

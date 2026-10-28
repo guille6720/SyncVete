@@ -44,4 +44,3 @@ test-results
 *.tsbuildinfo
 .vercel
 .env*
-.kokoro/

@@ -18,6 +18,46 @@ export const INVENTORY_PRODUCT_CATEGORY_LABELS: Record<InventoryProductCategory,
   otro: 'Otro',
 };
 
+export const PRODUCT_CURRENCIES = ['ARS', 'USD'] as const;
+
+export type ProductCurrency = (typeof PRODUCT_CURRENCIES)[number];
+
+export const PRODUCT_CURRENCY_LABELS: Record<ProductCurrency, string> = {
+  ARS: 'ARS',
+  USD: 'USD',
+};
+
+export function salePriceFromCost(cost: number, marginPercent: number): number {
+  return Math.round(cost * (1 + marginPercent / 100) * 100) / 100;
+}
+
+export function resolveProductSalePrice(input: {
+  unitCost?: number;
+  unitPrice?: number;
+  marginPercent?: number;
+  costCurrency?: ProductCurrency;
+  exchangeRate?: number | null;
+}): number | null {
+  if (input.unitCost != null && input.marginPercent != null) {
+    const rate = input.costCurrency === 'USD' ? input.exchangeRate : 1;
+    if (rate == null || !Number.isFinite(rate) || rate <= 0) return null;
+    return salePriceFromCost(input.unitCost * rate, input.marginPercent);
+  }
+  return input.unitPrice ?? null;
+}
+
+export function formatProductAmount(
+  value: number | null | undefined,
+  currency: ProductCurrency = 'ARS'
+): string {
+  if (value == null || Number.isNaN(value)) return '—';
+  const formatted = value.toLocaleString('es-AR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+  return currency === 'USD' ? `USD ${formatted}` : `$ ${formatted}`;
+}
+
 export const INVENTORY_UNITS = [
   'unidad',
   'caja',
@@ -44,12 +84,7 @@ export const INVENTORY_UNIT_LABELS: Record<InventoryUnit, string> = {
   otro: 'Otra',
 };
 
-export const INVENTORY_MOVEMENT_TYPES = [
-  'entrada',
-  'salida',
-  'ajuste',
-  'descarte',
-] as const;
+export const INVENTORY_MOVEMENT_TYPES = ['entrada', 'salida', 'ajuste', 'descarte'] as const;
 
 export type InventoryMovementType = (typeof INVENTORY_MOVEMENT_TYPES)[number];
 
@@ -71,7 +106,11 @@ export const INVENTORY_MOVEMENT_TYPE_VARIANT: Record<
 };
 
 export const INVENTORY_PRODUCT_PRESETS = [
-  { name: 'Amoxicilina + Ác. clavulánico', category: 'medicamento' as const, unit: 'caja' as const },
+  {
+    name: 'Amoxicilina + Ác. clavulánico',
+    category: 'medicamento' as const,
+    unit: 'caja' as const,
+  },
   { name: 'Meloxicam', category: 'medicamento' as const, unit: 'frasco' as const },
   { name: 'Vacuna séxtuple canina', category: 'vacuna' as const, unit: 'dosis' as const },
   { name: 'Vacuna triple felina', category: 'vacuna' as const, unit: 'dosis' as const },

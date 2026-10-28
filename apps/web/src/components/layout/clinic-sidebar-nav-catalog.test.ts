@@ -46,9 +46,44 @@ describe('clinic-sidebar-nav', () => {
 
   it('resolves active group preferring the longest href match', () => {
     expect(isSidebarNavItemActive('/agenda/nueva', '/agenda')).toBe(true);
+    expect(isSidebarNavItemActive('/agenda/turnos', '/agenda')).toBe(false);
+    expect(isSidebarNavItemActive('/agenda/turnos', '/agenda/turnos')).toBe(true);
     expect(
       findActiveSidebarGroupId('/liquidaciones/mis-liquidaciones', CLINIC_SIDEBAR_NAV_ITEMS)
     ).toBe('professionals');
+  });
+
+  it('includes Turnos under the agenda group', () => {
+    const item = CLINIC_SIDEBAR_NAV_ITEMS.find((entry) => entry.href === '/agenda/turnos');
+    expect(item?.groupId).toBe('agenda');
+    expect(item?.label).toBe('Turnos');
+  });
+
+  it('can resolve active group from a module hub pathname', () => {
+    expect(
+      findActiveSidebarGroupId('/modulos/clinica', CLINIC_SIDEBAR_NAV_ITEMS, () => 'clinical')
+    ).toBe('clinical');
+  });
+
+  it('shows "Usuarios y permisos" only to users:manage holders', () => {
+    const base = {
+      entitledHrefs: null,
+      showMySettlementsNav: false,
+      isEntitled: () => true,
+    };
+    const staff = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, {
+      ...base,
+      permissions: ['patients:read', 'appointments:write'],
+    });
+    const noPerms = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, base);
+    const admin = filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, {
+      ...base,
+      permissions: ['users:manage'],
+    });
+    expect(staff.some((item) => item.href === '/usuarios')).toBe(false);
+    expect(noPerms.some((item) => item.href === '/usuarios')).toBe(false);
+    expect(admin.some((item) => item.href === '/usuarios')).toBe(true);
+    expect(admin.find((item) => item.href === '/usuarios')?.groupId).toBe('users');
   });
 
   it('includes Interconsultas under professionals group', () => {

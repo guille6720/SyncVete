@@ -1,7 +1,7 @@
 import { NAV_FEATURE_BY_HREF, type FeatureKey } from '../constants/features';
 import { canUseResolvedFeature, type OrganizationEntitlements } from './resolve';
 
-const ALWAYS_VISIBLE_PREFIXES = ['/configuracion', '/superadmin'] as const;
+const ALWAYS_VISIBLE_PREFIXES = ['/configuracion', '/usuarios', '/importar', '/superadmin'] as const;
 
 export function getNavFeatureKey(href: string): FeatureKey | null {
   if (NAV_FEATURE_BY_HREF[href]) return NAV_FEATURE_BY_HREF[href];
@@ -26,6 +26,8 @@ export function getEntitledClinicHrefs(entitlements: OrganizationEntitlements): 
     .filter(([, featureKey]) => canUseResolvedFeature(entitlements, featureKey))
     .map(([href]) => href);
   if (!hrefs.includes('/configuracion')) hrefs.push('/configuracion');
+  if (!hrefs.includes('/usuarios')) hrefs.push('/usuarios');
+  if (!hrefs.includes('/importar')) hrefs.push('/importar');
   return hrefs;
 }
 

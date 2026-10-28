@@ -44,6 +44,11 @@ export const PERMISSION_LABELS: Record<string, string> = {
   'interconsultations:write': 'Gestionar interconsultas',
   'interconsultations:approve': 'Aprobar presupuestos de interconsulta',
   'interconsultations:billing': 'Facturar interconsultas',
+  'patients:delete': 'Eliminar pacientes y propietarios',
+  'appointments:cancel': 'Cancelar o eliminar turnos',
+  'billing:cancel': 'Anular facturas',
+  'data:import': 'Importar datos',
+  'data:export': 'Exportar datos',
 };
 
 export const BRANCH_COOKIE_NAME = 'sincvete_branch_id';

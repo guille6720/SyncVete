@@ -55,9 +55,22 @@ export const PERMISSIONS = [
   'interconsultations:write',
   'interconsultations:approve',
   'interconsultations:billing',
+  'patients:delete',
+  'appointments:cancel',
+  'billing:cancel',
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
+
+/**
+ * Granular permissions implied by their parent write permission. Roles keep today's
+ * behaviour; a Central Admin can restrict the child alone. Mirrors SQL permission_parent().
+ */
+export const IMPLIED_PERMISSIONS: Partial<Record<Permission, Permission>> = {
+  'patients:delete': 'patients:write',
+  'appointments:cancel': 'appointments:write',
+  'billing:cancel': 'billing:write',
+};
 
 export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: [...PERMISSIONS],
@@ -99,6 +112,7 @@ export const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'patients:write',
     'appointments:read',
     'appointments:write',
+    'professionals:read',
     'clinical:read',
     'clinical:write',
     'inventory:read',

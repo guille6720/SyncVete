@@ -2,13 +2,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { APP_NAME } from '@sincvete/shared';
 import { cn } from '@/lib/utils';
+import logoOnLight from '../../../public/brand/logo.png';
+import logoOnDark from '../../../public/brand/logo-dark.png';
 
 type BrandLogoProps = {
   href?: string;
   className?: string;
   /** Visual size preset */
   size?: 'sm' | 'md' | 'lg' | 'hero' | 'sidebar';
-  /** `onLight` = fondo claro; `onDark` = logo con fondo negro para barras oscuras */
+  /** High-contrast artwork keeps the wordmark readable on either surface. */
   variant?: 'onLight' | 'onDark';
   priority?: boolean;
 };
@@ -37,7 +39,7 @@ export function BrandLogo({
   priority = false,
 }: BrandLogoProps) {
   const dims = SIZE_PX[size];
-  const src = variant === 'onDark' ? '/brand/logo-dark.png' : '/brand/logo.png';
+  const src = variant === 'onDark' ? logoOnDark : logoOnLight;
   const image = (
     <Image
       src={src}

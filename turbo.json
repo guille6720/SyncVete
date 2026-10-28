@@ -15,30 +15,50 @@
     "MERCADOPAGO_WEBHOOK_SECRET",
     "OPENAI_API_KEY",
     "OPENAI_BASE_URL",
-    "OPENAI_MODEL"
+    "OPENAI_MODEL",
+    "NEXT_PUBLIC_UI_V2_ENABLED",
+    "NEXT_PUBLIC_ACADEMIA_ENABLED",
+    "SYNCVETE_ENV",
+    "OWNER_APP_ENABLED",
+    "OWNER_APP_STAGING_SUPABASE_URL",
+    "OWNER_APP_STAGING_ORIGIN"
   ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
-      "outputs": [".next/**", "!.next/cache/**", "dist/**"]
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        ".next/**",
+        "!.next/cache/**",
+        "dist/**"
+      ]
     },
     "dev": {
       "cache": false,
       "persistent": true
     },
     "lint": {
-      "dependsOn": ["^lint"]
+      "dependsOn": [
+        "^lint"
+      ]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck"]
+      "dependsOn": [
+        "^typecheck"
+      ]
     },
     "test": {
-      "dependsOn": ["^build"]
+      "dependsOn": [
+        "^build"
+      ]
     },
     "test:unit": {},
     "test:integration": {},
     "test:e2e": {
-      "dependsOn": ["build"]
+      "dependsOn": [
+        "build"
+      ]
     }
   }
 }

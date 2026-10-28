@@ -11,10 +11,15 @@ import { Label } from '@/components/ui/label';
 
 interface ResetPasswordFormProps {
   hasSession: boolean;
+  linkKind?: 'invite' | 'recovery';
 }
 
-export function ResetPasswordForm({ hasSession }: ResetPasswordFormProps) {
+export function ResetPasswordForm({
+  hasSession,
+  linkKind = 'recovery',
+}: ResetPasswordFormProps) {
   const [state, formAction, pending] = useActionState(updatePassword, null);
+  const isInvite = linkKind === 'invite';
 
   if (!hasSession) {
     return (
@@ -26,14 +31,18 @@ export function ResetPasswordForm({ hasSession }: ResetPasswordFormProps) {
           <div>
             <CardTitle>Enlace inválido o vencido</CardTitle>
             <CardDescription>
-              Pedí un nuevo enlace de recuperación para cambiar tu contraseña
+              {isInvite
+                ? 'Pedí al administrador que reenvíe la invitación o te pase un enlace nuevo'
+                : 'Pedí un nuevo enlace de recuperación para cambiar tu contraseña'}
             </CardDescription>
           </div>
         </CardHeader>
         <CardContent className="space-y-4 text-center">
-          <Button asChild className="w-full">
-            <Link href="/recuperar-contrasena">Recuperar contraseña</Link>
-          </Button>
+          {!isInvite && (
+            <Button asChild className="w-full">
+              <Link href="/recuperar-contrasena">Recuperar contraseña</Link>
+            </Button>
+          )}
           <p className="text-sm text-muted-foreground">
             <Link href="/login" className="font-medium text-primary hover:underline">
               Volver al inicio de sesión
@@ -51,8 +60,12 @@ export function ResetPasswordForm({ hasSession }: ResetPasswordFormProps) {
           <BrandLogo href="/login" size="lg" priority />
         </div>
         <div>
-          <CardTitle>Nueva contraseña</CardTitle>
-          <CardDescription>Elegí una contraseña nueva para tu cuenta</CardDescription>
+          <CardTitle>{isInvite ? 'Creá tu contraseña' : 'Nueva contraseña'}</CardTitle>
+          <CardDescription>
+            {isInvite
+              ? 'Elegí una contraseña para activar tu cuenta'
+              : 'Elegí una contraseña nueva para tu cuenta'}
+          </CardDescription>
         </div>
       </CardHeader>
       <CardContent>
@@ -89,7 +102,7 @@ export function ResetPasswordForm({ hasSession }: ResetPasswordFormProps) {
           {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
 
           <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? 'Guardando…' : 'Guardar contraseña'}
+            {pending ? 'Guardando…' : isInvite ? 'Activar cuenta' : 'Guardar contraseña'}
           </Button>
         </form>
       </CardContent>

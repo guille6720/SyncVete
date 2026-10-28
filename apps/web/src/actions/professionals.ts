@@ -326,25 +326,30 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
   const professionalIds = professionals.map((row) => row.id);
   const today = new Date().toISOString().slice(0, 10);
 
+  const [canReadCompensation, canReadSettlements] = await Promise.all([
+    canPermissionAndFeature('professional_compensation:read', FEATURES.PROFESSIONALS_SETTLEMENTS),
+    canPermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS),
+  ]);
+
   const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }, { data: payments, error: paymentsError }] =
     await Promise.all([
-      supabase
+      canReadSettlements ? supabase
         .from('professional_settlements')
         .select('professional_id, balance_due, status')
         .in('professional_id', professionalIds)
-        .is('deleted_at', null),
-      supabase
+        .is('deleted_at', null) : Promise.resolve({ data: [], error: null }),
+      canReadCompensation ? supabase
         .from('professional_compensation_schemes')
         .select('professional_id, name, is_active, valid_from, valid_to')
         .in('professional_id', professionalIds)
         .is('deleted_at', null)
-        .eq('is_active', true),
-      supabase
+        .eq('is_active', true) : Promise.resolve({ data: [], error: null }),
+      canReadSettlements ? supabase
         .from('professional_payments')
         .select('professional_id, amount, paid_at, settlement_id')
         .in('professional_id', professionalIds)
         .is('deleted_at', null)
-        .order('paid_at', { ascending: false }),
+        .order('paid_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
     ]);
   if (settlementsError) throw settlementsError;
   if (schemesError) throw schemesError;
@@ -413,7 +418,7 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
 export async function getProfessionalSettlementSummary(
   professionalId: string
 ): Promise<ProfessionalSettlementSummary> {
-  await requirePermissionAndFeature('professionals:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
+  await requirePermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
   const supabase = await createServerClient();
   const today = new Date().toISOString().slice(0, 10);
 

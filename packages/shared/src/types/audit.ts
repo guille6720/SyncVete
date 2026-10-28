@@ -1,5 +1,13 @@
 import type { AuditAction } from '../constants/audit';
 import type { AuditLog } from './index';
+import type { Role } from '../constants';
+
+export interface AuditMemberOption {
+  userId: string;
+  fullName: string;
+  roles: Role[];
+  isActive: boolean;
+}
 
 export interface AuditLogListRow {
   id: string;

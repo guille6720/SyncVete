@@ -214,3 +214,63 @@ export async function deleteProfessionalTimeBlock(id: string): Promise<ActionRes
     return actionError(error);
   }
 }
+
+export type ProfessionalAgendaContext = {
+  userId: string;
+  fullName: string;
+  specialty: string | null;
+  schedules: ProfessionalSchedule[];
+};
+
+/** Specialty + weekly hours from the professional ficha for agenda booking. */
+export async function getProfessionalAgendaContext(input: {
+  userId: string;
+  branchId?: string | null;
+}): Promise<ProfessionalAgendaContext | null> {
+  await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
+  if (!input.userId) return null;
+
+  const session = await getSessionContext();
+  if (!session) return null;
+
+  const supabase = await createServerClient();
+  const branchId = input.branchId || session.branchId || undefined;
+
+  const [{ data: pro }, schedules] = await Promise.all([
+    supabase
+      .from('professionals')
+      .select('first_name, last_name, specialty, user_id')
+      .eq('organization_id', session.organizationId)
+      .eq('user_id', input.userId)
+      .eq('is_active', true)
+      .is('deleted_at', null)
+      .maybeSingle(),
+    listProfessionalSchedules({
+      branchId,
+      userId: input.userId,
+    }),
+  ]);
+
+  let fullName = '';
+  let specialty: string | null = null;
+  if (pro) {
+    fullName = `${pro.first_name ?? ''} ${pro.last_name ?? ''}`.trim();
+    specialty = pro.specialty ? String(pro.specialty) : null;
+  }
+
+  if (!fullName) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', input.userId)
+      .maybeSingle();
+    fullName = profile?.full_name?.trim() || 'Profesional';
+  }
+
+  return {
+    userId: input.userId,
+    fullName,
+    specialty,
+    schedules: schedules.filter((row) => row.is_active && !row.deleted_at),
+  };
+}

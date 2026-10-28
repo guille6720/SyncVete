@@ -9,36 +9,63 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { ProductPricingFields } from '@/components/inventory/product-pricing-fields';
+import { CatalogCategorySelect } from '@/components/purchases/catalog-management';
 import {
   INVENTORY_PRODUCT_CATEGORIES,
   INVENTORY_PRODUCT_CATEGORY_LABELS,
   INVENTORY_PRODUCT_PRESETS,
   INVENTORY_UNITS,
   INVENTORY_UNIT_LABELS,
+  suppliersForProductCategory,
+  type PurchasePartyKind,
+  type PurchasePartyScope,
+  type PurchaseCategory,
 } from '@sincvete/shared';
 
 interface InventoryProductFormProps {
   branches: Array<{ id: string; name: string }>;
   defaultBranchId?: string | null;
   listHref?: string;
+  defaultCategory?: string;
+  lockCategory?: boolean;
+  categories?: PurchaseCategory[];
+  exchangeRate?: number | null;
+  suppliers?: Array<{
+    id: string;
+    name: string;
+    kind: PurchasePartyKind;
+    scope: PurchasePartyScope;
+    is_active: boolean;
+  }>;
+  afterCreate?: { seccion: 'productos' | 'vacunas' | 'precios'; categoria?: string };
 }
 
 export function InventoryProductForm({
   branches,
   defaultBranchId,
   listHref = '/inventario',
+  defaultCategory = 'medicamento',
+  lockCategory = false,
+  suppliers = [],
+  afterCreate,
+  categories = [],
+  exchangeRate = null,
 }: InventoryProductFormProps) {
   const [state, formAction, pending] = useActionState(createInventoryProduct, null);
   const [name, setName] = useState('');
-  const [category, setCategory] = useState<string>('medicamento');
+  const [category, setCategory] = useState<string>(defaultCategory);
   const [unit, setUnit] = useState<string>('unidad');
+  const [supplierId, setSupplierId] = useState('');
   const sessionBranch = branches.find((branch) => branch.id === defaultBranchId);
+  const supplierOptions = suppliersForProductCategory(suppliers, category);
 
   const applyPreset = (presetName: string) => {
     const preset = INVENTORY_PRODUCT_PRESETS.find((item) => item.name === presetName);
     if (!preset) return;
     setName(preset.name);
-    setCategory(preset.category);
+    if (!lockCategory) setCategory(preset.category);
+    setSupplierId('');
     setUnit(preset.unit);
   };
 
@@ -54,11 +81,22 @@ export function InventoryProductForm({
       </CardHeader>
       <CardContent>
         <form action={formAction} className="grid max-w-2xl gap-4">
+          {afterCreate ? (
+            <>
+              <input type="hidden" name="next" value="compras" />
+              <input type="hidden" name="seccion" value={afterCreate.seccion} />
+              {afterCreate.categoria ? (
+                <input type="hidden" name="categoria" value={afterCreate.categoria} />
+              ) : null}
+            </>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="preset">Plantilla rápida</Label>
             <Select id="preset" defaultValue="" onChange={(e) => applyPreset(e.target.value)}>
               <option value="">—</option>
-              {INVENTORY_PRODUCT_PRESETS.map((preset) => (
+              {INVENTORY_PRODUCT_PRESETS.filter(
+                (preset) => !lockCategory || preset.category === category
+              ).map((preset) => (
                 <option key={preset.name} value={preset.name}>
                   {preset.name}
                 </option>
@@ -110,11 +148,20 @@ export function InventoryProductForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="category">Categoría *</Label>
+              {lockCategory ? <input type="hidden" name="category" value={category} /> : null}
               <Select
                 id="category"
-                name="category"
+                name={lockCategory ? undefined : 'category'}
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                disabled={lockCategory}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setCategory(next);
+                  const stillValid = suppliersForProductCategory(suppliers, next).some(
+                    (item) => item.id === supplierId
+                  );
+                  if (!stillValid) setSupplierId('');
+                }}
               >
                 {INVENTORY_PRODUCT_CATEGORIES.map((item) => (
                   <option key={item} value={item}>
@@ -138,7 +185,14 @@ export function InventoryProductForm({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="quantity">Stock inicial</Label>
-              <Input id="quantity" name="quantity" type="number" min="0" step="any" defaultValue="0" />
+              <Input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="0"
+                step="any"
+                defaultValue="0"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="minQuantity">Stock mínimo</Label>
@@ -153,16 +207,36 @@ export function InventoryProductForm({
             </div>
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="unitCost">Costo unitario</Label>
-              <Input id="unitCost" name="unitCost" type="number" min="0" step="0.01" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="unitPrice">Precio de venta</Label>
-              <Input id="unitPrice" name="unitPrice" type="number" min="0" step="0.01" />
-            </div>
+          <div className="space-y-2">
+            <Label htmlFor="supplierPartyId">
+              {category === 'vacuna' ? 'Proveedor de vacunas' : 'Proveedor'}
+            </Label>
+            {supplierOptions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                {category === 'vacuna'
+                  ? 'No hay proveedores de vacunas. Cargalos en Compras → Vacunas.'
+                  : 'No hay proveedores cargados. Podés sumarlos en Compras → Proveedores.'}
+              </p>
+            ) : (
+              <Select
+                id="supplierPartyId"
+                name="supplierPartyId"
+                value={supplierId}
+                onChange={(event) => setSupplierId(event.target.value)}
+              >
+                <option value="">—</option>
+                {supplierOptions.map((supplier) => (
+                  <option key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                    {supplier.is_active ? '' : ' (inactivo)'}
+                  </option>
+                ))}
+              </Select>
+            )}
           </div>
+
+          <CatalogCategorySelect categories={categories} category={category} />
+          <ProductPricingFields exchangeRate={exchangeRate} />
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notas</Label>

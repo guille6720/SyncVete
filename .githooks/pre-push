@@ -1,0 +1,13 @@
+#!/bin/sh
+while read local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/feature/ui-v2-shell-dashboard-staging) ;;
+    refs/heads/main)
+      echo 'Producción recibe cambios mediante una solicitud desde staging, con autorización de publicación.' >&2
+      exit 1 ;;
+    refs/heads/*)
+      echo 'Solo existen las ramas compartida de staging y main. Publicá el trabajo en staging.' >&2
+      exit 1 ;;
+  esac
+done
+exit 0
