@@ -9,6 +9,27 @@ import {
 } from './clinic-sidebar-nav-catalog';
 
 describe('clinic-sidebar-nav', () => {
+  it('provides the clinical archive in Patients only to clinical readers', () => {
+    const item = CLINIC_SIDEBAR_NAV_ITEMS.find((entry) => entry.href === '/historia-clinica');
+    expect(item).toMatchObject({
+      label: 'Historias clínicas',
+      groupId: 'patients',
+      requiresPermission: 'clinical:read',
+    });
+    const base = { entitledHrefs: null, showMySettlementsNav: false, isEntitled: () => true };
+    expect(
+      filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, {
+        ...base,
+        permissions: ['patients:read'],
+      }).some((entry) => entry.href === '/historia-clinica')
+    ).toBe(false);
+    expect(
+      filterClinicSidebarNavItems(CLINIC_SIDEBAR_NAV_ITEMS, {
+        ...base,
+        permissions: ['clinical:read'],
+      }).some((entry) => entry.href === '/historia-clinica')
+    ).toBe(true);
+  });
   it('keeps unique hrefs and known groups', () => {
     const hrefs = CLINIC_SIDEBAR_NAV_ITEMS.map((item) => item.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);

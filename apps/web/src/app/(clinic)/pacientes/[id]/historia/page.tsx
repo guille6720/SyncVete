@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { listClinicalEntries } from '@/actions/clinical-entries';
 import { getPatient } from '@/actions/patients';
 import { ClinicalEntriesList } from '@/components/clinical/clinical-entries-list';
+import { ClinicalHistoryExport } from '@/components/clinical/clinical-history-export';
 import { Button } from '@/components/ui/button';
 import { getSessionContext } from '@/lib/session';
 import { CLINICAL_HISTORY_PAGE_SIZE, SPECIES_EMOJI } from '@sincvete/shared';
@@ -18,11 +19,7 @@ export default async function PatientHistoriaPage({
   params,
   searchParams,
 }: PatientHistoriaPageProps) {
-  const [session, { id }, query] = await Promise.all([
-    getSessionContext(),
-    params,
-    searchParams,
-  ]);
+  const [session, { id }, query] = await Promise.all([getSessionContext(), params, searchParams]);
   if (!session?.permissions.includes('clinical:read')) redirect('/dashboard');
 
   const page = Math.max(1, Number(query.page) || 1);
@@ -63,6 +60,7 @@ export default async function PatientHistoriaPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ClinicalHistoryExport patientId={id} patientName={patient.name} />
           <Button variant="outline" asChild>
             <Link href={`/imagenes?patientId=${id}`}>Imágenes</Link>
           </Button>

@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: path.resolve(__dirname, '../..'),
   turbopack: { root: path.resolve(__dirname, '../..') },
   transpilePackages: ['@sincvete/shared', '@sincvete/db'],
+  outputFileTracingIncludes: {
+    '/api/historia-clinica/pdf': ['./public/fonts/*.ttf'],
+  },
   env: {
     NEXT_PUBLIC_BUILD_ID:
       process.env.VERCEL_DEPLOYMENT_ID ||

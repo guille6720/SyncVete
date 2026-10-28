@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
+import { ClinicalHistoryExport } from '@/components/clinical/clinical-history-export';
 import {
   CLINICAL_ENTRY_TYPES,
   CLINICAL_ENTRY_TYPE_LABELS,
@@ -76,9 +77,7 @@ export function ClinicalEntriesList({
     router.push(`${pathname}?${params.toString()}`);
   };
 
-  const newHref = patientId
-    ? `${basePath}/nuevo?patientId=${patientId}`
-    : `${basePath}/nuevo`;
+  const newHref = patientId ? `${basePath}/nuevo?patientId=${patientId}` : `${basePath}/nuevo`;
 
   return (
     <div className="space-y-4">
@@ -144,42 +143,54 @@ export function ClinicalEntriesList({
             aria-busy={isPending || undefined}
           >
             {data.data.map((entry) => (
-              <Link
-                key={entry.id}
-                href={`${basePath}/${entry.id}`}
-                className="block rounded-lg border p-4 transition-colors hover:bg-muted/20"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-medium">
-                        {SPECIES_EMOJI[entry.patient_species]} {entry.patient_name}
+              <article key={entry.id} className="rounded-lg border p-4">
+                <Link
+                  href={`${basePath}/${entry.id}`}
+                  className="block rounded-md transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-medium">
+                          {SPECIES_EMOJI[entry.patient_species]} {entry.patient_name}
+                        </p>
+                        <Badge variant={CLINICAL_ENTRY_TYPE_VARIANT[entry.entry_type]}>
+                          {CLINICAL_ENTRY_TYPE_LABELS[entry.entry_type]}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {formatClinicalEntryDateTime(entry.entry_date)}
+                        {entry.recorded_by_name ? ` · ${entry.recorded_by_name}` : ''}
                       </p>
-                      <Badge variant={CLINICAL_ENTRY_TYPE_VARIANT[entry.entry_type]}>
-                        {CLINICAL_ENTRY_TYPE_LABELS[entry.entry_type]}
-                      </Badge>
+                      {(entry.title || entry.diagnosis) && (
+                        <p className="mt-1 text-sm">{entry.title || entry.diagnosis}</p>
+                      )}
+                      {!patientId && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Tutor: {entry.owner_full_name}
+                        </p>
+                      )}
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {formatClinicalEntryDateTime(entry.entry_date)}
-                      {entry.recorded_by_name ? ` · ${entry.recorded_by_name}` : ''}
-                    </p>
-                    {(entry.title || entry.diagnosis) && (
-                      <p className="mt-1 text-sm">
-                        {entry.title || entry.diagnosis}
-                      </p>
-                    )}
-                    {!patientId && (
-                      <p className="mt-1 text-xs text-muted-foreground">
-                        Tutor: {entry.owner_full_name}
-                      </p>
-                    )}
+                    <div className="text-right text-xs text-muted-foreground">
+                      {entry.weight_kg != null && <p>{entry.weight_kg} kg</p>}
+                      {entry.temperature_c != null && <p>{entry.temperature_c} °C</p>}
+                    </div>
                   </div>
-                  <div className="text-right text-xs text-muted-foreground">
-                    {entry.weight_kg != null && <p>{entry.weight_kg} kg</p>}
-                    {entry.temperature_c != null && <p>{entry.temperature_c} °C</p>}
-                  </div>
+                </Link>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t pt-3">
+                  <Link
+                    href={`${basePath}/${entry.id}`}
+                    className="text-sm text-primary underline-offset-4 hover:underline"
+                  >
+                    Ver entrada
+                  </Link>
+                  <ClinicalHistoryExport
+                    patientId={entry.patient_id}
+                    patientName={entry.patient_name}
+                    entryDate={entry.entry_date}
+                  />
                 </div>
-              </Link>
+              </article>
             ))}
           </div>
 
@@ -191,11 +202,7 @@ export function ClinicalEntriesList({
               </p>
               <div className="flex flex-wrap gap-2">
                 {showLoadOlder && data.page < data.totalPages && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => goToPage(data.page + 1)}
-                  >
+                  <Button variant="outline" size="sm" onClick={() => goToPage(data.page + 1)}>
                     Ver anteriores
                   </Button>
                 )}

@@ -59,7 +59,6 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
 
   { label: 'Sala de espera', href: '/sala-espera', icon: Hourglass, groupId: 'clinical' },
   { label: 'Consultas', href: '/consultas', icon: Stethoscope, groupId: 'clinical' },
-  { label: 'Historia clínica', href: '/historia-clinica', icon: ClipboardList, groupId: 'clinical' },
   { label: 'Laboratorio', href: '/laboratorio', icon: FlaskConical, groupId: 'clinical' },
   { label: 'Imágenes', href: '/imagenes', icon: Images, groupId: 'clinical' },
   { label: 'Farmacia', href: '/farmacia', icon: Pill, groupId: 'clinical' },
@@ -67,6 +66,13 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
 
   { label: 'Tutores', href: '/tutores', icon: Users, groupId: 'patients' },
   { label: 'Pacientes', href: '/pacientes', icon: PawPrint, groupId: 'patients' },
+  {
+    label: 'Historias clínicas',
+    href: '/historia-clinica',
+    icon: ClipboardList,
+    groupId: 'patients',
+    requiresPermission: 'clinical:read',
+  },
 
   { label: 'Agenda', href: '/agenda', icon: Calendar, groupId: 'agenda' },
   { label: 'Turnos', href: '/agenda/turnos', icon: CalendarPlus, groupId: 'agenda' },
@@ -82,7 +88,12 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   { label: 'Caja', href: '/caja', icon: Banknote, groupId: 'management' },
 
   { label: 'Profesionales', href: '/profesionales', icon: Briefcase, groupId: 'professionals' },
-  { label: 'Interconsultas', href: '/interconsultas', icon: MessagesSquare, groupId: 'professionals' },
+  {
+    label: 'Interconsultas',
+    href: '/interconsultas',
+    icon: MessagesSquare,
+    groupId: 'professionals',
+  },
   { label: 'Liquidaciones', href: '/liquidaciones', icon: Wallet, groupId: 'professionals' },
   {
     label: 'Mis liquidaciones',
@@ -107,7 +118,13 @@ export const CLINIC_SIDEBAR_NAV_ITEMS: ClinicSidebarNavItem[] = [
   },
 
   { label: 'Importar datos', href: '/importar', icon: Upload, groupId: 'settings' },
-  { label: 'Tutoriales', href: '/academia', icon: GraduationCap, groupId: 'settings', requiresAcademia: true },
+  {
+    label: 'Tutoriales',
+    href: '/academia',
+    icon: GraduationCap,
+    groupId: 'settings',
+    requiresAcademia: true,
+  },
   { label: 'Configuración', href: '/configuracion', icon: Settings, groupId: 'settings' },
 ];
 
@@ -131,9 +148,7 @@ export function filterClinicSidebarNavItems(
   });
 }
 
-export function groupClinicSidebarNavItems(
-  items: readonly ClinicSidebarNavItem[]
-): {
+export function groupClinicSidebarNavItems(items: readonly ClinicSidebarNavItem[]): {
   topLevel: ClinicSidebarNavItem[];
   groups: Array<{ group: DashboardNavGroup; items: ClinicSidebarNavItem[] }>;
 } {
