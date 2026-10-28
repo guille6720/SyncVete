@@ -6761,6 +6761,10 @@ export interface Database {
           total_count: number;
         }[];
       };
+      soft_delete_clinical_entry: {
+        Args: { p_entry_id: string };
+        Returns: { id: string; patient_id: string }[];
+      };
       soft_delete_owner: {
         Args: { p_owner_id: string };
         Returns: string;
