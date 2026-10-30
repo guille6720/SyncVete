@@ -2,7 +2,7 @@
 
 import { agendaMemberKey } from '@sincvete/shared';
 
-import { useActionState, useEffect, useMemo, useState, useTransition } from 'react';
+import { useActionState, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { createAppointment, updateAppointment } from '@/actions/appointments';
 import {
@@ -72,6 +72,7 @@ export function AppointmentForm({
   defaultAssignedUserId = null,
   justCreated = false,
 }: AppointmentFormProps) {
+  const defaultsFor = useRef('');
   const action = appointment ? updateAppointment.bind(null, appointment.id) : createAppointment;
   const [state, formAction, pending] = useActionState(action, null);
   const [, startTransition] = useTransition();
@@ -99,6 +100,10 @@ export function AppointmentForm({
   );
   const [proContext, setProContext] = useState<ProfessionalAgendaContext | null>(null);
   const [proPending, setProPending] = useState(false);
+  const [patientSummary, setPatientSummary] = useState({
+    name: appointment?.patient_name ?? defaultPatientName ?? '',
+    owner: appointment?.owner_full_name ?? defaultOwnerName ?? '',
+  });
   const [contextError, setContextError] = useState<string | null>(null);
   const [busyRanges, setBusyRanges] = useState<AgendaBusyRange[]>([]);
   const [busyPending, setBusyPending] = useState(false);
@@ -150,7 +155,9 @@ export function AppointmentForm({
         if (cancelled) return;
         setProContext(ctx);
         // Editing an existing appointment: keep saved start/duration.
-        if (appointment) return;
+        const defaultsKey = `${assignedUserId}:${selectedBranchId}`;
+        if (appointment || defaultsFor.current === defaultsKey) return;
+        defaultsFor.current = defaultsKey;
         const schedules = ctx?.schedules ?? [];
         if (schedules.length === 0) return;
 
@@ -331,6 +338,7 @@ export function AppointmentForm({
             </p>
           ) : null}
           <PatientPicker
+            onSelectionChange={(name, owner) => setPatientSummary({ name, owner })}
             defaultPatientId={appointment?.patient_id ?? defaultPatientId}
             defaultPatientName={appointment?.patient_name ?? defaultPatientName}
             defaultOwnerId={appointment?.owner_id ?? defaultOwnerId}
@@ -740,6 +748,13 @@ export function AppointmentForm({
         <aside className="space-y-4 rounded-xl border bg-muted/20 p-4 lg:sticky lg:top-6">
           <h2 className="text-lg font-semibold">Resumen del turno</h2>
           <dl className="space-y-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground">Paciente y tutor</dt>
+              <dd className="font-medium">{patientSummary.name || 'Elegí un paciente'}</dd>
+              {patientSummary.owner ? (
+                <dd className="text-xs text-muted-foreground">{patientSummary.owner}</dd>
+              ) : null}
+            </div>
             <div>
               <dt className="text-muted-foreground">Profesional</dt>
               <dd className="font-medium">{selectedStaff?.fullName || 'Sin asignar'}</dd>

@@ -42,6 +42,8 @@ export function ProfessionalForm({
 }: Props) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
+  const [currentDraftId] = useState(draftId);
+  const [showError, setShowError] = useState(true);
   const [state, formAction, pending] = useActionState(
     mode === 'create' ? createProfessional : updateProfessional,
     null
@@ -79,7 +81,10 @@ export function ProfessionalForm({
   const intent = useRef('detail');
   const submittedInvite = useRef(false);
   const savedBranch = useRef(selectedBranches[0] ?? '');
-  const errorFor = (key: string) => state?.fieldErrors?.[key]?.[0];
+  const errorFor = (key: string) => (showError ? state?.fieldErrors?.[key]?.[0] : undefined);
+  useEffect(() => {
+    if (state?.error) setShowError(true);
+  }, [state]);
   useEffect(() => {
     if (!state?.success || !state.data?.id) return;
     const booking = `/agenda/nueva?${new URLSearchParams({ assigned: state.data.id, branch: savedBranch.current, created: '1' })}`;
@@ -111,6 +116,7 @@ export function ProfessionalForm({
       ) : null}
       <form
         ref={formRef}
+        onChange={() => setShowError(false)}
         action={(data) => {
           intent.current = String(data.get('nextStep') || intent.current);
           submittedInvite.current = prepareInvite;
@@ -122,7 +128,7 @@ export function ProfessionalForm({
         <input
           type="hidden"
           name={mode === 'create' ? 'draftId' : 'id'}
-          value={mode === 'create' ? draftId : professional?.id}
+          value={mode === 'create' ? currentDraftId : professional?.id}
         />
         <div className="grid items-start gap-5 lg:grid-cols-2">
           <Card>
@@ -306,7 +312,14 @@ export function ProfessionalForm({
             <CardContent className="space-y-3">
               {canWriteAgenda ? (
                 <>
-                  <ProfessionalHoursEditor value={hours} onChange={setHours} disabled={pending} />
+                  <ProfessionalHoursEditor
+                    value={hours}
+                    onChange={(next) => {
+                      setHours(next);
+                      setShowError(false);
+                    }}
+                    disabled={pending}
+                  />
                   <p className="text-xs text-muted-foreground">
                     Al guardar, estos horarios reemplazan los anteriores de este profesional en las
                     sucursales seleccionadas. Los turnos existentes se conservan.
@@ -318,7 +331,7 @@ export function ProfessionalForm({
             </CardContent>
           </Card>
         </div>
-        {state?.error ? (
+        {state?.error && showError ? (
           <AgendaProblemNotice
             message={state.error}
             onRetry={() => formRef.current?.requestSubmit()}
