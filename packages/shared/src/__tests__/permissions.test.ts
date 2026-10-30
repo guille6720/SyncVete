@@ -37,8 +37,8 @@ describe('getPermissionsForRole', () => {
     expect(perms).not.toContain('audit:read');
   });
 
-  it('returns custom permissions when provided', () => {
+  it('returns custom permissions with their implied granular permissions', () => {
     const perms = getPermissionsForRole('readonly', ['billing:write']);
-    expect(perms).toEqual(['billing:write']);
+    expect(perms).toEqual(['billing:write', 'billing:cancel']);
   });
 });
