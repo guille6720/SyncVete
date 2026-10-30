@@ -87,14 +87,17 @@ export function ProfessionalForm({
   }, [state]);
   useEffect(() => {
     if (!state?.success || !state.data?.id) return;
-    const booking = `/agenda/nueva?${new URLSearchParams({ assigned: state.data.id, branch: savedBranch.current, created: '1' })}`;
+    const booking = `/agenda/nueva?${new URLSearchParams({ assigned: state.data.id, branch: state.workflow?.branchId ?? savedBranch.current, created: '1' })}`;
     const destination =
-      intent.current === 'appointment' ? booking : `/profesionales/${state.data.id}`;
-    if (submittedInvite.current && canInvite)
+      (state.workflow?.nextStep ?? intent.current) === 'appointment'
+        ? booking
+        : `/profesionales/${state.data.id}`;
+    if ((state.workflow?.prepareInvite ?? submittedInvite.current) && canInvite)
       router.push(
         `/usuarios?${new URLSearchParams({ professional: state.data.id, returnTo: destination })}`
       );
-    else if (mode === 'create' || intent.current === 'appointment') router.push(destination);
+    else if (mode === 'create' || (state.workflow?.nextStep ?? intent.current) === 'appointment')
+      router.push(destination);
     else router.refresh();
   }, [state, mode, canInvite, router]);
   return (
@@ -287,6 +290,8 @@ export function ProfessionalForm({
                     <input
                       type="checkbox"
                       className="mt-1"
+                      name="prepareInvite"
+                      value="true"
                       checked={prepareInvite}
                       onChange={(e) => setPrepareInvite(e.target.checked)}
                     />

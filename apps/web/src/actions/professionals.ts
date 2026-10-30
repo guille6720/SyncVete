@@ -402,10 +402,14 @@ export async function listProfessionalBranches(
   return (data ?? []) as ProfessionalBranch[];
 }
 
+export type ProfessionalWorkflowResult = ActionResult<Professional> & {
+  workflow?: { nextStep: 'appointment' | 'detail'; branchId: string; prepareInvite: boolean };
+};
+
 async function persistProfessional(
   formData: FormData,
   create: boolean
-): Promise<ActionResult<Professional>> {
+): Promise<ProfessionalWorkflowResult> {
   try {
     const session = await requirePermissionAndFeature(
       'professionals:write',
@@ -522,7 +526,15 @@ async function persistProfessional(
       };
     revalidateProfessionalsModule();
     revalidatePath(`/profesionales/${idInput.data}`);
-    return { success: true, data: mapProfessional(data as Record<string, unknown>) };
+    return {
+      success: true,
+      data: mapProfessional(data as Record<string, unknown>),
+      workflow: {
+        nextStep: formData.get('nextStep') === 'appointment' ? 'appointment' : 'detail',
+        branchId: branchIds[0],
+        prepareInvite: formData.get('prepareInvite') === 'true',
+      },
+    };
   } catch (error) {
     return actionError(error);
   }
@@ -530,12 +542,12 @@ async function persistProfessional(
 export async function createProfessional(
   _prev: ActionResult<Professional> | null,
   formData: FormData
-): Promise<ActionResult<Professional>> {
+): Promise<ProfessionalWorkflowResult> {
   return persistProfessional(formData, true);
 }
 export async function updateProfessional(
   _prev: ActionResult<Professional> | null,
   formData: FormData
-): Promise<ActionResult<Professional>> {
+): Promise<ProfessionalWorkflowResult> {
   return persistProfessional(formData, false);
 }

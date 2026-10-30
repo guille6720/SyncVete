@@ -128,6 +128,19 @@ describe('atomic professional and agenda submission', () => {
     });
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
+  it('returns the chosen next step and invitation intent after an edit', async () => {
+    const d = form(
+      JSON.stringify([
+        { weekday: 1, startTime: '14:00', endTime: '20:00', slotDurationMinutes: 15 },
+      ])
+    );
+    d.set('nextStep', 'appointment');
+    d.set('prepareInvite', 'true');
+    expect(await updateProfessional(null, d)).toMatchObject({
+      success: true,
+      workflow: { nextStep: 'appointment', branchId: branch, prepareInvite: true },
+    });
+  });
   it('does not accept an unconfirmed RPC response as success', async () => {
     mocks.rpc.mockResolvedValue({ data: null, error: null });
     expect((await updateProfessional(null, form('[]'))).success).toBe(false);
