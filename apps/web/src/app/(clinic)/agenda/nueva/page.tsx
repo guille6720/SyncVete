@@ -1,4 +1,5 @@
-import { redirect } from 'next/navigation';
+import { agendaMemberKey } from '@sincvete/shared';
+import { AgendaProblemNotice } from '@/components/appointments/agenda-problem-notice';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { canManageAppointments, getAssignableStaff } from '@/actions/appointments';
@@ -16,12 +17,16 @@ interface NuevaCitaPageProps {
     patientId?: string;
     assigned?: string;
     branch?: string;
+    created?: string;
   }>;
 }
 
 export default async function NuevaCitaPage({ searchParams }: NuevaCitaPageProps) {
   const canWrite = await canManageAppointments();
-  if (!canWrite) redirect('/agenda');
+  if (!canWrite)
+    return (
+      <AgendaProblemNotice message="No tenés permiso para crear turnos o tu plan no incluye Agenda. Pedile a un administrador que revise appointments:write y el plan de tu clínica." />
+    );
 
   const params = await searchParams;
   const session = await getSessionContext();
@@ -33,16 +38,13 @@ export default async function NuevaCitaPage({ searchParams }: NuevaCitaPageProps
     if (patient) owner = await getOwner(patient.owner_id);
   }
 
-  const [staff, branches] = await Promise.all([
-    getAssignableStaff(),
-    getUserBranches(),
-  ]);
+  const [staff, branches] = await Promise.all([getAssignableStaff(), getUserBranches()]);
 
   const date = parseDateParam(params.date);
   const defaultStartsAt = `${date}T09:00`;
   const defaultBranchId = params.branch || session?.branchId || null;
   const defaultAssignedUserId =
-    params.assigned && staff.some((member) => member.userId === params.assigned)
+    params.assigned && staff.some((member) => agendaMemberKey(member) === params.assigned)
       ? params.assigned
       : null;
 
@@ -64,6 +66,7 @@ export default async function NuevaCitaPage({ searchParams }: NuevaCitaPageProps
         defaultOwnerName={owner?.full_name}
         defaultStartsAt={defaultStartsAt}
         defaultAssignedUserId={defaultAssignedUserId}
+        justCreated={params.created === '1'}
       />
     </div>
   );

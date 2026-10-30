@@ -11,26 +11,6 @@ import { PAYMENT_METHODS } from '../constants/billing';
 const moneySchema = z.coerce.number().finite().min(0).max(999999999999.99);
 const percentageSchema = z.coerce.number().finite().min(0).max(100);
 
-function refineProfessionalAgendaAccess<T extends z.ZodTypeAny>(schema: T) {
-  return schema.superRefine((value, ctx) => {
-    const data = value as {
-      enableAgenda?: boolean;
-      userId?: string | null;
-      agendaEmail?: string | null;
-    };
-    if (data.enableAgenda !== true) return;
-    if (data.userId) return;
-    const email = typeof data.agendaEmail === 'string' ? data.agendaEmail.trim() : '';
-    if (!email) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: 'Indicá un email para agenda o vinculá un usuario',
-        path: ['agendaEmail'],
-      });
-    }
-  });
-}
-
 const professionalFieldsSchema = z.object({
   userId: z.string().uuid().optional().nullable(),
   profileId: z.string().uuid().optional().nullable(),
@@ -48,7 +28,7 @@ const professionalFieldsSchema = z.object({
   invoiceRequired: z.boolean().optional().default(false),
   notes: z.string().trim().max(2000).optional().nullable(),
   branchIds: z.array(z.string().uuid()).optional().default([]),
-  /** When true, ensure auth user + branch_members so they appear in Agenda. */
+  /** Retained for older callers. Booking no longer creates or requires an auth identity. */
   enableAgenda: z.boolean().optional(),
   agendaEmail: z
     .union([z.literal(''), z.string().trim().email('Email inválido').max(200)])
@@ -56,13 +36,10 @@ const professionalFieldsSchema = z.object({
     .nullable(),
 });
 
-export const professionalCreateSchema = refineProfessionalAgendaAccess(professionalFieldsSchema);
-
-export const professionalUpdateSchema = refineProfessionalAgendaAccess(
-  professionalFieldsSchema.partial().extend({
-    id: z.string().uuid(),
-  })
-);
+export const professionalCreateSchema = professionalFieldsSchema;
+export const professionalUpdateSchema = professionalFieldsSchema
+  .partial()
+  .extend({ id: z.string().uuid() });
 
 export const compensationSchemeCreateSchema = z.object({
   professionalId: z.string().uuid(),
@@ -95,7 +72,11 @@ function refineCompensationRule<T extends z.ZodTypeAny>(schema: T) {
   return schema.superRefine((value, ctx) => {
     const rule = value as z.infer<typeof compensationRuleBaseSchema>;
     if (rule.ruleType === 'percentage' && rule.percentage == null) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indicá el porcentaje', path: ['percentage'] });
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Indicá el porcentaje',
+        path: ['percentage'],
+      });
     }
     if ((rule.ruleType === 'fixed' || rule.ruleType === 'activity') && rule.amount == null) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: 'Indicá el monto', path: ['amount'] });
@@ -266,4 +247,6 @@ export type OmitSettlementItemInput = z.infer<typeof omitSettlementItemSchema>;
 export type RestoreSettlementOmissionInput = z.infer<typeof restoreSettlementOmissionSchema>;
 export type ReturnSettlementToDraftInput = z.infer<typeof returnSettlementToDraftSchema>;
 export type CloneCompensationSchemeInput = z.infer<typeof cloneCompensationSchemeSchema>;
-export type LinkProfessionalPaymentToCashInput = z.infer<typeof linkProfessionalPaymentToCashSchema>;
+export type LinkProfessionalPaymentToCashInput = z.infer<
+  typeof linkProfessionalPaymentToCashSchema
+>;

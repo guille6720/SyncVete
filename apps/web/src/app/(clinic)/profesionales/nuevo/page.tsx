@@ -1,17 +1,26 @@
-import { redirect } from 'next/navigation';
+import { AgendaProblemNotice } from '@/components/appointments/agenda-problem-notice';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { canWriteProfessionals } from '@/actions/professionals';
-import { getAssignableStaff } from '@/actions/appointments';
+import { canManageAppointments } from '@/actions/appointments';
+import { getSessionContext } from '@/actions/auth';
+import { randomUUID } from 'crypto';
 import { getUserBranches } from '@/actions/settings';
 import { ProfessionalForm } from '@/components/professionals/professional-form';
 import { Button } from '@/components/ui/button';
 
 export default async function NuevoProfesionalPage() {
   const canWrite = await canWriteProfessionals();
-  if (!canWrite) redirect('/profesionales');
+  if (!canWrite)
+    return (
+      <AgendaProblemNotice message="No tenés permiso para crear profesionales o tu plan no incluye esta función. Pedile a un administrador que revise professionals:write y el plan de la clínica." />
+    );
 
-  const [branches, staff] = await Promise.all([getUserBranches(), getAssignableStaff()]);
+  const [branches, session, canWriteAgenda] = await Promise.all([
+    getUserBranches(),
+    getSessionContext(),
+    canManageAppointments(),
+  ]);
 
   return (
     <div className="space-y-4">
@@ -24,7 +33,10 @@ export default async function NuevoProfesionalPage() {
       <ProfessionalForm
         mode="create"
         branches={branches}
-        staff={staff.map((member) => ({ userId: member.userId, fullName: member.fullName }))}
+        draftId={randomUUID()}
+        defaultBranchId={session?.branchId}
+        canWriteAgenda={canWriteAgenda}
+        canInvite={session?.permissions.includes('users:manage') ?? false}
       />
     </div>
   );

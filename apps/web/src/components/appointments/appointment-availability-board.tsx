@@ -1,5 +1,7 @@
 'use client';
 
+import { agendaMemberKey } from '@sincvete/shared';
+
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Plus, Trash2 } from 'lucide-react';
@@ -71,7 +73,9 @@ export function AppointmentAvailabilityBoard({
 
   const staffName = (userId: string | null) => {
     if (!userId) return 'Toda la sucursal';
-    return staff.find((member) => member.userId === userId)?.fullName ?? userId.slice(0, 8);
+    return (
+      staff.find((member) => agendaMemberKey(member) === userId)?.fullName ?? userId.slice(0, 8)
+    );
   };
 
   const handleSchedule = (formData: FormData) => {
@@ -182,7 +186,14 @@ export function AppointmentAvailabilityBoard({
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <CardTitle className="text-base">Horarios semanales</CardTitle>
           {canWrite && (
-            <Button type="button" size="sm" onClick={() => { setError(null); setScheduleOpen(true); }}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setScheduleOpen(true);
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Agregar horario
             </Button>
@@ -198,7 +209,9 @@ export function AppointmentAvailabilityBoard({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
               >
                 <div>
-                  <p className="font-medium">{staffName(schedule.user_id)}</p>
+                  <p className="font-medium">
+                    {staffName(schedule.professional_id ?? schedule.user_id)}
+                  </p>
                   <p className="text-sm text-muted-foreground">
                     {WEEKDAY_LABELS[schedule.weekday] ?? `Día ${schedule.weekday}`} ·{' '}
                     {formatTime(schedule.start_time)} – {formatTime(schedule.end_time)} · slots{' '}
@@ -230,7 +243,14 @@ export function AppointmentAvailabilityBoard({
         <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <CardTitle className="text-base">Bloqueos</CardTitle>
           {canWrite && (
-            <Button type="button" size="sm" onClick={() => { setError(null); setBlockOpen(true); }}>
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setBlockOpen(true);
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Agregar bloqueo
             </Button>
@@ -246,15 +266,13 @@ export function AppointmentAvailabilityBoard({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3"
               >
                 <div>
-                  <p className="font-medium">{staffName(block.user_id)}</p>
+                  <p className="font-medium">{staffName(block.professional_id ?? block.user_id)}</p>
                   <p className="text-sm text-muted-foreground">
                     {TIME_BLOCK_KIND_LABELS[block.kind as TimeBlockKind] ?? block.kind} ·{' '}
                     {toLocalDateTimeInput(block.starts_at).replace('T', ' ')} →{' '}
                     {toLocalDateTimeInput(block.ends_at).replace('T', ' ')}
                   </p>
-                  {block.reason && (
-                    <p className="text-xs text-muted-foreground">{block.reason}</p>
-                  )}
+                  {block.reason && <p className="text-xs text-muted-foreground">{block.reason}</p>}
                 </div>
                 {canWrite && (
                   <Button
@@ -283,7 +301,12 @@ export function AppointmentAvailabilityBoard({
           {branches.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="sched-branch">Sucursal *</Label>
-              <Select id="sched-branch" name="branchId" required defaultValue={defaultBranchId ?? ''}>
+              <Select
+                id="sched-branch"
+                name="branchId"
+                required
+                defaultValue={defaultBranchId ?? ''}
+              >
                 <option value="">—</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
@@ -298,7 +321,7 @@ export function AppointmentAvailabilityBoard({
             <Select id="sched-user" name="userId" required defaultValue="">
               <option value="">—</option>
               {staff.map((member) => (
-                <option key={member.userId} value={member.userId}>
+                <option key={agendaMemberKey(member)} value={agendaMemberKey(member)}>
                   {member.fullName}
                 </option>
               ))}
@@ -358,7 +381,12 @@ export function AppointmentAvailabilityBoard({
           {branches.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="block-branch">Sucursal *</Label>
-              <Select id="block-branch" name="branchId" required defaultValue={defaultBranchId ?? ''}>
+              <Select
+                id="block-branch"
+                name="branchId"
+                required
+                defaultValue={defaultBranchId ?? ''}
+              >
                 <option value="">—</option>
                 {branches.map((branch) => (
                   <option key={branch.id} value={branch.id}>
@@ -373,7 +401,7 @@ export function AppointmentAvailabilityBoard({
             <Select id="block-user" name="userId" defaultValue="">
               <option value="">Toda la sucursal</option>
               {staff.map((member) => (
-                <option key={member.userId} value={member.userId}>
+                <option key={agendaMemberKey(member)} value={agendaMemberKey(member)}>
                   {member.fullName}
                 </option>
               ))}

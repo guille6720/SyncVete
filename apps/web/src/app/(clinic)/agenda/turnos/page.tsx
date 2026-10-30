@@ -1,3 +1,4 @@
+import { agendaMemberKey } from '@sincvete/shared';
 import { redirect } from 'next/navigation';
 import {
   canManageAppointments,
@@ -26,7 +27,7 @@ export default async function TurnosPage({ searchParams }: TurnosPageProps) {
 
   const branchId = params.branch?.trim() || session?.branchId || '';
   const assigned =
-    params.assigned && staff.some((member) => member.userId === params.assigned)
+    params.assigned && staff.some((member) => agendaMemberKey(member) === params.assigned)
       ? params.assigned
       : '';
 

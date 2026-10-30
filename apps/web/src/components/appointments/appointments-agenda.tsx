@@ -1,5 +1,7 @@
 'use client';
 
+import { agendaMemberKey } from '@sincvete/shared';
+
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { CalendarClock, ClipboardList, Search, X } from 'lucide-react';
@@ -15,10 +17,7 @@ import {
 } from '@/components/appointments/appointments-calendar-views';
 import { AppointmentsWeekNav } from '@/components/appointments/appointments-week-nav';
 import { getAgendaDynamicData } from '@/actions/agenda-data';
-import type {
-  AgendaDynamicData,
-  AgendaShellData,
-} from '@/components/appointments/agenda-types';
+import type { AgendaDynamicData, AgendaShellData } from '@/components/appointments/agenda-types';
 import {
   APPOINTMENT_STATUSES,
   APPOINTMENT_STATUS_LABELS,
@@ -57,18 +56,16 @@ const VIEW_OPTIONS: { value: AgendaViewMode; label: string }[] = [
   { value: 'month', label: 'Mes' },
 ];
 
-function buildAgendaSearch(
-  state: {
-    selectedDate: string;
-    weekStart: string;
-    month: string;
-    view: AgendaViewMode;
-    status: string;
-    assignedUserId: string;
-    branchId: string;
-    query: string;
-  }
-): string {
+function buildAgendaSearch(state: {
+  selectedDate: string;
+  weekStart: string;
+  month: string;
+  view: AgendaViewMode;
+  status: string;
+  assignedUserId: string;
+  branchId: string;
+  query: string;
+}): string {
   const params = new URLSearchParams();
   params.set('date', state.selectedDate);
   params.set('week', state.weekStart);
@@ -168,9 +165,7 @@ export function AppointmentsAgenda({
     [staff, branchId]
   );
 
-  const selectedWaitingStatus = selected
-    ? waitingRoomByAppointment?.[selected.id] ?? null
-    : null;
+  const selectedWaitingStatus = selected ? (waitingRoomByAppointment?.[selected.id] ?? null) : null;
 
   const syncUrl = (next: {
     selectedDate: string;
@@ -262,8 +257,7 @@ export function AppointmentsAgenda({
     const nextSelectedDate = patch.selectedDate ?? selectedDate;
     const nextView = patch.view ?? view;
     const nextWeekStart =
-      patch.weekStart ??
-      (patch.selectedDate ? getWeekStartDate(patch.selectedDate) : weekStart);
+      patch.weekStart ?? (patch.selectedDate ? getWeekStartDate(patch.selectedDate) : weekStart);
     const nextMonth = patch.month ?? (patch.selectedDate ? patch.selectedDate.slice(0, 7) : month);
 
     const next = {
@@ -441,7 +435,7 @@ export function AppointmentsAgenda({
           >
             <option value="">Todos los profesionales</option>
             {visibleStaff.map((member) => (
-              <option key={member.userId} value={member.userId}>
+              <option key={agendaMemberKey(member)} value={agendaMemberKey(member)}>
                 {member.fullName}
               </option>
             ))}
@@ -518,15 +512,10 @@ export function AppointmentsAgenda({
         onNavigate={applyState}
       />
 
-      {view === 'day' && (
-        <h2 className="text-lg font-semibold">{formatDayLabel(selectedDate)}</h2>
-      )}
+      {view === 'day' && <h2 className="text-lg font-semibold">{formatDayLabel(selectedDate)}</h2>}
 
       <div
-        className={cn(
-          'relative min-h-[12rem] transition-opacity',
-          calendarPending && 'opacity-60'
-        )}
+        className={cn('relative min-h-[12rem] transition-opacity', calendarPending && 'opacity-60')}
         aria-busy={calendarPending || undefined}
       >
         {calendarPending && (

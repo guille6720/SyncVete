@@ -6,6 +6,7 @@ import {
   canWriteProfessionals,
   listProfessionalsWithSummary,
 } from '@/actions/professionals';
+import { canManageAppointments } from '@/actions/appointments';
 import { getOrganization } from '@/actions/settings';
 import {
   canReadProfessionalCompensation,
@@ -22,18 +23,29 @@ export default async function ProfesionalesPage() {
   if (!canRead) redirect('/dashboard');
 
   const session = await getSessionContext();
-  const [professionals, canWrite, seats, organization, canReadCompensation, canReadSettlements] =
-    await Promise.all([
-      listProfessionalsWithSummary(),
-      canWriteProfessionals(),
-      session ? getSeatUsageMeters(session.organizationId).catch(() => []) : Promise.resolve([]),
-      getOrganization(),
-      canReadProfessionalCompensation(),
-      canReadProfessionalSettlements(),
-    ]);
+  const [
+    professionals,
+    canWrite,
+    seats,
+    organization,
+    canReadCompensation,
+    canReadSettlements,
+    canBookAppointments,
+  ] = await Promise.all([
+    listProfessionalsWithSummary(),
+    canWriteProfessionals(),
+    session ? getSeatUsageMeters(session.organizationId).catch(() => []) : Promise.resolve([]),
+    getOrganization(),
+    canReadProfessionalCompensation(),
+    canReadProfessionalSettlements(),
+    canManageAppointments(),
+  ]);
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
-  const professionalsSeat = seats.find((meter) => meter.featureKey === 'professionals.max');
+  const seat = seats.find((meter) => meter.featureKey === 'professionals.max');
+  const professionalsSeat = seat
+    ? { ...seat, used: professionals.filter((p) => p.is_active).length }
+    : undefined;
 
   return (
     <div className="space-y-6">
@@ -70,6 +82,7 @@ export default async function ProfesionalesPage() {
         currency={currency}
         canReadCompensation={canReadCompensation}
         canReadSettlements={canReadSettlements}
+        canBookAppointments={canBookAppointments}
       />
     </div>
   );

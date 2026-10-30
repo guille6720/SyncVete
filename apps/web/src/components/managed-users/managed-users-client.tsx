@@ -36,6 +36,8 @@ interface ManagedUsersClientProps {
   overview: ManagedUsersOverview;
   users: ManagedUserRow[];
   invitations: ManagedInvitationRow[];
+  invitationDraft?: { fullName: string; branchId: string };
+  returnTo?: string;
   branches: Array<{ id: string; name: string }>;
   actorPermissions: Permission[];
   canViewActivity: boolean;
@@ -48,9 +50,11 @@ export function ManagedUsersClient({
   branches,
   actorPermissions,
   canViewActivity,
+  invitationDraft,
+  returnTo,
 }: ManagedUsersClientProps) {
   const router = useRouter();
-  const [addOpen, setAddOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(Boolean(invitationDraft));
   const [search, setSearch] = useState('');
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [pendingInvite, setPendingInvite] = useState<string | null>(null);
@@ -58,7 +62,8 @@ export function ManagedUsersClient({
   const [, startTransition] = useTransition();
 
   const limitReached = overview.limit !== null && overview.seatsUsed >= overview.limit;
-  const available = overview.limit === null ? null : Math.max(0, overview.limit - overview.seatsUsed);
+  const available =
+    overview.limit === null ? null : Math.max(0, overview.limit - overview.seatsUsed);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -115,7 +120,11 @@ export function ManagedUsersClient({
       const message = `Hola${invitation.fullName ? ` ${invitation.fullName}` : ''}, te invito a SyncVete. Abrí este enlace para crear tu contraseña y entrar:\n${link}`;
 
       if (mode === 'whatsapp') {
-        window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank', 'noopener,noreferrer');
+        window.open(
+          `https://wa.me/?text=${encodeURIComponent(message)}`,
+          '_blank',
+          'noopener,noreferrer'
+        );
         setNotice({
           kind: 'ok',
           text: `Se abrió WhatsApp con el enlace para ${result.data.email}.`,
@@ -154,6 +163,11 @@ export function ManagedUsersClient({
 
   return (
     <div className="space-y-6">
+      {returnTo ? (
+        <Button variant="outline" asChild>
+          <Link href={returnTo}>Continuar sin invitar / volver al turno</Link>
+        </Button>
+      ) : null}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Usuarios y permisos</h1>
@@ -186,9 +200,7 @@ export function ManagedUsersClient({
         <p
           role="status"
           className={`rounded-md px-3 py-2 text-sm ${
-            notice.kind === 'ok'
-              ? 'bg-emerald-50 text-emerald-800'
-              : 'bg-red-50 text-red-800'
+            notice.kind === 'ok' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'
           }`}
         >
           {notice.text}
@@ -257,7 +269,10 @@ export function ManagedUsersClient({
                         <td className="py-2 pr-3">
                           {user.branchName ?? '—'}
                           {user.branchCount > 1 ? (
-                            <span className="text-xs text-muted-foreground"> +{user.branchCount - 1}</span>
+                            <span className="text-xs text-muted-foreground">
+                              {' '}
+                              +{user.branchCount - 1}
+                            </span>
                           ) : null}
                         </td>
                         <td className="py-2 pr-3">
@@ -287,7 +302,9 @@ export function ManagedUsersClient({
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="truncate font-medium">{user.fullName}</p>
-                        <p className="truncate text-xs text-muted-foreground">{user.email ?? '—'}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {user.email ?? '—'}
+                        </p>
                       </div>
                       <UserStatusBadge status={user.status} />
                     </div>
@@ -325,9 +342,7 @@ export function ManagedUsersClient({
                 className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium">
-                    {invitation.fullName ?? invitation.email}
-                  </p>
+                  <p className="truncate font-medium">{invitation.fullName ?? invitation.email}</p>
                   <p className="truncate text-xs text-muted-foreground">
                     {invitation.email} · {managedRoleLabel(invitation.role)} ·{' '}
                     {invitation.branchName ?? '—'}
@@ -382,6 +397,7 @@ export function ManagedUsersClient({
       ) : null}
 
       <AddUserDialog
+        initialValues={invitationDraft}
         open={addOpen}
         onClose={() => setAddOpen(false)}
         branches={branches}
@@ -421,22 +437,24 @@ function OverviewCard({ label, value, hint }: { label: string; value: string; hi
 }
 
 function AddUserDialog({
+  initialValues,
   open,
   onClose,
   branches,
   actorPermissions,
   onDone,
 }: {
+  initialValues?: { fullName: string; branchId: string };
   open: boolean;
   onClose: () => void;
   branches: Array<{ id: string; name: string }>;
   actorPermissions: Permission[];
   onDone: (message: string) => void;
 }) {
-  const [fullName, setFullName] = useState('');
+  const [fullName, setFullName] = useState(initialValues?.fullName ?? '');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
-  const [branchId, setBranchId] = useState(branches[0]?.id ?? '');
+  const [branchId, setBranchId] = useState(initialValues?.branchId || branches[0]?.id || '');
   const defaultDenied = (forRole: Role) => {
     const held = new Set(actorPermissions);
     return getPermissionsForRole(forRole).filter((p) => !held.has(p));
@@ -486,7 +504,7 @@ function AddUserDialog({
       open={open}
       titleId="add-managed-user-title"
       title="Agregar usuario"
-      description="El usuario recibirá un email para crear su contraseña e ingresar."
+      description="Invitar es opcional: la agenda ya funciona. Revisá el correo y los permisos antes de enviar. El usuario recibirá un email para ingresar."
       onClose={onClose}
       maxWidthClassName="max-w-2xl"
     >

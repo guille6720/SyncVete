@@ -11,11 +11,7 @@ import { Select } from '@/components/ui/select';
 import { useDebouncedValue } from '@/lib/hooks/use-debounced-value';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
 import { cn } from '@/lib/utils';
-import {
-  PATIENT_SPECIES,
-  SPECIES_EMOJI,
-  type PatientSpecies,
-} from '@sincvete/shared';
+import { PATIENT_SPECIES, SPECIES_EMOJI, type PatientSpecies } from '@sincvete/shared';
 
 interface PatientPickerProps {
   defaultPatientId?: string;
@@ -24,6 +20,7 @@ interface PatientPickerProps {
   defaultOwnerName?: string;
   defaultBranchId?: string | null;
   error?: string;
+  onSelectionChange?: (name: string, ownerName: string) => void;
 }
 
 export function PatientPicker({
@@ -33,6 +30,7 @@ export function PatientPicker({
   defaultOwnerName,
   defaultBranchId,
   error,
+  onSelectionChange,
 }: PatientPickerProps) {
   const [query, setQuery] = useState(defaultPatientName ?? '');
   const [patientId, setPatientId] = useState(defaultPatientId ?? '');
@@ -95,6 +93,7 @@ export function PatientPicker({
     setOwnerId(patient.owner_id);
     setOwnerName(patient.owner_full_name);
     setQuery(patient.name);
+    onSelectionChange?.(patient.name, patient.owner_full_name);
     setOpen(false);
   };
 
@@ -139,6 +138,7 @@ export function PatientPicker({
       setOwnerId(ownerResult.data.id);
       setOwnerName(ownerFullName);
       setQuery(patientName);
+      onSelectionChange?.(patientName, ownerFullName);
       setCreateOpen(false);
     });
   };
@@ -147,10 +147,15 @@ export function PatientPicker({
     <div className="space-y-2" ref={containerRef}>
       <div className="flex flex-wrap items-end justify-between gap-2">
         <Label htmlFor="patientSearch">Paciente *</Label>
-        <Button type="button" variant="outline" size="sm" onClick={() => {
-          setCreateError(null);
-          setCreateOpen(true);
-        }}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setCreateError(null);
+            setCreateOpen(true);
+          }}
+        >
           Crear paciente/tutor
         </Button>
       </div>
@@ -165,6 +170,7 @@ export function PatientPicker({
             setPatientId('');
             setOwnerId('');
             setOwnerName('');
+            onSelectionChange?.('', '');
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
@@ -173,9 +179,7 @@ export function PatientPicker({
         />
         {open && (results.length > 0 || loading) && (
           <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-md border bg-popover py-1 shadow-md">
-            {loading && (
-              <li className="px-3 py-2 text-sm text-muted-foreground">Buscando...</li>
-            )}
+            {loading && <li className="px-3 py-2 text-sm text-muted-foreground">Buscando...</li>}
             {results.map((patient) => (
               <li key={patient.id}>
                 <button
@@ -196,9 +200,7 @@ export function PatientPicker({
           </ul>
         )}
       </div>
-      {ownerName && (
-        <p className="text-xs text-muted-foreground">Tutor: {ownerName}</p>
-      )}
+      {ownerName && <p className="text-xs text-muted-foreground">Tutor: {ownerName}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
       {!patientId && query && !loading && (
         <p className="text-xs text-muted-foreground">Seleccioná un paciente de la lista</p>
@@ -224,7 +226,12 @@ export function PatientPicker({
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="quick-patient-name">Paciente *</Label>
-              <Input id="quick-patient-name" name="name" required placeholder="Nombre del paciente" />
+              <Input
+                id="quick-patient-name"
+                name="name"
+                required
+                placeholder="Nombre del paciente"
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="quick-patient-species">Especie</Label>

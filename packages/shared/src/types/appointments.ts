@@ -17,6 +17,7 @@ export interface Appointment {
   patient_id: string;
   owner_id: string;
   assigned_user_id: string | null;
+  assigned_professional_id?: string | null;
   starts_at: string;
   ends_at: string;
   status: AppointmentStatus;
@@ -43,7 +44,9 @@ export interface AppointmentListRow extends Appointment {
 }
 
 export interface AssignableStaffMember {
+  /** Empty when the professional has no app login. Use agendaMemberKey for selectors. */
   userId: string;
+  professionalId?: string | null;
   fullName: string;
   role: string;
   /** Branches where this user can be assigned (from branch_members / professional_branches). */
@@ -77,7 +80,8 @@ export interface ProfessionalSchedule {
   id: string;
   organization_id: string;
   branch_id: string;
-  user_id: string;
+  user_id: string | null;
+  professional_id?: string | null;
   /** 1=Monday .. 7=Sunday (ISODOW) */
   weekday: number;
   start_time: string;
@@ -91,6 +95,7 @@ export interface ProfessionalSchedule {
 }
 
 export interface ProfessionalTimeBlock {
+  professional_id?: string | null;
   id: string;
   organization_id: string;
   branch_id: string;

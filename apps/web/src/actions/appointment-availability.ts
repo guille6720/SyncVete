@@ -14,6 +14,9 @@ import { PermissionError, requirePermissionAndFeature } from '@/lib/permissions'
 import { getSessionContext } from '@/actions/auth';
 import { revalidateAgenda } from '@/lib/cache-revalidate';
 import { FEATURES, planRestrictionResult } from '@/lib/entitlements';
+import { getAssignableStaff } from '@/actions/appointments';
+import { agendaMemberKey } from '@sincvete/shared';
+import { z } from 'zod';
 
 function actionError<T = void>(error: unknown): ActionResult<T> {
   const planError = planRestrictionResult<T>(error);
@@ -35,37 +38,37 @@ function normalizeTime(value: string): string {
   return value.length === 5 ? `${value}:00` : value;
 }
 
-export async function listProfessionalSchedules(input: {
-  branchId?: string;
-  userId?: string;
-} = {}): Promise<ProfessionalSchedule[]> {
+export async function listProfessionalSchedules(
+  input: {
+    branchId?: string;
+    userId?: string;
+  } = {}
+): Promise<ProfessionalSchedule[]> {
   await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
   const parsed = professionalScheduleListSchema.parse(input);
   const session = await getSessionContext();
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase.rpc('list_professional_schedules', {
+  const { data, error } = await supabase.rpc('list_agenda_schedules', {
     p_branch_id: parsed.branchId ?? session?.branchId ?? null,
-    p_user_id: parsed.userId ?? null,
+    p_assignee_id: parsed.userId ?? null,
   });
 
   if (error) throw error;
   return (data ?? []) as ProfessionalSchedule[];
 }
 
-export async function upsertProfessionalSchedule(
-  input: {
-    id?: string;
-    branchId: string;
-    userId: string;
-    weekday: number;
-    startTime: string;
-    endTime: string;
-    slotDurationMinutes?: number;
-    allowedAppointmentTypes?: string[];
-    isActive?: boolean;
-  }
-): Promise<ActionResult<ProfessionalSchedule>> {
+export async function upsertProfessionalSchedule(input: {
+  id?: string;
+  branchId: string;
+  userId: string;
+  weekday: number;
+  startTime: string;
+  endTime: string;
+  slotDurationMinutes?: number;
+  allowedAppointmentTypes?: string[];
+  isActive?: boolean;
+}): Promise<ActionResult<ProfessionalSchedule>> {
   try {
     await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
     const parsed = professionalScheduleSchema.safeParse(input);
@@ -78,17 +81,30 @@ export async function upsertProfessionalSchedule(
     }
 
     const supabase = await createServerClient();
-    const { data, error } = await supabase.rpc('upsert_professional_schedule', {
-      p_branch_id: parsed.data.branchId,
-      p_user_id: parsed.data.userId,
-      p_weekday: parsed.data.weekday,
-      p_start_time: normalizeTime(parsed.data.startTime),
-      p_end_time: normalizeTime(parsed.data.endTime),
-      p_slot_duration_minutes: parsed.data.slotDurationMinutes,
-      p_allowed_appointment_types: parsed.data.allowedAppointmentTypes ?? null,
-      p_is_active: parsed.data.isActive,
-      p_id: parsed.data.id ?? null,
-    });
+    const member = (await getAssignableStaff()).find(
+      (m) => agendaMemberKey(m) === parsed.data.userId && m.branchIds.includes(parsed.data.branchId)
+    );
+    if (!member)
+      return {
+        success: false,
+        error: 'Profesional no disponible en esta sucursal. Revisá su ficha.',
+      };
+    const payload = {
+      branch_id: parsed.data.branchId,
+      organization_id: (await getSessionContext())!.organizationId,
+      professional_id: member.professionalId ?? null,
+      user_id: member.professionalId ? null : member.userId,
+      weekday: parsed.data.weekday,
+      start_time: normalizeTime(parsed.data.startTime),
+      end_time: normalizeTime(parsed.data.endTime),
+      slot_duration_minutes: parsed.data.slotDurationMinutes,
+      allowed_appointment_types: parsed.data.allowedAppointmentTypes ?? null,
+      is_active: parsed.data.isActive,
+    };
+    const query = parsed.data.id
+      ? supabase.from('professional_schedules').update(payload).eq('id', parsed.data.id)
+      : supabase.from('professional_schedules').insert(payload);
+    const { data, error } = await query.select('*').single();
 
     if (error) {
       return {
@@ -126,38 +142,45 @@ export async function deleteProfessionalSchedule(id: string): Promise<ActionResu
   }
 }
 
-export async function listProfessionalTimeBlocks(input: {
-  branchId?: string;
-  userId?: string;
-  from?: string;
-  to?: string;
-} = {}): Promise<ProfessionalTimeBlock[]> {
+export async function listProfessionalTimeBlocks(
+  input: {
+    branchId?: string;
+    userId?: string;
+    from?: string;
+    to?: string;
+  } = {}
+): Promise<ProfessionalTimeBlock[]> {
   await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
   const parsed = professionalTimeBlockListSchema.parse(input);
   const session = await getSessionContext();
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase.rpc('list_professional_time_blocks', {
-    p_branch_id: parsed.branchId ?? session?.branchId ?? null,
-    p_user_id: parsed.userId ?? null,
-    p_from: parsed.from ?? null,
-    p_to: parsed.to ?? null,
-  });
-
+  let query = supabase.from('professional_time_blocks').select('*').is('deleted_at', null);
+  const branchId = parsed.branchId ?? session?.branchId;
+  if (branchId) query = query.eq('branch_id', branchId);
+  if (parsed.from) query = query.gte('ends_at', parsed.from);
+  if (parsed.to) query = query.lte('starts_at', parsed.to);
+  const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []) as ProfessionalTimeBlock[];
+  const member = parsed.userId
+    ? (await getAssignableStaff()).find((m) => agendaMemberKey(m) === parsed.userId)
+    : null;
+  return (data ?? []).filter(
+    (b) =>
+      !parsed.userId ||
+      b.professional_id === parsed.userId ||
+      (!b.professional_id && (!b.user_id || b.user_id === (member?.userId || parsed.userId)))
+  ) as ProfessionalTimeBlock[];
 }
 
-export async function upsertProfessionalTimeBlock(
-  input: {
-    branchId: string;
-    startsAt: string;
-    endsAt: string;
-    kind?: string;
-    userId?: string;
-    reason?: string;
-  }
-): Promise<ActionResult<ProfessionalTimeBlock>> {
+export async function upsertProfessionalTimeBlock(input: {
+  branchId: string;
+  startsAt: string;
+  endsAt: string;
+  kind?: string;
+  userId?: string;
+  reason?: string;
+}): Promise<ActionResult<ProfessionalTimeBlock>> {
   try {
     await requirePermissionAndFeature('appointments:write', FEATURES.APPOINTMENTS);
     const parsed = professionalTimeBlockSchema.safeParse(input);
@@ -170,14 +193,31 @@ export async function upsertProfessionalTimeBlock(
     }
 
     const supabase = await createServerClient();
-    const { data, error } = await supabase.rpc('create_professional_time_block', {
-      p_branch_id: parsed.data.branchId,
-      p_starts_at: parsed.data.startsAt,
-      p_ends_at: parsed.data.endsAt,
-      p_kind: parsed.data.kind,
-      p_user_id: parsed.data.userId ?? null,
-      p_reason: parsed.data.reason ?? null,
-    });
+    const member = parsed.data.userId
+      ? (await getAssignableStaff()).find(
+          (m) =>
+            agendaMemberKey(m) === parsed.data.userId && m.branchIds.includes(parsed.data.branchId)
+        )
+      : null;
+    if (parsed.data.userId && !member)
+      return {
+        success: false,
+        error: 'Profesional no disponible en esta sucursal. Revisá su ficha.',
+      };
+    const { data, error } = await supabase
+      .from('professional_time_blocks')
+      .insert({
+        organization_id: (await getSessionContext())!.organizationId,
+        branch_id: parsed.data.branchId,
+        starts_at: parsed.data.startsAt,
+        ends_at: parsed.data.endsAt,
+        kind: parsed.data.kind,
+        professional_id: member?.professionalId ?? null,
+        user_id: member?.professionalId ? null : member?.userId || null,
+        reason: parsed.data.reason ?? null,
+      })
+      .select('*')
+      .single();
 
     if (error) {
       return {
@@ -217,60 +257,57 @@ export async function deleteProfessionalTimeBlock(id: string): Promise<ActionRes
 
 export type ProfessionalAgendaContext = {
   userId: string;
+  professionalId?: string | null;
   fullName: string;
   specialty: string | null;
   schedules: ProfessionalSchedule[];
 };
-
-/** Specialty + weekly hours from the professional ficha for agenda booking. */
 export async function getProfessionalAgendaContext(input: {
   userId: string;
   branchId?: string | null;
 }): Promise<ProfessionalAgendaContext | null> {
   await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
-  if (!input.userId) return null;
-
+  const id = z.string().uuid().parse(input.userId);
   const session = await getSessionContext();
-  if (!session) return null;
-
-  const supabase = await createServerClient();
-  const branchId = input.branchId || session.branchId || undefined;
-
-  const [{ data: pro }, schedules] = await Promise.all([
-    supabase
-      .from('professionals')
-      .select('first_name, last_name, specialty, user_id')
-      .eq('organization_id', session.organizationId)
-      .eq('user_id', input.userId)
-      .eq('is_active', true)
-      .is('deleted_at', null)
-      .maybeSingle(),
-    listProfessionalSchedules({
-      branchId,
-      userId: input.userId,
-    }),
-  ]);
-
-  let fullName = '';
-  let specialty: string | null = null;
-  if (pro) {
-    fullName = `${pro.first_name ?? ''} ${pro.last_name ?? ''}`.trim();
-    specialty = pro.specialty ? String(pro.specialty) : null;
-  }
-
-  if (!fullName) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('full_name')
-      .eq('id', input.userId)
-      .maybeSingle();
-    fullName = profile?.full_name?.trim() || 'Profesional';
-  }
-
+  const branchId = input.branchId || session?.branchId || undefined;
+  const member = (await getAssignableStaff()).find(
+    (m) => agendaMemberKey(m) === id && (!branchId || m.branchIds.includes(branchId))
+  );
+  if (!member)
+    throw new Error(
+      'Profesional no disponible en esta sucursal. Seleccioná otra sucursal o revisá su ficha.'
+    );
+  const schedules = await listProfessionalSchedules({ userId: id, branchId });
   return {
-    userId: input.userId,
-    fullName,
-    specialty,
-    schedules: schedules.filter((row) => row.is_active && !row.deleted_at),
+    userId: id,
+    professionalId: member.professionalId,
+    fullName: member.fullName,
+    specialty: member.specialty ?? null,
+    schedules,
   };
+}
+export type AgendaBusyRange = {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  kind: 'appointment' | 'block';
+};
+export async function getAgendaBusyRanges(input: {
+  assigneeId: string;
+  branchId: string;
+  date: string;
+}): Promise<AgendaBusyRange[]> {
+  await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
+  const parsed = z
+    .object({ assigneeId: z.string().uuid(), branchId: z.string().uuid(), date: z.string().date() })
+    .parse(input);
+  const { data, error } = await (
+    await createServerClient()
+  ).rpc('agenda_busy_ranges', {
+    p_assignee_id: parsed.assigneeId,
+    p_branch_id: parsed.branchId,
+    p_date: parsed.date,
+  });
+  if (error) throw error;
+  return (data as unknown as AgendaBusyRange[]) ?? [];
 }

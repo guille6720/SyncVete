@@ -1,7 +1,10 @@
 'use client';
 
+import { agendaMemberKey } from '@sincvete/shared';
+
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { AgendaProblemNotice } from './agenda-problem-notice';
 import { Plus } from 'lucide-react';
 import {
   getProfessionalAgendaContext,
@@ -35,6 +38,8 @@ export function TurnosBookingView({
   const [branchId, setBranchId] = useState(defaultBranchId ?? '');
   const [assignedUserId, setAssignedUserId] = useState(initialAssignedUserId);
   const [context, setContext] = useState<ProfessionalAgendaContext | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retry, setRetry] = useState(0);
   const [pending, setPending] = useState(false);
   const today = formatDateParam(new Date());
 
@@ -44,7 +49,10 @@ export function TurnosBookingView({
   );
 
   useEffect(() => {
-    if (assignedUserId && !visibleStaff.some((member) => member.userId === assignedUserId)) {
+    if (
+      assignedUserId &&
+      !visibleStaff.some((member) => agendaMemberKey(member) === assignedUserId)
+    ) {
       setAssignedUserId('');
     }
   }, [visibleStaff, assignedUserId]);
@@ -57,6 +65,8 @@ export function TurnosBookingView({
     }
     let cancelled = false;
     setPending(true);
+    setContext(null);
+    setError(null);
     void getProfessionalAgendaContext({
       userId: assignedUserId,
       branchId: branchId || null,
@@ -65,7 +75,10 @@ export function TurnosBookingView({
         if (!cancelled) setContext(ctx);
       })
       .catch(() => {
-        if (!cancelled) setContext(null);
+        if (!cancelled) {
+          setContext(null);
+          setError('No se pudo cargar la agenda. Revisá tu conexión y reintentá.');
+        }
       })
       .finally(() => {
         if (!cancelled) setPending(false);
@@ -73,7 +86,7 @@ export function TurnosBookingView({
     return () => {
       cancelled = true;
     };
-  }, [assignedUserId, branchId]);
+  }, [assignedUserId, branchId, retry]);
 
   const nuevoTurnoHref = useMemo(() => {
     const params = new URLSearchParams();
@@ -83,7 +96,8 @@ export function TurnosBookingView({
     return `/agenda/nueva?${params.toString()}`;
   }, [today, assignedUserId, branchId]);
 
-  const selectedStaff = visibleStaff.find((member) => member.userId === assignedUserId) ?? null;
+  const selectedStaff =
+    visibleStaff.find((member) => agendaMemberKey(member) === assignedUserId) ?? null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -117,7 +131,7 @@ export function TurnosBookingView({
           >
             <option value="">Elegí un profesional…</option>
             {visibleStaff.map((member) => (
-              <option key={member.userId} value={member.userId}>
+              <option key={agendaMemberKey(member)} value={agendaMemberKey(member)}>
                 {member.fullName}
                 {member.specialty ? ` · ${member.specialty}` : ''}
               </option>
@@ -135,6 +149,8 @@ export function TurnosBookingView({
         <div className="rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
           Seleccioná un profesional para ver sus días y horarios de atención.
         </div>
+      ) : error ? (
+        <AgendaProblemNotice message={error} onRetry={() => setRetry((v) => v + 1)} />
       ) : pending && !context ? (
         <div className="rounded-xl border border-dashed px-4 py-6 text-sm text-muted-foreground">
           Cargando agenda de {selectedStaff?.fullName ?? 'profesional'}…
@@ -146,9 +162,19 @@ export function TurnosBookingView({
             specialty={context?.specialty ?? selectedStaff?.specialty}
             schedules={context?.schedules ?? []}
             selectedDate={today}
+            editHref={
+              selectedStaff?.professionalId
+                ? `/profesionales/${selectedStaff.professionalId}`
+                : '/agenda/disponibilidad'
+            }
           />
 
-          {canWrite ? (
+          {canWrite && context?.professionalId && !context.schedules.length ? (
+            <AgendaProblemNotice
+              message="El profesional no tiene horarios cargados. Agregá días y horarios en su ficha."
+              hoursHref={`/profesionales/${context.professionalId}`}
+            />
+          ) : canWrite ? (
             <Button asChild className="w-full sm:w-auto" disabled={!assignedUserId}>
               <Link href={nuevoTurnoHref}>
                 <Plus className="mr-2 h-4 w-4" />
@@ -157,7 +183,8 @@ export function TurnosBookingView({
             </Button>
           ) : (
             <p className="text-sm text-muted-foreground">
-              No tenés permiso para crear turnos.
+              No tenés permiso para crear turnos. Pedile a un administrador que habilite
+              appointments:write en Usuarios y permisos.
             </p>
           )}
         </div>

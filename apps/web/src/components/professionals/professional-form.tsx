@@ -1,15 +1,13 @@
 'use client';
 
-import { useActionState, useState, useEffect } from 'react';
+import { useActionState, useEffect, useRef, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { ArrowRight, CheckCircle2, UserRound, CalendarDays } from 'lucide-react';
 import { createProfessional, updateProfessional } from '@/actions/professionals';
-import {
-  DEFAULT_WEEKDAY_HOURS,
-  ProfessionalHoursEditor,
-  type ProfessionalHoursDraft,
-} from '@/components/professionals/professional-hours-editor';
+import { ProfessionalHoursEditor, type ProfessionalHoursDraft } from './professional-hours-editor';
+import { AgendaProblemNotice } from '@/components/appointments/agenda-problem-notice';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
@@ -20,269 +18,371 @@ import {
   type Professional,
 } from '@sincvete/shared';
 
-interface StaffOption {
-  userId: string;
-  fullName: string;
-}
-
-interface BranchOption {
-  id: string;
-  name: string;
-}
-
-interface ProfessionalFormProps {
+interface Props {
   mode: 'create' | 'edit';
   professional?: Professional;
-  branches: BranchOption[];
-  staff?: StaffOption[];
+  branches: Array<{ id: string; name: string }>;
   branchIds?: string[];
+  defaultBranchId?: string | null;
   initialHours?: ProfessionalHoursDraft[];
+  draftId?: string;
+  canWriteAgenda?: boolean;
+  canInvite?: boolean;
 }
-
 export function ProfessionalForm({
   mode,
   professional,
   branches,
-  staff = [],
   branchIds = [],
-  initialHours,
-}: ProfessionalFormProps) {
+  defaultBranchId,
+  initialHours = [],
+  draftId,
+  canWriteAgenda = true,
+  canInvite = false,
+}: Props) {
   const router = useRouter();
-  const action = mode === 'create' ? createProfessional : updateProfessional;
-  const [state, formAction, pending] = useActionState(action, null);
-  const [enableAgenda, setEnableAgenda] = useState(
-    mode === 'create' || !professional?.user_id
+  const formRef = useRef<HTMLFormElement>(null);
+  const [currentDraftId] = useState(draftId);
+  const [showError, setShowError] = useState(true);
+  const [state, formAction, pending] = useActionState(
+    mode === 'create' ? createProfessional : updateProfessional,
+    null
   );
-  const [linkedUserId, setLinkedUserId] = useState(professional?.user_id ?? '');
-  const [hours, setHours] = useState<ProfessionalHoursDraft[]>(
-    initialHours && initialHours.length > 0
-      ? initialHours
-      : mode === 'create'
-        ? DEFAULT_WEEKDAY_HOURS
-        : []
+  const [, startTransition] = useTransition();
+  const [hours, setHours] = useState(initialHours);
+  const [selectedBranches, setSelectedBranches] = useState(
+    branchIds.length
+      ? branchIds
+      : defaultBranchId
+        ? [defaultBranchId]
+        : branches.length === 1
+          ? [branches[0].id]
+          : []
   );
-
+  const [prepareInvite, setPrepareInvite] = useState(false);
+  const [fields, setFields] = useState<Record<string, string>>({
+    firstName: professional?.first_name ?? '',
+    lastName: professional?.last_name ?? '',
+    specialty: professional?.specialty ?? '',
+    relationshipType: professional?.relationship_type ?? 'independent',
+    taxId: professional?.tax_id ?? '',
+    professionalLicense: professional?.professional_license ?? '',
+    startDate: professional?.start_date ?? '',
+    endDate: professional?.end_date ?? '',
+    isActive: professional?.is_active === false ? 'false' : 'true',
+    notes: professional?.notes ?? '',
+  });
+  const [invoiceRequired, setInvoiceRequired] = useState(professional?.invoice_required ?? false);
+  const field = (name: string) => ({
+    value: fields[name] ?? '',
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+      setFields((v) => ({ ...v, [name]: e.target.value })),
+  });
+  const intent = useRef('detail');
+  const submittedInvite = useRef(false);
+  const savedBranch = useRef(selectedBranches[0] ?? '');
+  const errorFor = (key: string) => (showError ? state?.fieldErrors?.[key]?.[0] : undefined);
   useEffect(() => {
-    if (!state?.success) return;
-    if (mode === 'create' && state.data?.id) {
-      router.push(`/profesionales/${state.data.id}`);
-      return;
-    }
-    router.refresh();
-  }, [state, mode, router]);
-
-  const needsAgendaEmail = enableAgenda && !linkedUserId;
-  const alreadyOnAgenda = Boolean(professional?.user_id);
-  const showHours = enableAgenda || alreadyOnAgenda;
-
+    if (state?.error) setShowError(true);
+  }, [state]);
+  useEffect(() => {
+    if (!state?.success || !state.data?.id) return;
+    const booking = `/agenda/nueva?${new URLSearchParams({ assigned: state.data.id, branch: state.workflow?.branchId ?? savedBranch.current, created: '1' })}`;
+    const destination =
+      (state.workflow?.nextStep ?? intent.current) === 'appointment'
+        ? booking
+        : `/profesionales/${state.data.id}`;
+    if ((state.workflow?.prepareInvite ?? submittedInvite.current) && canInvite)
+      router.push(
+        `/usuarios?${new URLSearchParams({ professional: state.data.id, returnTo: destination })}`
+      );
+    else if (mode === 'create' || (state.workflow?.nextStep ?? intent.current) === 'appointment')
+      router.push(destination);
+    else router.refresh();
+  }, [state, mode, canInvite, router]);
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{mode === 'create' ? 'Nuevo profesional' : 'Editar profesional'}</CardTitle>
-        <CardDescription>
-          Completá los datos, habilitá agenda y definí días y horarios de atención.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form action={formAction} className="grid max-w-2xl gap-4">
-          {professional && <input type="hidden" name="id" value={professional.id} />}
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="firstName">Nombre</Label>
-              <Input
-                id="firstName"
-                name="firstName"
-                required
-                defaultValue={professional?.first_name ?? ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="lastName">Apellido</Label>
-              <Input
-                id="lastName"
-                name="lastName"
-                required
-                defaultValue={professional?.last_name ?? ''}
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="relationshipType">Relación con la clínica</Label>
-              <Select
-                id="relationshipType"
-                name="relationshipType"
-                defaultValue={professional?.relationship_type ?? 'independent'}
-              >
-                {PROFESSIONAL_RELATIONSHIP_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {PROFESSIONAL_RELATIONSHIP_LABELS[type]}
-                  </option>
+    <div className="mx-auto max-w-6xl space-y-5">
+      <div>
+        <h1 className="text-2xl font-bold">
+          {mode === 'create' ? 'Nuevo profesional' : 'Editar profesional y agenda'}
+        </h1>
+        <p className="mt-1 text-muted-foreground">
+          Creá su ficha y su agenda en un solo lugar. Cada profesional tiene sus propios horarios.
+        </p>
+      </div>
+      {mode === 'create' ? (
+        <ol aria-label="Pasos del alta" className="grid grid-cols-3 gap-2 text-center text-sm">
+          <li className="rounded-lg bg-primary/10 p-3 font-medium text-primary">1 · Datos</li>
+          <li className="rounded-lg bg-primary/10 p-3 font-medium text-primary">2 · Horarios</li>
+          <li className="rounded-lg bg-muted p-3 text-muted-foreground">3 · Primer turno</li>
+        </ol>
+      ) : null}
+      <form
+        ref={formRef}
+        onChange={() => setShowError(false)}
+        action={(data) => {
+          data.set('nextStep', intent.current);
+          submittedInvite.current = prepareInvite;
+          savedBranch.current = selectedBranches[0] ?? '';
+          startTransition(() => formAction(data));
+        }}
+        className="space-y-5"
+      >
+        <input
+          type="hidden"
+          name={mode === 'create' ? 'draftId' : 'id'}
+          value={mode === 'create' ? currentDraftId : professional?.id}
+        />
+        <div className="grid items-start gap-5 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserRound className="h-5 w-5" />
+                Datos del profesional
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  ['firstName', 'Nombre'],
+                  ['lastName', 'Apellido'],
+                ].map(([name, label]) => (
+                  <div key={name} className="space-y-2">
+                    <Label htmlFor={name}>{label} *</Label>
+                    <Input
+                      id={name}
+                      name={name}
+                      required
+                      maxLength={100}
+                      {...field(name!)}
+                      aria-invalid={Boolean(errorFor(name!))}
+                    />
+                    {errorFor(name!) ? (
+                      <p className="text-sm text-destructive">{errorFor(name!)}</p>
+                    ) : null}
+                  </div>
                 ))}
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="userId">Usuario vinculado (opcional)</Label>
-              <Select
-                id="userId"
-                name="userId"
-                value={linkedUserId}
-                onChange={(e) => setLinkedUserId(e.target.value)}
-              >
-                <option value="">Sin vincular</option>
-                {staff.map((member) => (
-                  <option key={member.userId} value={member.userId}>
-                    {member.fullName}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </div>
-
-          <div className="space-y-3 rounded-md border p-3">
-            <label className="flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="enableAgenda"
-                value="true"
-                className="mt-0.5"
-                checked={enableAgenda}
-                onChange={(e) => setEnableAgenda(e.target.checked)}
-              />
-              <span>
-                <span className="font-medium">Disponible en agenda / Nuevo turno</span>
-                <span className="mt-0.5 block text-muted-foreground">
-                  {alreadyOnAgenda && !enableAgenda
-                    ? 'Este profesional ya está vinculado a un usuario de agenda.'
-                    : 'Lo agrega automáticamente a las opciones al crear un turno.'}
-                </span>
-              </span>
-            </label>
-            {needsAgendaEmail && (
-              <div className="space-y-2">
-                <Label htmlFor="agendaEmail">Email para agenda *</Label>
-                <Input
-                  id="agendaEmail"
-                  name="agendaEmail"
-                  type="email"
-                  required={needsAgendaEmail}
-                  placeholder="profesional@clinica.com"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Se crea o reutiliza el usuario del equipo con rol veterinario en las sucursales
-                  seleccionadas.
-                </p>
               </div>
-            )}
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="specialty">Especialidad</Label>
-              <Input id="specialty" name="specialty" defaultValue={professional?.specialty ?? ''} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="taxId">CUIT/CUIL</Label>
-              <Input id="taxId" name="taxId" defaultValue={professional?.tax_id ?? ''} />
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="startDate">Inicio</Label>
-              <Input
-                id="startDate"
-                name="startDate"
-                type="date"
-                defaultValue={professional?.start_date ?? ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="endDate">Fin</Label>
-              <Input
-                id="endDate"
-                name="endDate"
-                type="date"
-                defaultValue={professional?.end_date ?? ''}
-              />
-            </div>
-          </div>
-
-          {branches.length > 0 && (
-            <div className="space-y-2">
-              <Label>Sucursales {enableAgenda ? '*' : ''}</Label>
-              <div className="grid gap-2 sm:grid-cols-2">
-                {branches.map((branch) => (
-                  <label key={branch.id} className="flex items-center gap-2 text-sm">
+              <div className="space-y-2">
+                <Label htmlFor="specialty">Especialidad (opcional)</Label>
+                <Input
+                  id="specialty"
+                  name="specialty"
+                  maxLength={120}
+                  {...field('specialty')}
+                  placeholder="Clínica general, cirugía…"
+                />
+              </div>
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Sucursal *</legend>
+                {branches.length === 0 ? (
+                  <p className="text-sm text-destructive">
+                    No tenés sucursales habilitadas. Pedile a un administrador que te asigne una.
+                  </p>
+                ) : (
+                  branches.map((b) => (
+                    <label
+                      key={b.id}
+                      className="flex items-center gap-2 rounded-md border p-3 text-sm"
+                    >
+                      <input
+                        type="checkbox"
+                        name="branchIds"
+                        value={b.id}
+                        checked={selectedBranches.includes(b.id)}
+                        onChange={(e) =>
+                          setSelectedBranches((old) =>
+                            e.target.checked ? [...old, b.id] : old.filter((id) => id !== b.id)
+                          )
+                        }
+                      />
+                      {b.name}
+                    </label>
+                  ))
+                )}
+              </fieldset>
+              <details className="rounded-lg border p-3">
+                <summary className="cursor-pointer text-sm font-medium">
+                  Más datos opcionales
+                </summary>
+                <div className="mt-4 space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="relationshipType">Relación con la clínica</Label>
+                    <Select
+                      id="relationshipType"
+                      name="relationshipType"
+                      {...field('relationshipType')}
+                    >
+                      {PROFESSIONAL_RELATIONSHIP_TYPES.map((t) => (
+                        <option key={t} value={t}>
+                          {PROFESSIONAL_RELATIONSHIP_LABELS[t]}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="taxId">CUIT/CUIL</Label>
+                      <Input id="taxId" name="taxId" maxLength={50} {...field('taxId')} />
+                    </div>
+                    <div>
+                      <Label htmlFor="professionalLicense">Matrícula</Label>
+                      <Input
+                        id="professionalLicense"
+                        name="professionalLicense"
+                        maxLength={80}
+                        {...field('professionalLicense')}
+                      />
+                    </div>
+                  </div>
+                  <input
+                    type="hidden"
+                    name="documentNumber"
+                    value={professional?.document_number ?? ''}
+                  />
+                  <input
+                    type="hidden"
+                    name="professionalLicenseJurisdiction"
+                    value={professional?.professional_license_jurisdiction ?? ''}
+                  />
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="startDate">Inicio</Label>
+                      <Input type="date" id="startDate" name="startDate" {...field('startDate')} />
+                    </div>
+                    <div>
+                      <Label htmlFor="endDate">Fin</Label>
+                      <Input type="date" id="endDate" name="endDate" {...field('endDate')} />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="isActive">Estado</Label>
+                    <Select id="isActive" name="isActive" {...field('isActive')}>
+                      <option value="true">Activo</option>
+                      <option value="false">Inactivo</option>
+                    </Select>
+                  </div>
+                  <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      name="branchIds"
-                      value={branch.id}
-                      defaultChecked={
-                        branchIds.includes(branch.id) ||
-                        (mode === 'create' && branches.length === 1)
-                      }
+                      name="invoiceRequired"
+                      checked={invoiceRequired}
+                      onChange={(e) => setInvoiceRequired(e.target.checked)}
                     />
-                    {branch.name}
+                    Requiere factura
                   </label>
-                ))}
+                  <div>
+                    <Label htmlFor="notes">Notas</Label>
+                    <Textarea
+                      id="notes"
+                      name="notes"
+                      maxLength={2000}
+                      rows={3}
+                      {...field('notes')}
+                    />
+                  </div>
+                </div>
+              </details>
+              <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                La agenda funciona sin correo ni usuario de acceso.
+                {canInvite ? (
+                  <label className="mt-3 flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      name="prepareInvite"
+                      value="true"
+                      checked={prepareInvite}
+                      onChange={(e) => setPrepareInvite(e.target.checked)}
+                    />
+                    <span>
+                      Preparar invitación al guardar
+                      <span className="mt-1 block text-xs text-muted-foreground">
+                        Revisarás el correo y los permisos antes de enviarla. También podés
+                        invitarlo después.
+                      </span>
+                    </span>
+                  </label>
+                ) : null}
               </div>
-            </div>
-          )}
-
-          {showHours && (
-            <div className="space-y-2 rounded-md border p-3">
-              <div>
-                <p className="text-sm font-medium">Días y horarios de atención</p>
-                <p className="text-xs text-muted-foreground">
-                  Se guardan en la agenda del profesional para tomar turnos.
-                </p>
-              </div>
-              <ProfessionalHoursEditor value={hours} onChange={setHours} disabled={pending} />
-            </div>
-          )}
-
-          <div className="flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="isActive"
-                value="true"
-                defaultChecked={professional?.is_active ?? true}
-              />
-              Activo
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                name="invoiceRequired"
-                value="true"
-                defaultChecked={professional?.invoice_required ?? false}
-              />
-              Requiere factura (independiente)
-            </label>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarDays className="h-5 w-5" />
+                Días y horarios
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {canWriteAgenda ? (
+                <>
+                  <ProfessionalHoursEditor
+                    value={hours}
+                    onChange={(next) => {
+                      setHours(next);
+                      setShowError(false);
+                    }}
+                    disabled={pending}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Al guardar, estos horarios reemplazan los anteriores de este profesional en las
+                    sucursales seleccionadas. Los turnos existentes se conservan.
+                  </p>
+                </>
+              ) : (
+                <AgendaProblemNotice message="No tenés permiso para modificar horarios. Pedile a un administrador que habilite appointments:write." />
+              )}
+            </CardContent>
+          </Card>
+        </div>
+        {state?.error && showError ? (
+          <AgendaProblemNotice
+            message={state.error}
+            onRetry={() => formRef.current?.requestSubmit()}
+          />
+        ) : null}
+        {state?.success && mode === 'edit' ? (
+          <p
+            role="status"
+            className="flex items-center gap-2 text-sm text-emerald-700 dark:text-emerald-400"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Ficha y horarios guardados correctamente.
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card p-4">
+          <p className="max-w-md text-sm text-muted-foreground">
+            {hours.length
+              ? 'Quedará disponible en Agenda y Nuevo turno al guardar.'
+              : 'Podés guardar la ficha ahora y agregar horarios después.'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="submit"
+              onClick={() => {
+                intent.current = 'detail';
+              }}
+              variant="outline"
+              disabled={pending || !selectedBranches.length}
+            >
+              {pending ? 'Guardando…' : mode === 'create' ? 'Guardar y salir' : 'Guardar cambios'}
+            </Button>
+            {canWriteAgenda ? (
+              <Button
+                type="submit"
+                onClick={() => {
+                  intent.current = 'appointment';
+                }}
+                disabled={pending || !selectedBranches.length}
+              >
+                {mode === 'create' ? 'Guardar y crear primer turno' : 'Guardar y dar turno'}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            ) : null}
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas</Label>
-            <Textarea id="notes" name="notes" rows={3} defaultValue={professional?.notes ?? ''} />
-          </div>
-
-          {state?.error && <p className="text-sm text-destructive">{state.error}</p>}
-          {state?.fieldErrors?.agendaEmail?.[0] && (
-            <p className="text-sm text-destructive">{state.fieldErrors.agendaEmail[0]}</p>
-          )}
-          {state?.success && mode === 'edit' && (
-            <p className="text-sm text-emerald-600">Profesional actualizado</p>
-          )}
-
-          <Button type="submit" disabled={pending}>
-            {pending ? 'Guardando...' : mode === 'create' ? 'Crear profesional' : 'Guardar cambios'}
-          </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </form>
+    </div>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  agendaMemberKey,
   buildAppointmentDayMetrics,
   computeEndTime,
   formatDateParam,
@@ -119,5 +120,21 @@ describe('appointment utils', () => {
     ];
     expect(filterAssignableStaffByBranch(staff, 'b1').map((m) => m.userId)).toEqual(['u1', 'u3']);
     expect(filterAssignableStaffByBranch(staff, null)).toHaveLength(3);
+  });
+});
+
+describe('professional identity in calendar selectors', () => {
+  it('keeps two calendars independent even with the same login', () => {
+    expect(agendaMemberKey({ professionalId: 'josefina', userId: 'shared' })).toBe('josefina');
+    expect(agendaMemberKey({ professionalId: 'lorena', userId: 'shared' })).toBe('lorena');
+    const grouped = groupAppointmentsByAssignee([
+      { assigned_professional_id: 'josefina', assigned_user_id: null },
+      { assigned_professional_id: 'lorena', assigned_user_id: null },
+      { assigned_user_id: 'shared' },
+    ]);
+    expect(Object.keys(grouped)).toEqual(['josefina', 'lorena', 'shared']);
+  });
+  it('uses a professional without inventing a login ID', () => {
+    expect(agendaMemberKey({ professionalId: 'professional', userId: '' })).toBe('professional');
   });
 });
