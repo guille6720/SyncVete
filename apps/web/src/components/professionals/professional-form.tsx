@@ -121,7 +121,7 @@ export function ProfessionalForm({
         ref={formRef}
         onChange={() => setShowError(false)}
         action={(data) => {
-          intent.current = String(data.get('nextStep') || intent.current);
+          data.set('nextStep', intent.current);
           submittedInvite.current = prepareInvite;
           savedBranch.current = selectedBranches[0] ?? '';
           startTransition(() => formAction(data));
@@ -360,8 +360,9 @@ export function ProfessionalForm({
           <div className="flex flex-wrap gap-2">
             <Button
               type="submit"
-              name="nextStep"
-              value="detail"
+              onClick={() => {
+                intent.current = 'detail';
+              }}
               variant="outline"
               disabled={pending || !selectedBranches.length}
             >
@@ -370,8 +371,9 @@ export function ProfessionalForm({
             {canWriteAgenda ? (
               <Button
                 type="submit"
-                name="nextStep"
-                value="appointment"
+                onClick={() => {
+                  intent.current = 'appointment';
+                }}
                 disabled={pending || !selectedBranches.length}
               >
                 {mode === 'create' ? 'Guardar y crear primer turno' : 'Guardar y dar turno'}
