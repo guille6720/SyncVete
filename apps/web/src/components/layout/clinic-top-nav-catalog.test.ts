@@ -23,6 +23,7 @@ describe('clinic-top-nav-catalog', () => {
       'Profesionales',
       'Reportes',
       'Comunicación',
+      'Usuarios',
       'Configuración',
     ]);
   });
