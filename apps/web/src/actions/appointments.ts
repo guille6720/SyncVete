@@ -2,7 +2,7 @@
 
 import { redirect } from 'next/navigation';
 import {
-  APPOINTMENT_ASSIGNABLE_ROLES,
+  agendaMemberKey,
   appointmentListSchema,
   appointmentRescheduleSchema,
   appointmentSchema,
@@ -16,10 +16,14 @@ import {
   type AssignableStaffMember,
   type ConsultationMode,
   type PaymentMethod,
-  type Role,
 } from '@sincvete/shared';
 import { createServerClient } from '@/lib/supabase/server';
-import { PermissionError, requirePermission, requirePermissionAndFeature, canPermissionAndFeature } from '@/lib/permissions';
+import {
+  PermissionError,
+  requirePermission,
+  requirePermissionAndFeature,
+  canPermissionAndFeature,
+} from '@/lib/permissions';
 import { getSessionContext } from '@/actions/auth';
 import {
   revalidateAgenda,
@@ -29,6 +33,7 @@ import {
 import { APPOINTMENT_COLUMNS } from '@/lib/db-columns';
 import { FEATURES, planRestrictionResult } from '@/lib/entitlements';
 import { cache } from 'react';
+import { explainAgendaProblem } from '@/lib/agenda-problems';
 
 function isNextRedirect(error: unknown): boolean {
   return (
@@ -48,10 +53,16 @@ function actionError<T = void>(error: unknown): ActionResult<T> {
     return { success: false, error: error.message };
   }
   console.error(error);
-  return { success: false, error: 'Ocurrió un error inesperado' };
+  return {
+    success: false,
+    error: explainAgendaProblem(error instanceof Error ? error.message : null).message,
+  };
 }
 
-function rpcErrorMessage(error: { message?: string; code?: string; details?: string } | null, fallback: string): string {
+function rpcErrorMessage(
+  error: { message?: string; code?: string; details?: string } | null,
+  fallback: string
+): string {
   const message = error?.message?.trim();
   if (!message) return fallback;
   const cleaned = message.replace(/^.*ERROR:\s*/i, '').replace(/\s+CONTEXT:[\s\S]*$/i, '');
@@ -119,9 +130,7 @@ function appointmentWritePayload(data: {
   remindConfirmation?: boolean;
 }) {
   return {
-    ...(data.consultationMode !== undefined
-      ? { consultation_mode: data.consultationMode }
-      : {}),
+    ...(data.consultationMode !== undefined ? { consultation_mode: data.consultationMode } : {}),
     ...(data.expectedPaymentMethod !== undefined
       ? { expected_payment_method: data.expectedPaymentMethod }
       : {}),
@@ -183,14 +192,12 @@ async function enqueueReminderJobsSoft(appointmentId: string) {
   }
 }
 
-export async function listAppointments(
-  input: {
-    weekStart: string;
-    branchId?: string;
-    status?: string;
-    assignedUserId?: string;
-  }
-): Promise<AppointmentListRow[]> {
+export async function listAppointments(input: {
+  weekStart: string;
+  branchId?: string;
+  status?: string;
+  assignedUserId?: string;
+}): Promise<AppointmentListRow[]> {
   await requirePermission('appointments:read');
   const parsed = appointmentListSchema.parse(input);
   if (!parsed.weekStart) {
@@ -199,15 +206,18 @@ export async function listAppointments(
   const session = await getSessionContext();
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase.rpc('list_appointments_range', {
-    p_week_start: parsed.weekStart,
+  const weekEnd = new Date(`${parsed.weekStart}T12:00:00Z`);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 6);
+  const { data, error } = await supabase.rpc('list_agenda_appointments', {
+    p_from: parsed.weekStart,
+    p_to: weekEnd.toISOString().slice(0, 10),
     p_branch_id: parsed.branchId ?? session?.branchId ?? null,
     p_status: parsed.status ?? null,
-    p_assigned_user_id: parsed.assignedUserId ?? null,
+    p_assignee_id: parsed.assignedUserId ?? null,
   });
 
   if (error) throw error;
-  return (data ?? []) as AppointmentListRow[];
+  return (data ?? []) as unknown as AppointmentListRow[];
 }
 
 export async function listAppointmentsCalendar(input: {
@@ -226,17 +236,17 @@ export async function listAppointmentsCalendar(input: {
   const session = await getSessionContext();
   const supabase = await createServerClient();
 
-  const { data, error } = await supabase.rpc('list_appointments_calendar', {
+  const { data, error } = await supabase.rpc('list_agenda_appointments', {
     p_from: parsed.from,
     p_to: parsed.to,
     p_branch_id: parsed.branchId ?? session?.branchId ?? null,
     p_status: parsed.status ?? null,
-    p_assigned_user_id: parsed.assignedUserId ?? null,
+    p_assignee_id: parsed.assignedUserId ?? null,
     p_query: parsed.query ?? null,
   });
 
   if (error) throw error;
-  return (data ?? []) as AppointmentListRow[];
+  return (data ?? []) as unknown as AppointmentListRow[];
 }
 
 export async function getAppointment(id: string): Promise<AppointmentListRow | null> {
@@ -255,9 +265,21 @@ export async function getAppointment(id: string): Promise<AppointmentListRow | n
   const [{ data: patient }, { data: owner }, profileResult] = await Promise.all([
     supabase.from('patients').select('name, species').eq('id', appointment.patient_id).single(),
     supabase.from('owners').select('full_name').eq('id', appointment.owner_id).single(),
-    appointment.assigned_user_id
-      ? supabase.from('profiles').select('full_name').eq('id', appointment.assigned_user_id).single()
-      : Promise.resolve({ data: null }),
+    appointment.assigned_professional_id
+      ? getAssignableStaff().then((staff) => ({
+          data: {
+            full_name:
+              staff.find((m) => m.professionalId === appointment.assigned_professional_id)
+                ?.fullName ?? 'Profesional archivado',
+          },
+        }))
+      : appointment.assigned_user_id
+        ? supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', appointment.assigned_user_id)
+            .single()
+        : Promise.resolve({ data: null }),
   ]);
 
   if (!patient || !owner) return null;
@@ -306,7 +328,7 @@ export async function createAppointment(
         branch_id: branchId,
         patient_id: parsed.data.patientId,
         owner_id: parsed.data.ownerId,
-        assigned_user_id: parsed.data.assignedUserId ?? null,
+        ...(await resolveAssignee(parsed.data.assignedUserId, branchId)),
         starts_at: startsAt,
         ends_at: endsAt,
         appointment_type: parsed.data.appointmentType,
@@ -399,7 +421,7 @@ export async function createReferralFromConsultation(
       branch_id: branchId,
       patient_id: parsed.data.patientId,
       owner_id: parsed.data.ownerId,
-      assigned_user_id: parsed.data.assignedUserId,
+      ...(await resolveAssignee(parsed.data.assignedUserId, branchId)),
       starts_at: startsAt,
       ends_at: endsAt,
       appointment_type: parsed.data.appointmentType,
@@ -416,10 +438,7 @@ export async function createReferralFromConsultation(
       .single();
 
     // Staging may lag the is_overbook migration; retry without the column.
-    if (
-      error &&
-      (error.code === 'PGRST204' || /is_overbook/i.test(error.message ?? ''))
-    ) {
+    if (error && (error.code === 'PGRST204' || /is_overbook/i.test(error.message ?? ''))) {
       ({ data, error } = await supabase.from('appointments').insert(baseRow).select('id').single());
     }
 
@@ -469,7 +488,7 @@ export async function updateAppointment(
         branch_id: parsed.data.branchId,
         patient_id: parsed.data.patientId,
         owner_id: parsed.data.ownerId,
-        assigned_user_id: parsed.data.assignedUserId ?? null,
+        ...(await resolveAssignee(parsed.data.assignedUserId, parsed.data.branchId)),
         starts_at: startsAt,
         ends_at: endsAt,
         appointment_type: parsed.data.appointmentType,
@@ -569,8 +588,7 @@ export async function updateAppointmentStatus(
       .from('appointments')
       .update({
         status,
-        cancellation_reason:
-          status === 'cancelada' ? cancellationReason ?? 'Cancelada' : null,
+        cancellation_reason: status === 'cancelada' ? (cancellationReason ?? 'Cancelada') : null,
       })
       .eq('id', appointmentId);
 
@@ -624,127 +642,30 @@ export async function deleteAppointment(appointmentId: string): Promise<ActionRe
 
 /** Request-scoped staff list for agenda forms (not patient PHI). */
 const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => {
-  await requirePermission('appointments:read');
-  const session = await getSessionContext();
-  if (!session) return [];
-
+  await requirePermissionAndFeature('appointments:read', FEATURES.APPOINTMENTS);
   const supabase = await createServerClient();
-  type StaffRow = {
-    userId: string;
-    fullName: string;
-    role: Role;
-    branchIds: Set<string>;
-    specialty: string | null;
-  };
-  const byUser = new Map<string, StaffRow>();
-
-  const { data: members, error: membersError } = await supabase
-    .from('branch_members')
-    .select('user_id, role, branch_id')
-    .eq('organization_id', session.organizationId)
-    .eq('is_active', true)
-    .is('deleted_at', null)
-    .in('role', [...APPOINTMENT_ASSIGNABLE_ROLES]);
-
-  if (membersError) {
-    console.warn('[appointments] assignable staff branch_members', membersError.message);
-  } else {
-    for (const member of members ?? []) {
-      const role = member.role as Role;
-      const existing = byUser.get(member.user_id);
-      if (existing) {
-        existing.branchIds.add(member.branch_id);
-      } else {
-        byUser.set(member.user_id, {
-          userId: member.user_id,
-          fullName: '',
-          role,
-          branchIds: new Set([member.branch_id]),
-          specialty: null,
-        });
-      }
-    }
-  }
-
-  const { data: linkedProfessionals, error: prosError } = await supabase
-    .from('professionals')
-    .select('id, user_id, first_name, last_name, specialty')
-    .eq('organization_id', session.organizationId)
-    .eq('is_active', true)
-    .is('deleted_at', null)
-    .not('user_id', 'is', null);
-
-  if (prosError) {
-    console.warn('[appointments] assignable staff professionals', prosError.message);
-  } else if (linkedProfessionals?.length) {
-    const proIds = linkedProfessionals.map((row) => row.id);
-    const { data: proBranches, error: proBranchesError } = await supabase
-      .from('professional_branches')
-      .select('professional_id, branch_id')
-      .in('professional_id', proIds)
-      .eq('is_active', true)
-      .is('deleted_at', null);
-
-    if (proBranchesError) {
-      console.warn('[appointments] assignable staff professional_branches', proBranchesError.message);
-    }
-
-    const branchesByPro = new Map<string, string[]>();
-    for (const row of proBranches ?? []) {
-      const list = branchesByPro.get(row.professional_id) ?? [];
-      list.push(row.branch_id);
-      branchesByPro.set(row.professional_id, list);
-    }
-
-    for (const pro of linkedProfessionals) {
-      if (!pro.user_id) continue;
-      const branchIds = branchesByPro.get(pro.id) ?? [];
-      const proName = `${pro.first_name ?? ''} ${pro.last_name ?? ''}`.trim();
-      const specialty = pro.specialty ? String(pro.specialty) : null;
-      const existing = byUser.get(pro.user_id);
-      if (existing) {
-        for (const branchId of branchIds) existing.branchIds.add(branchId);
-        if (!existing.fullName && proName) existing.fullName = proName;
-        if (!existing.specialty && specialty) existing.specialty = specialty;
-      } else {
-        byUser.set(pro.user_id, {
-          userId: pro.user_id,
-          fullName: proName,
-          role: 'veterinarian',
-          branchIds: new Set(branchIds),
-          specialty,
-        });
-      }
-    }
-  }
-
-  if (byUser.size === 0) return [];
-
-  const userIds = [...byUser.keys()];
-  const { data: profiles, error: profilesError } = await supabase
-    .from('profiles')
-    .select('id, full_name')
-    .in('id', userIds);
-
-  if (profilesError) {
-    console.warn('[appointments] assignable staff profiles', profilesError.message);
-  } else {
-    for (const profile of profiles ?? []) {
-      const row = byUser.get(profile.id);
-      if (row && profile.full_name) row.fullName = profile.full_name;
-    }
-  }
-
-  return [...byUser.values()]
-    .map((row) => ({
-      userId: row.userId,
-      fullName: row.fullName || 'Sin nombre',
-      role: row.role,
-      branchIds: [...row.branchIds],
-      specialty: row.specialty,
-    }))
-    .sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
+  const { data, error } = await supabase.rpc('list_agenda_professionals');
+  if (error) throw error;
+  return ((data as unknown as AssignableStaffMember[]) ?? []).sort((a, b) =>
+    a.fullName.localeCompare(b.fullName, 'es')
+  );
 });
+
+async function resolveAssignee(id?: string, branchId?: string | null) {
+  if (!id) return { assigned_user_id: null, assigned_professional_id: null };
+  const staff = await getAssignableStaff();
+  const member = staff.find(
+    (m) => agendaMemberKey(m) === id && (!branchId || m.branchIds.includes(branchId))
+  );
+  if (!member)
+    throw new Error(
+      'Profesional no disponible en esta sucursal. Volvé a seleccionarlo o revisá la sucursal de su ficha.'
+    );
+  return {
+    assigned_user_id: member.professionalId ? null : member.userId,
+    assigned_professional_id: member.professionalId ?? null,
+  };
+}
 
 export async function getAssignableStaff(): Promise<AssignableStaffMember[]> {
   return loadAssignableStaff();

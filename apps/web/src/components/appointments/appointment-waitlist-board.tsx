@@ -173,9 +173,7 @@ export function AppointmentWaitlistBoard({
                         .join(' – ')}
                     </p>
                   )}
-                  {entry.notes && (
-                    <p className="text-sm text-muted-foreground">{entry.notes}</p>
-                  )}
+                  {entry.notes && <p className="text-sm text-muted-foreground">{entry.notes}</p>}
                 </div>
                 {canWrite && (
                   <div className="flex flex-wrap gap-2">
@@ -247,18 +245,26 @@ export function AppointmentWaitlistBoard({
             </div>
             <div className="space-y-2">
               <Label htmlFor="waitlist-priority">Prioridad</Label>
-              <Input id="waitlist-priority" name="priority" type="number" defaultValue={0} min={0} />
+              <Input
+                id="waitlist-priority"
+                name="priority"
+                type="number"
+                defaultValue={0}
+                min={0}
+              />
             </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="waitlist-staff">Profesional preferido</Label>
             <Select id="waitlist-staff" name="preferredUserId" defaultValue="">
               <option value="">Indistinto</option>
-              {staff.map((member) => (
-                <option key={member.userId} value={member.userId}>
-                  {member.fullName}
-                </option>
-              ))}
+              {staff
+                .filter((member) => member.userId && !member.professionalId)
+                .map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.fullName}
+                  </option>
+                ))}
             </Select>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

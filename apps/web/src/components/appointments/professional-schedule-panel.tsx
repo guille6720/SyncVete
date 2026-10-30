@@ -1,10 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import {
-  summarizeProfessionalSchedules,
-  type ProfessionalSchedule,
-} from '@sincvete/shared';
+import { summarizeProfessionalSchedules, type ProfessionalSchedule } from '@sincvete/shared';
 import { cn } from '@/lib/utils';
 
 interface ProfessionalSchedulePanelProps {
@@ -34,8 +31,7 @@ export function ProfessionalSchedulePanel({
           return utc === 0 ? 7 : utc;
         })()
       : null;
-  const todayWindows =
-    weekday == null ? [] : summary.filter((row) => row.weekday === weekday);
+  const todayWindows = weekday == null ? [] : summary.filter((row) => row.weekday === weekday);
 
   return (
     <div
@@ -58,13 +54,16 @@ export function ProfessionalSchedulePanel({
         <p className="mt-2 text-muted-foreground">
           No hay días/horarios cargados en la ficha. Cargalos en{' '}
           {editHref ? (
-            <Link href={editHref} className="font-medium text-primary underline-offset-2 hover:underline">
-              Disponibilidad
+            <Link
+              href={editHref}
+              className="font-medium text-primary underline-offset-2 hover:underline"
+            >
+              su ficha
             </Link>
           ) : (
-            'Disponibilidad'
+            'su ficha'
           )}{' '}
-          para restringir turnos a su agenda.
+          antes de asignarle un turno.
         </p>
       ) : (
         <>
@@ -79,8 +78,7 @@ export function ProfessionalSchedulePanel({
                     : 'border-border text-muted-foreground'
                 )}
               >
-                <span className="font-medium">{row.label}</span>{' '}
-                {row.startTime}–{row.endTime}
+                <span className="font-medium">{row.label}</span> {row.startTime}–{row.endTime}
                 <span className="text-muted-foreground"> · {row.slotDurationMinutes} min</span>
               </li>
             ))}
@@ -92,7 +90,7 @@ export function ProfessionalSchedulePanel({
           ) : null}
           {selectedDate && todayWindows.length > 0 ? (
             <p className="mt-2 text-xs text-muted-foreground">
-              Hoy ({selectedDate}):{' '}
+              Día seleccionado ({selectedDate}):{' '}
               {todayWindows.map((w) => `${w.startTime}–${w.endTime}`).join(', ')}. Solo se pueden
               dar turnos dentro de estos rangos.
             </p>

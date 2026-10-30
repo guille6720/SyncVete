@@ -1,10 +1,10 @@
 'use client';
 
+import { agendaMemberKey } from '@sincvete/shared';
+
 import { useActionState, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import {
-  createReferralFromConsultation,
-} from '@/actions/appointments';
+import { createReferralFromConsultation } from '@/actions/appointments';
 import {
   getProfessionalAgendaContext,
   type ProfessionalAgendaContext,
@@ -42,7 +42,11 @@ export function ConsultationReferralPanel({
   const [state, formAction, pending] = useActionState(createReferralFromConsultation, null);
 
   const others = useMemo(
-    () => staff.filter((member) => member.userId && member.userId !== consultation.veterinarian_id),
+    () =>
+      staff.filter(
+        (member) =>
+          agendaMemberKey(member) && agendaMemberKey(member) !== consultation.veterinarian_id
+      ),
     [staff, consultation.veterinarian_id]
   );
 
@@ -109,11 +113,7 @@ export function ConsultationReferralPanel({
         <input type="hidden" name="durationMinutes" value={String(durationMinutes)} />
         <input type="hidden" name="appointmentType" value="consulta" />
         <input type="hidden" name="startsAt" value={startsAt} />
-        <input
-          type="hidden"
-          name="title"
-          value={`Derivación · ${consultation.patient_name}`}
-        />
+        <input type="hidden" name="title" value={`Derivación · ${consultation.patient_name}`} />
 
         <div className="space-y-1.5 sm:col-span-2">
           <Label htmlFor="referral-professional">Profesional</Label>
@@ -129,7 +129,7 @@ export function ConsultationReferralPanel({
           >
             <option value="">Elegí un profesional…</option>
             {others.map((member) => (
-              <option key={member.userId} value={member.userId}>
+              <option key={agendaMemberKey(member)} value={agendaMemberKey(member)}>
                 {member.fullName}
                 {member.specialty ? ` · ${member.specialty}` : ''}
               </option>
@@ -201,7 +201,9 @@ export function ConsultationReferralPanel({
               onChange={(event) => {
                 setIsOverbook(event.target.checked);
                 if (event.target.checked && !startsAt) {
-                  setStartsAt(`${selectedDate}T${toLocalDateTimeInput(new Date().toISOString()).slice(11, 16)}`);
+                  setStartsAt(
+                    `${selectedDate}T${toLocalDateTimeInput(new Date().toISOString()).slice(11, 16)}`
+                  );
                 }
               }}
             />
@@ -244,7 +246,9 @@ export function ConsultationReferralPanel({
           />
         </div>
 
-        {state?.error ? <p className="text-sm text-destructive sm:col-span-2">{state.error}</p> : null}
+        {state?.error ? (
+          <p className="text-sm text-destructive sm:col-span-2">{state.error}</p>
+        ) : null}
         {state?.success && state.data?.appointmentId ? (
           <p className="text-sm text-emerald-600 sm:col-span-2">
             Derivación creada.{' '}
@@ -255,7 +259,11 @@ export function ConsultationReferralPanel({
         ) : null}
 
         <div className="flex flex-wrap gap-2 sm:col-span-2">
-          <Button type="submit" disabled={pending || !assignedUserId || !startsAt} isPending={pending}>
+          <Button
+            type="submit"
+            disabled={pending || !assignedUserId || !startsAt}
+            isPending={pending}
+          >
             {pending ? 'Derivando…' : 'Confirmar derivación'}
           </Button>
         </div>

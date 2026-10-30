@@ -1,10 +1,4 @@
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type UserRole =
   | 'owner'
@@ -18,44 +12,22 @@ export type UserRole =
 
 export type OrgPlan = 'trial' | 'basic' | 'professional' | 'enterprise';
 
-export type SubscriptionStatus =
-  | 'trialing'
-  | 'active'
-  | 'past_due'
-  | 'cancelled'
-  | 'expired';
+export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'cancelled' | 'expired';
 
 export type FeatureValueType = 'boolean' | 'limit';
 
 export type CommercialPlanKey = 'legacy' | 'trial' | 'basic' | 'pro' | 'premium' | 'enterprise';
 
 export type PatientSpecies =
-  | 'Canino'
-  | 'Felino'
-  | 'Ave'
-  | 'Roedor'
-  | 'Reptil'
-  | 'Equino'
-  | 'Bovino'
-  | 'Otro';
+  'Canino' | 'Felino' | 'Ave' | 'Roedor' | 'Reptil' | 'Equino' | 'Bovino' | 'Otro';
 
 export type PatientSex = 'Macho' | 'Hembra' | 'Desconocido';
 
 export type AppointmentStatus =
-  | 'programada'
-  | 'confirmada'
-  | 'en_curso'
-  | 'completada'
-  | 'cancelada'
-  | 'ausente';
+  'programada' | 'confirmada' | 'en_curso' | 'completada' | 'cancelada' | 'ausente';
 
 export type AppointmentType =
-  | 'consulta'
-  | 'vacunacion'
-  | 'cirugia'
-  | 'control'
-  | 'emergencia'
-  | 'otro';
+  'consulta' | 'vacunacion' | 'cirugia' | 'control' | 'emergencia' | 'otro';
 
 export type ConsultationMode = 'clinic' | 'home_visit' | 'video';
 
@@ -72,28 +44,13 @@ export type AppointmentReminderJobKind =
   | 'professional_notify';
 
 export type AppointmentReminderJobStatus =
-  | 'pending'
-  | 'due'
-  | 'sent'
-  | 'skipped'
-  | 'failed'
-  | 'cancelled';
+  'pending' | 'due' | 'sent' | 'skipped' | 'failed' | 'cancelled';
 
 export type WaitingRoomStatus =
-  | 'waiting'
-  | 'called'
-  | 'in_consultation'
-  | 'payment_pending'
-  | 'completed';
+  'waiting' | 'called' | 'in_consultation' | 'payment_pending' | 'completed';
 
 export type ClinicalEntryType =
-  | 'consulta'
-  | 'cirugia'
-  | 'internacion'
-  | 'laboratorio'
-  | 'vacunacion'
-  | 'nota'
-  | 'otro';
+  'consulta' | 'cirugia' | 'internacion' | 'laboratorio' | 'vacunacion' | 'nota' | 'otro';
 
 export type ConsultationStatus = 'en_espera' | 'en_curso' | 'completada' | 'cancelada';
 
@@ -103,12 +60,7 @@ export type HospitalizationNoteType = 'evolucion' | 'tratamiento' | 'vitals' | '
 
 export type VaccinationRoute = 'sc' | 'im' | 'in' | 'oral' | 'otro';
 
-export type SurgeryStatus =
-  | 'programada'
-  | 'en_curso'
-  | 'recuperacion'
-  | 'completada'
-  | 'cancelada';
+export type SurgeryStatus = 'programada' | 'en_curso' | 'recuperacion' | 'completada' | 'cancelada';
 
 export type SurgeryAsa = 'I' | 'II' | 'III' | 'IV' | 'V';
 
@@ -123,23 +75,10 @@ export type LabSampleType = 'sangre' | 'orina' | 'materia_fecal' | 'hisopado' | 
 export type LabResultFlag = 'pendiente' | 'normal' | 'alto' | 'bajo' | 'anormal';
 
 export type InventoryProductCategory =
-  | 'medicamento'
-  | 'vacuna'
-  | 'insumo'
-  | 'alimento'
-  | 'laboratorio'
-  | 'otro';
+  'medicamento' | 'vacuna' | 'insumo' | 'alimento' | 'laboratorio' | 'otro';
 
 export type InventoryUnit =
-  | 'unidad'
-  | 'caja'
-  | 'frasco'
-  | 'ml'
-  | 'mg'
-  | 'g'
-  | 'kg'
-  | 'dosis'
-  | 'otro';
+  'unidad' | 'caja' | 'frasco' | 'ml' | 'mg' | 'g' | 'kg' | 'dosis' | 'otro';
 
 export type ProductCurrency = 'ARS' | 'USD';
 
@@ -152,12 +91,7 @@ export type InventoryMovementType = 'entrada' | 'salida' | 'ajuste' | 'descarte'
 export type InvoiceStatus = 'borrador' | 'emitida' | 'pagada' | 'anulada';
 
 export type PaymentMethod =
-  | 'efectivo'
-  | 'transferencia'
-  | 'tarjeta'
-  | 'mercadopago'
-  | 'gratuito'
-  | 'otro';
+  'efectivo' | 'transferencia' | 'tarjeta' | 'mercadopago' | 'gratuito' | 'otro';
 
 export type ProfessionalRelationshipType = 'employee' | 'independent' | 'partner' | 'other';
 
@@ -181,12 +115,7 @@ export type CompensationFrequency =
   | 'mixed';
 
 export type SettlementStatus =
-  | 'draft'
-  | 'review'
-  | 'approved'
-  | 'partially_paid'
-  | 'paid'
-  | 'cancelled';
+  'draft' | 'review' | 'approved' | 'partially_paid' | 'paid' | 'cancelled';
 
 export type SettlementItemSourceType =
   | 'appointment'
@@ -204,12 +133,7 @@ export type SettlementItemSourceType =
 export type SettlementAdjustmentType = 'bonus' | 'deduction' | 'correction' | 'other';
 
 export type WhatsAppRelatedType =
-  | 'none'
-  | 'appointment'
-  | 'invoice'
-  | 'lab_order'
-  | 'vaccination'
-  | 'portal';
+  'none' | 'appointment' | 'invoice' | 'lab_order' | 'vaccination' | 'portal';
 
 export type ReminderType = 'appointment' | 'vaccination' | 'invoice';
 
@@ -221,26 +145,14 @@ export type ClinicalAiKind = 'patient_summary' | 'soap_assist' | 'owner_instruct
 
 export type PrescriptionStatus = 'activa' | 'dispensada' | 'anulada';
 
-export type PrescriptionRoute =
-  | 'oral'
-  | 'sc'
-  | 'im'
-  | 'topico'
-  | 'oftalmico'
-  | 'otico'
-  | 'otro';
+export type PrescriptionRoute = 'oral' | 'sc' | 'im' | 'topico' | 'oftalmico' | 'otico' | 'otro';
 
 export type CashSessionStatus = 'abierta' | 'cerrada';
 
 export type CashMovementKind = 'cobro' | 'ingreso' | 'egreso' | 'retiro';
 
 export type ClinicalImageKind =
-  | 'foto'
-  | 'radiografia'
-  | 'ecografia'
-  | 'laboratorio'
-  | 'documento'
-  | 'otro';
+  'foto' | 'radiografia' | 'ecografia' | 'laboratorio' | 'documento' | 'otro';
 
 export type NotificationKind =
   | 'cita'
@@ -2274,6 +2186,7 @@ export interface Database {
           patient_id: string;
           owner_id: string;
           assigned_user_id: string | null;
+          assigned_professional_id: string | null;
           starts_at: string;
           ends_at: string;
           status: AppointmentStatus;
@@ -2304,6 +2217,7 @@ export interface Database {
           patient_id: string;
           owner_id: string;
           assigned_user_id?: string | null;
+          assigned_professional_id?: string | null;
           starts_at: string;
           ends_at: string;
           status?: AppointmentStatus;
@@ -2334,6 +2248,7 @@ export interface Database {
           patient_id?: string;
           owner_id?: string;
           assigned_user_id?: string | null;
+          assigned_professional_id?: string | null;
           starts_at?: string;
           ends_at?: string;
           status?: AppointmentStatus;
@@ -2393,7 +2308,8 @@ export interface Database {
           id: string;
           organization_id: string;
           branch_id: string;
-          user_id: string;
+          user_id: string | null;
+          professional_id: string | null;
           weekday: number;
           start_time: string;
           end_time: string;
@@ -2408,7 +2324,8 @@ export interface Database {
           id?: string;
           organization_id: string;
           branch_id: string;
-          user_id: string;
+          user_id: string | null;
+          professional_id: string | null;
           weekday: number;
           start_time: string;
           end_time: string;
@@ -2423,7 +2340,8 @@ export interface Database {
           id?: string;
           organization_id?: string;
           branch_id?: string;
-          user_id?: string;
+          user_id?: string | null;
+          professional_id?: string | null;
           weekday?: number;
           start_time?: string;
           end_time?: string;
@@ -2457,6 +2375,7 @@ export interface Database {
           organization_id: string;
           branch_id: string;
           user_id: string | null;
+          professional_id: string | null;
           kind: TimeBlockKind;
           starts_at: string;
           ends_at: string;
@@ -2471,6 +2390,7 @@ export interface Database {
           organization_id: string;
           branch_id: string;
           user_id?: string | null;
+          professional_id?: string | null;
           kind?: TimeBlockKind;
           starts_at: string;
           ends_at: string;
@@ -2485,6 +2405,7 @@ export interface Database {
           organization_id?: string;
           branch_id?: string;
           user_id?: string | null;
+          professional_id?: string | null;
           kind?: TimeBlockKind;
           starts_at?: string;
           ends_at?: string;
@@ -3745,42 +3666,42 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'lab_orders_organization_id_fkey',
+            foreignKeyName: 'lab_orders_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'lab_orders_branch_id_fkey',
+            foreignKeyName: 'lab_orders_branch_id_fkey';
             columns: ['branch_id'];
             isOneToOne: false;
             referencedRelation: 'branches';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'lab_orders_patient_id_fkey',
+            foreignKeyName: 'lab_orders_patient_id_fkey';
             columns: ['patient_id'];
             isOneToOne: false;
             referencedRelation: 'patients';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'lab_orders_owner_id_fkey',
+            foreignKeyName: 'lab_orders_owner_id_fkey';
             columns: ['owner_id'];
             isOneToOne: false;
             referencedRelation: 'owners';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'lab_orders_consultation_id_fkey',
+            foreignKeyName: 'lab_orders_consultation_id_fkey';
             columns: ['consultation_id'];
             isOneToOne: false;
             referencedRelation: 'consultations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'lab_orders_clinical_entry_id_fkey',
+            foreignKeyName: 'lab_orders_clinical_entry_id_fkey';
             columns: ['clinical_entry_id'];
             isOneToOne: false;
             referencedRelation: 'clinical_entries';
@@ -3836,14 +3757,14 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'lab_order_items_organization_id_fkey',
+            foreignKeyName: 'lab_order_items_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'lab_order_items_lab_order_id_fkey',
+            foreignKeyName: 'lab_order_items_lab_order_id_fkey';
             columns: ['lab_order_id'];
             isOneToOne: false;
             referencedRelation: 'lab_orders';
@@ -3938,21 +3859,21 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'inventory_products_organization_id_fkey',
+            foreignKeyName: 'inventory_products_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'inventory_products_branch_id_fkey',
+            foreignKeyName: 'inventory_products_branch_id_fkey';
             columns: ['branch_id'];
             isOneToOne: false;
             referencedRelation: 'branches';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'inventory_products_supplier_party_id_fkey',
+            foreignKeyName: 'inventory_products_supplier_party_id_fkey';
             columns: ['supplier_party_id'];
             isOneToOne: false;
             referencedRelation: 'purchase_parties';
@@ -4011,7 +3932,7 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'purchase_parties_organization_id_fkey',
+            foreignKeyName: 'purchase_parties_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
@@ -4073,21 +3994,21 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'inventory_movements_organization_id_fkey',
+            foreignKeyName: 'inventory_movements_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'inventory_movements_branch_id_fkey',
+            foreignKeyName: 'inventory_movements_branch_id_fkey';
             columns: ['branch_id'];
             isOneToOne: false;
             referencedRelation: 'branches';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'inventory_movements_product_id_fkey',
+            foreignKeyName: 'inventory_movements_product_id_fkey';
             columns: ['product_id'];
             isOneToOne: false;
             referencedRelation: 'inventory_products';
@@ -4191,35 +4112,35 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'invoices_organization_id_fkey',
+            foreignKeyName: 'invoices_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'invoices_branch_id_fkey',
+            foreignKeyName: 'invoices_branch_id_fkey';
             columns: ['branch_id'];
             isOneToOne: false;
             referencedRelation: 'branches';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'invoices_owner_id_fkey',
+            foreignKeyName: 'invoices_owner_id_fkey';
             columns: ['owner_id'];
             isOneToOne: false;
             referencedRelation: 'owners';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'invoices_patient_id_fkey',
+            foreignKeyName: 'invoices_patient_id_fkey';
             columns: ['patient_id'];
             isOneToOne: false;
             referencedRelation: 'patients';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'invoices_consultation_id_fkey',
+            foreignKeyName: 'invoices_consultation_id_fkey';
             columns: ['consultation_id'];
             isOneToOne: false;
             referencedRelation: 'consultations';
@@ -4272,21 +4193,21 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'invoice_items_organization_id_fkey',
+            foreignKeyName: 'invoice_items_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'invoice_items_invoice_id_fkey',
+            foreignKeyName: 'invoice_items_invoice_id_fkey';
             columns: ['invoice_id'];
             isOneToOne: false;
             referencedRelation: 'invoices';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'invoice_items_inventory_product_id_fkey',
+            foreignKeyName: 'invoice_items_inventory_product_id_fkey';
             columns: ['inventory_product_id'];
             isOneToOne: false;
             referencedRelation: 'inventory_products';
@@ -4354,14 +4275,14 @@ export interface Database {
         };
         Relationships: [
           {
-            foreignKeyName: 'payments_organization_id_fkey',
+            foreignKeyName: 'payments_organization_id_fkey';
             columns: ['organization_id'];
             isOneToOne: false;
             referencedRelation: 'organizations';
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'payments_invoice_id_fkey',
+            foreignKeyName: 'payments_invoice_id_fkey';
             columns: ['invoice_id'];
             isOneToOne: false;
             referencedRelation: 'invoices';
@@ -5430,6 +5351,37 @@ export interface Database {
     };
     Views: Record<string, never>;
     Functions: {
+      save_professional_with_agenda: {
+        Args: {
+          p_id: string;
+          p_data: Json;
+          p_branch_ids: string[];
+          p_schedules?: Json | null;
+          p_create?: boolean;
+        };
+        Returns: Json;
+      };
+      list_agenda_professionals: { Args: Record<PropertyKey, never>; Returns: Json[] };
+      list_agenda_schedules: {
+        Args: { p_assignee_id?: string | null; p_branch_id?: string | null };
+        Returns: Database['public']['Tables']['professional_schedules']['Row'][];
+      };
+      list_agenda_appointments: {
+        Args: {
+          p_from: string;
+          p_to: string;
+          p_branch_id?: string | null;
+          p_status?: string | null;
+          p_assignee_id?: string | null;
+          p_query?: string | null;
+        };
+        Returns: Json[];
+      };
+      agenda_busy_ranges: {
+        Args: { p_assignee_id: string; p_branch_id: string; p_date: string };
+        Returns: Json[];
+      };
+
       get_user_organization_id: {
         Args: Record<PropertyKey, never>;
         Returns: string;
@@ -6914,9 +6866,15 @@ export interface Database {
       get_owner_app_brand: { Args: { p_organization_id: string }; Returns: Json };
       get_owner_app_invite_brand: { Args: { p_token: string }; Returns: Json };
       save_owner_app_brand: { Args: { p_brand: Json }; Returns: undefined };
-      publish_owner_app_slot: { Args: { p_branch_id: string; p_starts_at: string }; Returns: string };
+      publish_owner_app_slot: {
+        Args: { p_branch_id: string; p_starts_at: string };
+        Returns: string;
+      };
       get_owner_professional_availability: { Args: { p_date?: string | null }; Returns: Json };
-      book_owner_professional_slot: { Args: { p_schedule_id: string; p_starts_at: string; p_patient_id: string }; Returns: string };
+      book_owner_professional_slot: {
+        Args: { p_schedule_id: string; p_starts_at: string; p_patient_id: string };
+        Returns: string;
+      };
       book_owner_app_slot: { Args: { p_slot_id: string; p_patient_id: string }; Returns: string };
       cancel_owner_app_booking: { Args: { p_appointment_id: string }; Returns: undefined };
       get_owner_app_data: { Args: Record<string, never>; Returns: Json };

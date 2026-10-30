@@ -19,7 +19,8 @@ import {
   listProfessionalBranches,
 } from '@/actions/professionals';
 import { ProfessionalSummaryStrip } from '@/components/professionals/professional-summary-strip';
-import { canReadAppointments, getAssignableStaff } from '@/actions/appointments';
+import { canReadAppointments, canManageAppointments } from '@/actions/appointments';
+import { getSessionContext } from '@/actions/auth';
 import { getOrganization, getUserBranches } from '@/actions/settings';
 import { CompensationPanel } from '@/components/professionals/compensation-panel';
 import { ProfessionalSettlementsLink } from '@/components/professionals/professional-settlements-link';
@@ -43,7 +44,8 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
   const [
     branches,
     professionalBranches,
-    staff,
+    session,
+    canWriteAgenda,
     canWrite,
     canReadComp,
     canWriteComp,
@@ -54,7 +56,8 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
   ] = await Promise.all([
     getUserBranches(),
     listProfessionalBranches(id),
-    getAssignableStaff(),
+    getSessionContext(),
+    canManageAppointments(),
     canWriteProfessionals(),
     canReadProfessionalCompensation(),
     canWriteProfessionalCompensation(),
@@ -63,9 +66,7 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
     canReadProfessionalSettlements().then((allowed) =>
       allowed ? getProfessionalSettlementSummary(id) : null
     ),
-    professional.user_id && canReadAgenda
-      ? listProfessionalSchedules({ userId: professional.user_id }).catch(() => [])
-      : Promise.resolve([]),
+    canReadAgenda ? listProfessionalSchedules({ userId: professional.id }) : Promise.resolve([]),
   ]);
 
   const currency = parseOrganizationSettings(organization?.settings).currency ?? 'ARS';
@@ -120,7 +121,7 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
           <h2 id="professional-agenda-heading" className="text-lg font-semibold">
             Agenda del profesional
           </h2>
-          {professional.user_id ? (
+          {professional.is_active ? (
             <>
               <ProfessionalSchedulePanel
                 fullName={`${professional.first_name} ${professional.last_name}`}
@@ -129,8 +130,17 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
                 editHref={null}
               />
               <div className="flex flex-wrap gap-2">
+                {canWriteAgenda ? (
+                  <Button asChild>
+                    <Link
+                      href={`/agenda/nueva?assigned=${professional.id}&branch=${branchIds[0] ?? ''}`}
+                    >
+                      Dar turno
+                    </Link>
+                  </Button>
+                ) : null}
                 <Button variant="outline" asChild>
-                  <Link href={`/agenda?assigned=${professional.user_id}`}>
+                  <Link href={`/agenda?assigned=${professional.id}`}>
                     Ver turnos de este profesional
                   </Link>
                 </Button>
@@ -141,7 +151,7 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
             </>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Este profesional todavía no tiene un usuario vinculado a la agenda.
+              Este profesional está inactivo. Activá su ficha para habilitar nuevos turnos.
             </p>
           )}
         </section>
@@ -153,7 +163,8 @@ export default async function ProfesionalDetailPage({ params }: PageProps) {
           professional={professional}
           branches={branches}
           branchIds={branchIds}
-          staff={staff.map((member) => ({ userId: member.userId, fullName: member.fullName }))}
+          canWriteAgenda={canWriteAgenda}
+          canInvite={session?.permissions.includes('users:manage') ?? false}
           initialHours={initialHours}
         />
       )}

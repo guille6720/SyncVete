@@ -1,5 +1,7 @@
 'use client';
 
+import { agendaMemberKey } from '@sincvete/shared';
+
 import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -175,7 +177,9 @@ export function AppointmentsCalendarViews({
       .sort((a, b) => a.starts_at.localeCompare(b.starts_at));
 
     const byAssignee = groupAppointmentsByAssignee(dayAppointments);
-    const assignedColumns = staff.filter((member) => (byAssignee[member.userId] ?? []).length > 0);
+    const assignedColumns = staff.filter(
+      (member) => (byAssignee[agendaMemberKey(member)] ?? []).length > 0
+    );
     const useColumns = assignedColumns.length > 1;
     const unassigned = byAssignee.unassigned ?? [];
 
@@ -210,9 +214,9 @@ export function AppointmentsCalendarViews({
             }}
           >
             {assignedColumns.map((member) => (
-              <div key={member.userId} className="space-y-2">
+              <div key={agendaMemberKey(member)} className="space-y-2">
                 <p className="truncate text-sm font-semibold">{member.fullName}</p>
-                {(byAssignee[member.userId] ?? []).map((appointment) => (
+                {(byAssignee[agendaMemberKey(member)] ?? []).map((appointment) => (
                   <AppointmentCard
                     key={appointment.id}
                     appointment={appointment}

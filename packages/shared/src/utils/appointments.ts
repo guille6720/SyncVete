@@ -197,11 +197,11 @@ export function groupAppointmentsByDay<T extends { starts_at: string }>(
 }
 
 export function groupAppointmentsByAssignee<
-  T extends { assigned_user_id?: string | null },
+  T extends { assigned_user_id?: string | null; assigned_professional_id?: string | null },
 >(entries: T[]): Record<string, T[]> {
   const grouped: Record<string, T[]> = {};
   for (const entry of entries) {
-    const key = entry.assigned_user_id ?? 'unassigned';
+    const key = entry.assigned_professional_id ?? entry.assigned_user_id ?? 'unassigned';
     if (!grouped[key]) grouped[key] = [];
     grouped[key].push(entry);
   }
@@ -270,13 +270,10 @@ export function resolveAgendaCalendarRange(input: {
   view?: string | null;
 }): AgendaCalendarRange {
   const selectedDate = parseDateParam(input.date ?? undefined);
-  const weekStart = input.week && DATE_PARAM_REGEX.test(input.week)
-    ? input.week
-    : getWeekStartDate(selectedDate);
+  const weekStart =
+    input.week && DATE_PARAM_REGEX.test(input.week) ? input.week : getWeekStartDate(selectedDate);
   const month =
-    input.month && /^\d{4}-\d{2}$/.test(input.month)
-      ? input.month
-      : selectedDate.slice(0, 7);
+    input.month && /^\d{4}-\d{2}$/.test(input.month) ? input.month : selectedDate.slice(0, 7);
   const view = parseAgendaViewMode(input.view);
 
   if (view === 'day') {
@@ -312,4 +309,12 @@ export function filterAssignableStaffByBranch(
   return staff.filter(
     (member) => member.branchIds.length === 0 || member.branchIds.includes(branchId)
   );
+}
+
+/** Selection identity is a ficha ID, falling back to a genuine legacy account ID. */
+export function agendaMemberKey(member: {
+  professionalId?: string | null;
+  userId: string;
+}): string {
+  return member.professionalId || member.userId;
 }
