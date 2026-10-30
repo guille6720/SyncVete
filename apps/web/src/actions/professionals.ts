@@ -16,10 +16,18 @@ import {
   canPermissionAndFeature,
   requirePermissionAndFeature,
 } from '@/lib/permissions';
-import { FEATURES, planRestrictionResult, canUseFeature, assertWithinLimit, getSeatUsageMeters } from '@/lib/entitlements';
+import {
+  FEATURES,
+  planRestrictionResult,
+  canUseFeature,
+  assertWithinLimit,
+  getSeatUsageMeters,
+} from '@/lib/entitlements';
 import { getSessionContext } from '@/actions/auth';
 import { randomBytes } from 'crypto';
 import type { Database } from '@sincvete/db';
+import { parseProfessionalScheduleInput } from '@/lib/professional-schedule-input';
+import { saveProfessionalSchedules } from '@/lib/professional-schedule-save';
 
 type ProfessionalUpdate = Database['public']['Tables']['professionals']['Update'];
 
@@ -29,6 +37,8 @@ function revalidateProfessionalsModule() {
   revalidatePath('/configuracion');
   revalidatePath('/agenda');
   revalidatePath('/agenda/nueva');
+  revalidatePath('/agenda/turnos');
+  revalidatePath('/agenda/disponibilidad');
 }
 
 function isNextRedirect(error: unknown): boolean {
@@ -186,84 +196,6 @@ async function ensureProfessionalAgendaAccess(params: {
   return { userId };
 }
 
-function normalizeTime(value: string): string {
-  return value.length === 5 ? `${value}:00` : value;
-}
-
-function parseSchedulesJson(raw: FormDataEntryValue | null): Array<{
-  weekday: number;
-  startTime: string;
-  endTime: string;
-  slotDurationMinutes: number;
-}> {
-  if (typeof raw !== 'string' || !raw.trim()) return [];
-  try {
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed
-      .map((row) => {
-        if (!row || typeof row !== 'object') return null;
-        const item = row as Record<string, unknown>;
-        const weekday = Number(item.weekday);
-        const startTime = String(item.startTime ?? '');
-        const endTime = String(item.endTime ?? '');
-        const slotDurationMinutes = Number(item.slotDurationMinutes ?? 30);
-        if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) return null;
-        if (!/^\d{2}:\d{2}/.test(startTime) || !/^\d{2}:\d{2}/.test(endTime)) return null;
-        return {
-          weekday,
-          startTime,
-          endTime,
-          slotDurationMinutes:
-            Number.isFinite(slotDurationMinutes) && slotDurationMinutes >= 5
-              ? slotDurationMinutes
-              : 30,
-        };
-      })
-      .filter((row): row is NonNullable<typeof row> => Boolean(row));
-  } catch {
-    return [];
-  }
-}
-
-async function saveProfessionalSchedules(params: {
-  userId: string;
-  branchIds: string[];
-  schedules: Array<{
-    weekday: number;
-    startTime: string;
-    endTime: string;
-    slotDurationMinutes: number;
-  }>;
-}): Promise<string | null> {
-  if (params.schedules.length === 0 || params.branchIds.length === 0) return null;
-  const supabase = await createServerClient();
-  for (const branchId of params.branchIds) {
-    for (const schedule of params.schedules) {
-      const { error } = await supabase.rpc('upsert_professional_schedule', {
-        p_branch_id: branchId,
-        p_user_id: params.userId,
-        p_weekday: schedule.weekday,
-        p_start_time: normalizeTime(schedule.startTime),
-        p_end_time: normalizeTime(schedule.endTime),
-        p_slot_duration_minutes: schedule.slotDurationMinutes,
-        p_allowed_appointment_types: null,
-        p_is_active: true,
-        p_id: null,
-      });
-      if (error) {
-        if (/schema cache|does not exist|Could not find the (table|function)/i.test(error.message)) {
-          return null;
-        }
-        return rpcErrorMessage(error);
-      }
-    }
-  }
-  revalidatePath('/agenda');
-  revalidatePath('/agenda/disponibilidad');
-  return null;
-}
-
 function mapProfessional(row: Record<string, unknown>): Professional {
   return {
     id: String(row.id),
@@ -299,7 +231,9 @@ export async function canWriteProfessionals(): Promise<boolean> {
   return canPermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
 }
 
-export async function listProfessionals(input: { activeOnly?: boolean } = {}): Promise<Professional[]> {
+export async function listProfessionals(
+  input: { activeOnly?: boolean } = {}
+): Promise<Professional[]> {
   await requirePermissionAndFeature('professionals:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
   const supabase = await createServerClient();
   let query = supabase
@@ -331,26 +265,35 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
     canPermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS),
   ]);
 
-  const [{ data: settlements, error: settlementsError }, { data: schemes, error: schemesError }, { data: payments, error: paymentsError }] =
-    await Promise.all([
-      canReadSettlements ? supabase
-        .from('professional_settlements')
-        .select('professional_id, balance_due, status')
-        .in('professional_id', professionalIds)
-        .is('deleted_at', null) : Promise.resolve({ data: [], error: null }),
-      canReadCompensation ? supabase
-        .from('professional_compensation_schemes')
-        .select('professional_id, name, is_active, valid_from, valid_to')
-        .in('professional_id', professionalIds)
-        .is('deleted_at', null)
-        .eq('is_active', true) : Promise.resolve({ data: [], error: null }),
-      canReadSettlements ? supabase
-        .from('professional_payments')
-        .select('professional_id, amount, paid_at, settlement_id')
-        .in('professional_id', professionalIds)
-        .is('deleted_at', null)
-        .order('paid_at', { ascending: false }) : Promise.resolve({ data: [], error: null }),
-    ]);
+  const [
+    { data: settlements, error: settlementsError },
+    { data: schemes, error: schemesError },
+    { data: payments, error: paymentsError },
+  ] = await Promise.all([
+    canReadSettlements
+      ? supabase
+          .from('professional_settlements')
+          .select('professional_id, balance_due, status')
+          .in('professional_id', professionalIds)
+          .is('deleted_at', null)
+      : Promise.resolve({ data: [], error: null }),
+    canReadCompensation
+      ? supabase
+          .from('professional_compensation_schemes')
+          .select('professional_id, name, is_active, valid_from, valid_to')
+          .in('professional_id', professionalIds)
+          .is('deleted_at', null)
+          .eq('is_active', true)
+      : Promise.resolve({ data: [], error: null }),
+    canReadSettlements
+      ? supabase
+          .from('professional_payments')
+          .select('professional_id, amount, paid_at, settlement_id')
+          .in('professional_id', professionalIds)
+          .is('deleted_at', null)
+          .order('paid_at', { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
   if (settlementsError) throw settlementsError;
   if (schemesError) throw schemesError;
   if (paymentsError) throw paymentsError;
@@ -418,7 +361,10 @@ export async function listProfessionalsWithSummary(): Promise<ProfessionalListRo
 export async function getProfessionalSettlementSummary(
   professionalId: string
 ): Promise<ProfessionalSettlementSummary> {
-  await requirePermissionAndFeature('professional_settlements:read', FEATURES.PROFESSIONALS_SETTLEMENTS);
+  await requirePermissionAndFeature(
+    'professional_settlements:read',
+    FEATURES.PROFESSIONALS_SETTLEMENTS
+  );
   const supabase = await createServerClient();
   const today = new Date().toISOString().slice(0, 10);
 
@@ -448,7 +394,11 @@ export async function getProfessionalSettlementSummary(
       .maybeSingle(),
   ]);
   if (settlementsError) {
-    if (/schema cache|does not exist|Could not find the (table|function)/i.test(settlementsError.message)) {
+    if (
+      /schema cache|does not exist|Could not find the (table|function)/i.test(
+        settlementsError.message
+      )
+    ) {
       return {
         openBalance: 0,
         pendingSettlementCount: 0,
@@ -462,7 +412,9 @@ export async function getProfessionalSettlementSummary(
     throw settlementsError;
   }
   if (schemesError) {
-    if (/schema cache|does not exist|Could not find the (table|function)/i.test(schemesError.message)) {
+    if (
+      /schema cache|does not exist|Could not find the (table|function)/i.test(schemesError.message)
+    ) {
       return {
         openBalance: 0,
         pendingSettlementCount: 0,
@@ -476,7 +428,9 @@ export async function getProfessionalSettlementSummary(
     throw schemesError;
   }
   if (paymentError) {
-    if (/schema cache|does not exist|Could not find the (table|function)/i.test(paymentError.message)) {
+    if (
+      /schema cache|does not exist|Could not find the (table|function)/i.test(paymentError.message)
+    ) {
       return {
         openBalance: 0,
         pendingSettlementCount: 0,
@@ -522,9 +476,7 @@ export async function getProfessionalSettlementSummary(
     activeSchemeName,
     lastPaymentAmount: lastPayment ? Number(lastPayment.amount) : null,
     lastPaymentDate: lastPayment ? String(lastPayment.paid_at) : null,
-    lastPaymentSettlementId: lastPayment?.settlement_id
-      ? String(lastPayment.settlement_id)
-      : null,
+    lastPaymentSettlementId: lastPayment?.settlement_id ? String(lastPayment.settlement_id) : null,
   };
 }
 
@@ -594,6 +546,8 @@ export async function createProfessional(
 ): Promise<ActionResult<Professional>> {
   try {
     await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    const scheduleInput = parseProfessionalScheduleInput(formData.get('schedulesJson'));
+    if (!scheduleInput.success) return { success: false, error: scheduleInput.error };
     const session = await getSessionContext();
     if (!session) return { success: false, error: 'Sesión inválida' };
 
@@ -613,7 +567,8 @@ export async function createProfessional(
       startDate: formData.get('startDate') || null,
       endDate: formData.get('endDate') || null,
       isActive: formData.get('isActive') === 'true' || formData.get('isActive') === 'on',
-      invoiceRequired: formData.get('invoiceRequired') === 'true' || formData.get('invoiceRequired') === 'on',
+      invoiceRequired:
+        formData.get('invoiceRequired') === 'true' || formData.get('invoiceRequired') === 'on',
       notes: formData.get('notes') || null,
       branchIds: formData.getAll('branchIds').map(String).filter(Boolean),
       enableAgenda,
@@ -686,18 +641,19 @@ export async function createProfessional(
         branch_id: branchId,
         is_active: true,
       }));
-      const { error: branchError } = await supabase.from('professional_branches').insert(branchRows);
+      const { error: branchError } = await supabase
+        .from('professional_branches')
+        .insert(branchRows);
       if (branchError) {
         return { success: false, error: rpcErrorMessage(branchError) };
       }
     }
 
-    if (userId) {
-      const schedules = parseSchedulesJson(formData.get('schedulesJson'));
+    if (userId && scheduleInput.schedules !== undefined) {
       const scheduleError = await saveProfessionalSchedules({
         userId,
         branchIds,
-        schedules,
+        schedules: scheduleInput.schedules,
       });
       if (scheduleError) {
         return {
@@ -720,6 +676,8 @@ export async function updateProfessional(
 ): Promise<ActionResult<Professional>> {
   try {
     await requirePermissionAndFeature('professionals:write', FEATURES.PROFESSIONALS_SETTLEMENTS);
+    const scheduleInput = parseProfessionalScheduleInput(formData.get('schedulesJson'));
+    if (!scheduleInput.success) return { success: false, error: scheduleInput.error };
 
     const parsed = professionalUpdateSchema.safeParse({
       id: formData.get('id'),
@@ -735,14 +693,12 @@ export async function updateProfessional(
       relationshipType: formData.get('relationshipType') || undefined,
       startDate: formData.get('startDate') || undefined,
       endDate: formData.get('endDate') || undefined,
-      isActive:
-        formData.has('isActive')
-          ? formData.get('isActive') === 'true' || formData.get('isActive') === 'on'
-          : undefined,
-      invoiceRequired:
-        formData.has('invoiceRequired')
-          ? formData.get('invoiceRequired') === 'true' || formData.get('invoiceRequired') === 'on'
-          : undefined,
+      isActive: formData.has('isActive')
+        ? formData.get('isActive') === 'true' || formData.get('isActive') === 'on'
+        : undefined,
+      invoiceRequired: formData.has('invoiceRequired')
+        ? formData.get('invoiceRequired') === 'true' || formData.get('invoiceRequired') === 'on'
+        : undefined,
       notes: formData.get('notes') || undefined,
       branchIds: formData.has('branchIds')
         ? formData.getAll('branchIds').map(String).filter(Boolean)
@@ -773,7 +729,8 @@ export async function updateProfessional(
     if (fields.lastName !== undefined) patch.last_name = fields.lastName;
     if (fields.documentNumber !== undefined) patch.document_number = fields.documentNumber;
     if (fields.taxId !== undefined) patch.tax_id = fields.taxId;
-    if (fields.professionalLicense !== undefined) patch.professional_license = fields.professionalLicense;
+    if (fields.professionalLicense !== undefined)
+      patch.professional_license = fields.professionalLicense;
     if (fields.professionalLicenseJurisdiction !== undefined) {
       patch.professional_license_jurisdiction = fields.professionalLicenseJurisdiction;
     }
@@ -815,7 +772,8 @@ export async function updateProfessional(
       const agenda = await ensureProfessionalAgendaAccess({
         organizationId: session.organizationId,
         branchIds: resolvedBranchIds,
-        fullName: `${fields.firstName ?? existing.first_name} ${fields.lastName ?? existing.last_name}`.trim(),
+        fullName:
+          `${fields.firstName ?? existing.first_name} ${fields.lastName ?? existing.last_name}`.trim(),
         userId: (fields.userId as string | undefined) ?? existing.user_id,
         agendaEmail: agendaEmail as string | undefined,
       });
@@ -860,20 +818,17 @@ export async function updateProfessional(
     }
 
     const linkedUserId = (patch.user_id as string | undefined) ?? data.user_id ?? null;
-    if (linkedUserId) {
-      const schedules = parseSchedulesJson(formData.get('schedulesJson'));
-      if (schedules.length > 0) {
-        const scheduleError = await saveProfessionalSchedules({
-          userId: String(linkedUserId),
-          branchIds: resolvedBranchIds,
-          schedules,
-        });
-        if (scheduleError) {
-          return {
-            success: false,
-            error: `Profesional actualizado, pero no se pudieron guardar los horarios: ${scheduleError}`,
-          };
-        }
+    if (linkedUserId && scheduleInput.schedules !== undefined) {
+      const scheduleError = await saveProfessionalSchedules({
+        userId: String(linkedUserId),
+        branchIds: resolvedBranchIds,
+        schedules: scheduleInput.schedules,
+      });
+      if (scheduleError) {
+        return {
+          success: false,
+          error: `Profesional actualizado, pero no se pudieron guardar los horarios: ${scheduleError}`,
+        };
       }
     }
 

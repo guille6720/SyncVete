@@ -7548,6 +7548,10 @@ export interface Database {
         };
         Returns: boolean;
       };
+      replace_professional_schedules: {
+        Args: { p_user_id: string; p_branch_ids: string[]; p_schedules: Json };
+        Returns: number;
+      };
       upsert_professional_schedule: {
         Args: {
           p_branch_id: string;

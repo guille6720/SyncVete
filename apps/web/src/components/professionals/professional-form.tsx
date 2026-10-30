@@ -50,9 +50,7 @@ export function ProfessionalForm({
   const router = useRouter();
   const action = mode === 'create' ? createProfessional : updateProfessional;
   const [state, formAction, pending] = useActionState(action, null);
-  const [enableAgenda, setEnableAgenda] = useState(
-    mode === 'create' || !professional?.user_id
-  );
+  const [enableAgenda, setEnableAgenda] = useState(mode === 'create' || !professional?.user_id);
   const [linkedUserId, setLinkedUserId] = useState(professional?.user_id ?? '');
   const [hours, setHours] = useState<ProfessionalHoursDraft[]>(
     initialHours && initialHours.length > 0
@@ -237,7 +235,8 @@ export function ProfessionalForm({
               <div>
                 <p className="text-sm font-medium">Días y horarios de atención</p>
                 <p className="text-xs text-muted-foreground">
-                  Se guardan en la agenda del profesional para tomar turnos.
+                  Al guardar, estos días y horarios reemplazan los anteriores en las sucursales
+                  seleccionadas.
                 </p>
               </div>
               <ProfessionalHoursEditor value={hours} onChange={setHours} disabled={pending} />
