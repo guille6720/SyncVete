@@ -42,7 +42,8 @@ describe('independent professional agenda migration and workflow', () => {
       create table profiles(id uuid primary key,organization_id uuid,full_name text,is_active boolean default true,deleted_at timestamptz);
       create table branch_members(organization_id uuid,branch_id uuid,user_id uuid,role text,is_active boolean default true,deleted_at timestamptz);
       create table professionals(id uuid primary key default gen_random_uuid(),organization_id uuid,user_id uuid,profile_id uuid,first_name text not null,last_name text not null,specialty text,relationship_type professional_relationship_type default 'independent',document_number text,tax_id text,professional_license text,professional_license_jurisdiction text,start_date date,end_date date,is_active boolean default true,invoice_required boolean default false,notes text,created_at timestamptz default now(),created_by uuid,updated_at timestamptz default now(),deleted_at timestamptz);
-      create table professional_branches(id uuid default gen_random_uuid(),organization_id uuid,professional_id uuid,branch_id uuid,is_active boolean default true,deleted_at timestamptz,unique(professional_id,branch_id));
+      create table professional_branches(id uuid default gen_random_uuid(),organization_id uuid,professional_id uuid,branch_id uuid,is_active boolean default true,deleted_at timestamptz);
+      create unique index professional_branches_active on professional_branches(professional_id,branch_id) where deleted_at is null;
       create table professional_schedules(id uuid primary key default gen_random_uuid(),organization_id uuid,branch_id uuid,user_id uuid not null,weekday smallint,start_time time,end_time time,slot_duration_minutes int,allowed_appointment_types text[],is_active boolean default true,created_at timestamptz default now(),updated_at timestamptz default now(),deleted_at timestamptz,check(end_time>start_time));
       create table professional_time_blocks(id uuid default gen_random_uuid(),organization_id uuid,branch_id uuid,user_id uuid,starts_at timestamptz,ends_at timestamptz,deleted_at timestamptz);
       create table owners(id uuid primary key,organization_id uuid,full_name text,deleted_at timestamptz);
@@ -67,6 +68,15 @@ describe('independent professional agenda migration and workflow', () => {
         resolve(
           process.cwd(),
           '../../supabase/migrations/20261030171506_independent_professional_agendas.sql'
+        ),
+        'utf8'
+      )
+    );
+    await db.exec(
+      readFileSync(
+        resolve(
+          process.cwd(),
+          '../../supabase/migrations/20261030173928_fix_professional_branch_atomic_upsert.sql'
         ),
         'utf8'
       )
@@ -103,6 +113,26 @@ describe('independent professional agenda migration and workflow', () => {
     expect(
       (await db.query(`select * from list_agenda_schedules('${user}','${branch}')`)).rows
     ).toHaveLength(1);
+  });
+  it('restores an inactive branch atomically using the real partial unique index', async () => {
+    await db.exec(
+      `reset role;update professional_branches set is_active=false where professional_id='${pro}';set role authenticated;`
+    );
+    await db.query(save());
+    const listed = await db.query<{ list_agenda_professionals: { professionalId: string } }>(
+      'select * from list_agenda_professionals()'
+    );
+    expect(listed.rows.some((r) => r.list_agenda_professionals.professionalId === pro)).toBe(true);
+  });
+  it('creates a new assignment while preserving an archived one', async () => {
+    await db.exec(
+      `reset role;update professional_branches set deleted_at=now(),is_active=false where professional_id='${pro}';set role authenticated;`
+    );
+    await db.query(save());
+    await db.exec('reset role');
+    expect(
+      (await db.query(`select * from professional_branches where professional_id='${pro}'`)).rows
+    ).toHaveLength(2);
   });
   it('returns both professionals by their own name despite sharing a login', async () => {
     const result = await db.query<{
