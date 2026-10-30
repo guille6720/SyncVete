@@ -8,7 +8,11 @@ import { Button } from '@/components/ui/button';
 import { getSessionContext } from '@/lib/session';
 import { canPermissionAndFeature } from '@/lib/permissions';
 import { FEATURES } from '@/lib/entitlements';
-import { CLINICAL_ENTRY_TYPES, CLINICAL_HISTORY_PAGE_SIZE, type ClinicalEntryType } from '@sincvete/shared';
+import {
+  CLINICAL_ENTRY_TYPES,
+  CLINICAL_HISTORY_PAGE_SIZE,
+  type ClinicalEntryType,
+} from '@sincvete/shared';
 
 interface HistoriaClinicaPageProps {
   searchParams: Promise<{ page?: string; search?: string; type?: string }>;
@@ -43,12 +47,13 @@ async function ClinicalHistorySection({
 }
 
 export default async function HistoriaClinicaPage({ searchParams }: HistoriaClinicaPageProps) {
-  const [session, params, canImport] = await Promise.all([
+  const [session, params, canImport, canRead] = await Promise.all([
     getSessionContext(),
     searchParams,
     canPermissionAndFeature('data:import', FEATURES.DATA_IMPORT_EXPORT),
+    canPermissionAndFeature('clinical:read', FEATURES.CLINICAL_HISTORY),
   ]);
-  if (!session?.permissions.includes('clinical:read')) redirect('/dashboard');
+  if (!session?.permissions.includes('clinical:read') || !canRead) redirect('/dashboard');
 
   const page = Math.max(1, Number(params.page) || 1);
   const search = params.search?.trim() ?? '';
@@ -61,8 +66,11 @@ export default async function HistoriaClinicaPage({ searchParams }: HistoriaClin
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Historia clínica</h1>
-          <p className="text-muted-foreground">Registro longitudinal de atenciones y evolución</p>
+          <h1 className="text-2xl font-bold tracking-tight">Historias clínicas</h1>
+          <p className="text-muted-foreground">
+            Buscá por paciente, tutor, motivo o diagnóstico. Imprimí o descargá la historia completa
+            o las atenciones de una fecha.
+          </p>
         </div>
         {canImport && (
           <Button variant="outline" asChild>

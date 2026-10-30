@@ -266,25 +266,26 @@ export async function deleteClinicalEntry(entryId: string): Promise<ActionResult
     await requirePermissionAndFeature('clinical:write', FEATURES.CLINICAL_HISTORY);
     const supabase = await createServerClient();
 
-    const { data: entry } = await supabase
-      .from('clinical_entries')
-      .select('patient_id')
-      .eq('id', entryId)
-      .single();
-
-    const { error } = await supabase
-      .from('clinical_entries')
-      .update({ deleted_at: new Date().toISOString() })
-      .eq('id', entryId);
+    const { data, error } = await supabase.rpc('soft_delete_clinical_entry', {
+      p_entry_id: entryId,
+    });
 
     if (error) {
-      return { success: false, error: 'No se pudo eliminar la entrada clínica' };
+      if (error.code === '42501') {
+        return { success: false, error: 'No tenés permisos para eliminar esta entrada clínica' };
+      }
+      if (error.code === 'P0002') {
+        return { success: false, error: 'La entrada ya fue eliminada o no está disponible' };
+      }
+      console.error('[clinical-entries] soft delete failed', error.code);
+      return { success: false, error: 'No se pudo eliminar la entrada clínica. Intentá nuevamente.' };
     }
 
-    revalidateClinicalEntryList();
-    if (entry?.patient_id) {
-      revalidatePatientHistoria(entry.patient_id);
+    const deletedEntry = data?.[0];
+    if (!deletedEntry || deletedEntry.id !== entryId) {
+      return { success: false, error: 'No se confirmó la eliminación de la entrada clínica' };
     }
+    revalidateClinicalEntry(entryId, deletedEntry.patient_id);
     return { success: true };
   } catch (error) {
     return actionError(error);

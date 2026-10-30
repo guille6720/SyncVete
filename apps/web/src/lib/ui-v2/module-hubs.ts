@@ -35,7 +35,7 @@ export function getModuleGroupById(groupId: DashboardNavGroupId) {
 export const MODULE_ITEM_BLURB: Record<string, string> = {
   '/sala-espera': 'Flujo del día y check-in',
   '/consultas': 'Atención y notas clínicas',
-  '/historia-clinica': 'Historial del paciente',
+  '/historia-clinica': 'Buscá historias por paciente, tutor o diagnóstico. Imprimí o descargá la historia completa o por fecha.',
   '/laboratorio': 'Órdenes y resultados',
   '/imagenes': 'Estudios e imágenes',
   '/farmacia': 'Recetas y dispensa',

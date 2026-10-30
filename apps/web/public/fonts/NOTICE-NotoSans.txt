@@ -1,0 +1,4 @@
+Noto Sans Regular and Bold are bundled for readable clinical PDF exports.
+Source: https://github.com/notofonts/noto-fonts/tree/main/hinted/ttf/NotoSans
+Font files are unmodified. The SIL Open Font License is included in OFL-NotoSans.txt.
+The fonts are embedded locally; PDF generation does not contact a font service.

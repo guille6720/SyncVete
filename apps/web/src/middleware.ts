@@ -94,6 +94,12 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api/cron/');
 
   if (!user && !isPublicRoute) {
+    if (pathname === '/api/historia-clinica/pdf') {
+      return NextResponse.json(
+        { error: 'Iniciá sesión para descargar la historia clínica' },
+        { status: 401, headers: { 'Cache-Control': 'private, no-store, max-age=0' } }
+      );
+    }
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('redirectTo', pathname);

@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Images, Pencil, Sparkles, Trash2 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { deleteClinicalEntry } from '@/actions/clinical-entries';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { usePendingAction } from '@/lib/hooks/use-pending-action';
 import {
   CLINICAL_ENTRY_TYPE_LABELS,
@@ -27,13 +28,23 @@ interface ClinicalEntryDetailProps {
 export function ClinicalEntryDetail({ entry, canWrite }: ClinicalEntryDetailProps) {
   const router = useRouter();
   const [pending, runPending] = usePendingAction();
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const handleDelete = () => {
-    if (!confirm('¿Eliminar esta entrada clínica?')) return;
+    if (pending) return;
+    setDeleteError(null);
     void runPending(async () => {
-      const result = await deleteClinicalEntry(entry.id);
-      if (result.success) {
-        router.push(`/pacientes/${entry.patient_id}/historia`);
+      try {
+        const result = await deleteClinicalEntry(entry.id);
+        if (result.success) {
+          router.push(`/pacientes/${entry.patient_id}/historia`);
+          router.refresh();
+        } else {
+          setDeleteError(result.error ?? 'No se pudo eliminar la entrada clínica');
+        }
+      } catch {
+        setDeleteError('No se pudo conectar para eliminar la entrada clínica. Intentá nuevamente.');
       }
     });
   };
@@ -78,7 +89,7 @@ export function ClinicalEntryDetail({ entry, canWrite }: ClinicalEntryDetailProp
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleDelete}
+              onClick={() => setConfirmDelete(true)}
               isPending={pending}
             >
               {pending ? (
@@ -93,6 +104,19 @@ export function ClinicalEntryDetail({ entry, canWrite }: ClinicalEntryDetailProp
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Eliminar entrada clínica"
+        description="La entrada dejará de aparecer en la historia del paciente. Se conservará su registro para auditoría."
+        confirmLabel="Eliminar entrada"
+        variant="destructive"
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={handleDelete}
+      />
+      {deleteError ? (
+        <p role="alert" className="text-sm text-destructive">{deleteError}</p>
+      ) : null}
 
       <Card>
         <CardHeader>

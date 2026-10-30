@@ -80,7 +80,7 @@ export function AppUpdateBanner() {
   if (!updateAvailable) return null;
 
   return (
-    <div className="fixed inset-x-0 top-0 z-[100] flex justify-center p-3 pointer-events-none">
+    <div className="fixed inset-x-0 top-0 z-[100] flex justify-center p-3 pointer-events-none print:hidden">
       <div
         role="status"
         aria-live="polite"
