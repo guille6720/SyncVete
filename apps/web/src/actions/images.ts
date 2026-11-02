@@ -1,4 +1,5 @@
 'use server';
+import { uploadWithStorageReservation } from '@/lib/storage-upload';
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -8,7 +9,6 @@ import {
   clinicalImageCreateSchema,
   clinicalImageListSchema,
   CLINICAL_IMAGE_MAX_BYTES,
-  bytesToStorageMb,
   isAllowedClinicalImageMime,
   type ActionResult,
   type ClinicalImage,
@@ -21,7 +21,6 @@ import { getSessionContext } from '@/actions/auth';
 import {
   FEATURES,
   canUseFeature,
-  consumeMeteredFeature,
   planRestrictionResult,
   requireFeature,
 } from '@/lib/entitlements';
@@ -192,11 +191,6 @@ export async function uploadClinicalImage(
     }
 
     await requireFeature(session.organizationId, FEATURES.CLINICAL_IMAGES);
-    await consumeMeteredFeature({
-      organizationId: session.organizationId,
-      featureKey: FEATURES.STORAGE_MAX_MB,
-      amount: bytesToStorageMb(file.size),
-    });
 
     const branchId = parsed.data.branchId ?? session.branchId;
     const imageId = crypto.randomUUID();
@@ -241,12 +235,10 @@ export async function uploadClinicalImage(
       return { success: false, error: 'No se pudo guardar la imagen' };
     }
 
-    const { error: uploadError } = await supabase.storage
-      .from('clinical-images')
-      .upload(storagePath, file, {
-        contentType: file.type,
-        upsert: false,
-      });
+    const { error: uploadError } = await uploadWithStorageReservation({
+      organizationId: session.organizationId, bucket: 'clinical-images',
+      path: storagePath, body: file, contentType: file.type,
+    });
 
     if (uploadError) {
       await supabase

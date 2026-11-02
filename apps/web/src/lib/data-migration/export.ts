@@ -1,4 +1,5 @@
 import 'server-only';
+import { uploadWithStorageReservation } from '@/lib/storage-upload';
 
 import {
   DATA_MIGRATION_FORMAT,
@@ -2949,15 +2950,14 @@ export async function runExportJob(
 
     // Persist artifact for later download / background jobs
     const storagePath = `${organizationId}/exports/${jobId}/${filename}`;
-    const storageClient = options?.asService
-      ? await (await import('@/lib/supabase/server')).createServiceClient()
-      : await createServerClient();
     const uploadBytes =
       typeof body === 'string' ? Buffer.from(body, 'utf8') : Buffer.from(body);
-    const { error: uploadError } = await storageClient.storage
-      .from('data-migration')
-      .upload(storagePath, uploadBytes, { contentType, upsert: true });
+    const { error: uploadError } = await uploadWithStorageReservation({
+      organizationId, bucket: 'data-migration', path: storagePath,
+      body: uploadBytes, contentType, asService: options?.asService,
+    });
     if (uploadError) {
+      if (options?.asService) throw new Error('No se pudo guardar el archivo de exportación');
       // Non-fatal for interactive download; still return body
       console.warn('[export] artifact upload failed', uploadError.message);
     }

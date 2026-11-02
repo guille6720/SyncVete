@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { getSessionContext } from '@/actions/auth';
 import { getOrganizationSettingsForm, listBranches } from '@/actions/settings';
 import { getPlanBillingState, cancelClinicCheckoutIntents } from '@/actions/plan-billing';
@@ -88,6 +89,8 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
   );
 
   return (
+    <>
+    {hasPermission(session.permissions, 'org:manage') && <Link className="inline-block mb-4 underline" href="/configuracion/almacenamiento">Almacenamiento y disponibilidad</Link>}
     <SettingsPageClient
       ownerApp={
         ownerAppEnabled() && hasPermission(session.permissions, 'org:manage')
@@ -113,5 +116,6 @@ export default async function ConfiguracionPage({ searchParams }: PageProps) {
       planBilling={planBilling}
       checkoutBanner={params.checkout ?? null}
     />
+    </>
   );
 }

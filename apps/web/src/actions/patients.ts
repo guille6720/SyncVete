@@ -1,9 +1,9 @@
 'use server';
 
 import { randomUUID } from 'crypto';
+import { uploadWithStorageReservation } from '@/lib/storage-upload';
 import {
   buildPaginatedResult,
-  bytesToStorageMb,
   patientListSchema,
   patientSchema,
   type ActionResult,
@@ -19,7 +19,6 @@ import { PATIENT_COLUMNS } from '@/lib/db-columns';
 import {
   FEATURES,
   assertWithinLimit,
-  consumeMeteredFeature,
   planRestrictionResult,
 } from '@/lib/entitlements';
 
@@ -102,16 +101,10 @@ async function uploadPatientPhoto(
 
   const path = `${organizationId}/${patientId}/${randomUUID()}.${ext}`;
   const supabase = await createServerClient();
-  await consumeMeteredFeature({
-    organizationId,
-    featureKey: FEATURES.STORAGE_MAX_MB,
-    amount: bytesToStorageMb(file.size),
-  });
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error } = await supabase.storage.from('patient-photos').upload(path, buffer, {
-    contentType: file.type,
-    upsert: false,
+  const { error } = await uploadWithStorageReservation({
+    organizationId, bucket: 'patient-photos', path, body: buffer, contentType: file.type,
   });
 
   if (error) {
