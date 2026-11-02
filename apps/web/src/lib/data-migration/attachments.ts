@@ -1,4 +1,5 @@
 import 'server-only';
+import { uploadWithStorageReservation } from '@/lib/storage-upload';
 
 import {
   CLINICAL_IMAGE_MAX_BYTES,
@@ -7,7 +8,6 @@ import {
   MAX_IMPORT_ZIP_BYTES,
   buildAttachmentMetaKey,
   buildClinicalImageStoragePath,
-  bytesToStorageMb,
   chunkRange,
   guessMimeFromFilename,
   isAllowedClinicalImageMime,
@@ -19,9 +19,8 @@ import {
   type ClinicalImageKind,
 } from '@sincvete/shared';
 import JSZip from 'jszip';
-import { createServerClient } from '@/lib/supabase/server';
 import { requirePermission } from '@/lib/permissions';
-import { canUseFeature, consumeMeteredFeature, getMeteredUsageMeters } from '@/lib/entitlements';
+import { canUseFeature } from '@/lib/entitlements';
 import { migrationDb } from '@/lib/data-migration/db';
 
 function kindFromMime(mime: string): ClinicalImageKind {
@@ -81,7 +80,6 @@ export async function importZipAttachmentsChunk(input: {
   }
 
   const supabase = await migrationDb();
-  const storage = await createServerClient();
   const { data: batch } = await supabase
     .from('data_import_batches')
     .select('id, organization_id, imported_records, failed_records')
@@ -125,33 +123,6 @@ export async function importZipAttachmentsChunk(input: {
     input.chunkSize ?? DEFAULT_IMPORT_CHUNK_SIZE
   );
   const slice = refs.slice(range.offset, range.end);
-
-  if (range.offset === 0 && refs.length > 0) {
-    let estimatedBytes = 0;
-    for (const ref of refs) {
-      const entry = zip.file(ref.zipPath);
-      if (!entry) continue;
-      const raw = entry as unknown as { _data?: { uncompressedSize?: number } };
-      const declared = Number(raw._data?.uncompressedSize ?? 0);
-      if (declared > 0) {
-        estimatedBytes += declared;
-        continue;
-      }
-      const bytes = await entry.async('uint8array');
-      estimatedBytes += bytes.byteLength;
-    }
-    const meters = await getMeteredUsageMeters(session.organizationId);
-    const storage = meters.find((m) => m.featureKey === FEATURES.STORAGE_MAX_MB);
-    if (storage && storage.limit !== null) {
-      const neededMb = bytesToStorageMb(estimatedBytes);
-      const remaining = Math.max(0, storage.limit - storage.used);
-      if (neededMb > remaining) {
-        throw new Error(
-          `Storage insuficiente: el ZIP necesita ~${neededMb} MB y quedan ${remaining} MB del plan`
-        );
-      }
-    }
-  }
 
   await supabase
     .from('data_import_batches')
@@ -199,17 +170,6 @@ export async function importZipAttachmentsChunk(input: {
       .eq('organization_id', session.organizationId)
       .maybeSingle();
     if (!patient) {
-      failed += 1;
-      continue;
-    }
-
-    try {
-      await consumeMeteredFeature({
-        organizationId: session.organizationId,
-        featureKey: FEATURES.STORAGE_MAX_MB,
-        amount: bytesToStorageMb(bytes.byteLength),
-      });
-    } catch {
       failed += 1;
       continue;
     }
@@ -282,9 +242,10 @@ export async function importZipAttachmentsChunk(input: {
       continue;
     }
 
-    const { error: uploadError } = await storage.storage
-      .from('clinical-images')
-      .upload(storagePath, bytes, { contentType: mime, upsert: false });
+    const { error: uploadError } = await uploadWithStorageReservation({
+      organizationId: session.organizationId, bucket: 'clinical-images',
+      path: storagePath, body: bytes, contentType: mime,
+    });
     if (uploadError) {
       await supabase
         .from('clinical_images')

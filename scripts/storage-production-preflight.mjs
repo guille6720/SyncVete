@@ -1,0 +1,23 @@
+import assert from 'node:assert/strict';
+import { createClient } from '@supabase/supabase-js';
+
+assert.equal(process.env.VERCEL_PROJECT_ID, 'prj_Inb0VWS9TnRW0jDohy3vvVjpSgtZ', 'Production application project required');
+assert.equal(process.env.VERCEL_ENV, 'production', 'Production build required');
+assert.equal(process.env.NEXT_PUBLIC_SUPABASE_URL, 'https://lhdksiptpsubktikdses.supabase.co', 'Production database required');
+assert.equal(process.env.STORAGE_RESERVATIONS_ENABLED, 'true', 'Storage reservations must be explicitly enabled');
+assert.notEqual(process.env.STORAGE_LIMITED_WRITER_ENABLED, 'true', 'Staging writer cannot be used in production');
+assert.ok(process.env.SUPABASE_SERVICE_ROLE_KEY && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, 'Server configuration required');
+const options = { auth: { persistSession: false, autoRefreshToken: false } };
+const service = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, options);
+const anonymous = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY, options);
+const namespace = '00000000-0000-0000-0000-000000000099';
+const guard = await service.rpc('get_organization_storage_guard_status', { target_organization: namespace });
+assert.ok(!guard.error && typeof guard.data === 'boolean', 'Storage guard schema unavailable');
+const invalid = { target_organization: namespace, target_bucket: 'clinical-images', target_path: `${namespace}/preflight`, requested_bytes: 0, requested_sha256: '' };
+const rejection = await service.rpc('reserve_organization_storage', invalid);
+assert.equal(rejection.error?.code, '22023', 'Reservation input validation unavailable');
+const forbidden = await anonymous.rpc('reserve_organization_storage', invalid);
+assert.equal(forbidden.error?.code, '42501', 'Anonymous reservation must be denied');
+const quotas = await service.from('organization_storage_quotas').select('organization_id', { count: 'exact', head: true });
+assert.ok(!quotas.error && quotas.count > 0, 'Storage quotas unavailable');
+console.log('STORAGE_PRODUCTION_PREFLIGHT', JSON.stringify({ project: 'lhdksiptpsubktikdses', schemaReady: true, guardEnabled: guard.data, invalidReservationRejected: true, anonymousRpcDenied: true, createdObjects: 0, createdAccounts: 0 }));

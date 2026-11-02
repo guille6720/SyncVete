@@ -1,4 +1,5 @@
 import 'server-only';
+import { uploadWithStorageReservation } from '@/lib/storage-upload';
 
 import {
   BRANCH_IMPORT_FIELDS,
@@ -1590,8 +1591,6 @@ export async function queueImportBatch(input: {
 }) {
   const session = await requirePermission('data:import');
   const supabase = await migrationDb();
-  const { createServerClient } = await import('@/lib/supabase/server');
-  const storage = await createServerClient();
 
   const { data: batch } = await supabase
     .from('data_import_batches')
@@ -1619,12 +1618,11 @@ export async function queueImportBatch(input: {
   }
 
   const storagePath = `${session.organizationId}/${input.batchId}/payload.csv`;
-  const { error: uploadError } = await storage.storage
-    .from('data-migration')
-    .upload(storagePath, new Blob([input.csvText], { type: 'text/csv;charset=utf-8' }), {
-      contentType: 'text/csv;charset=utf-8',
-      upsert: true,
-    });
+  const { error: uploadError } = await uploadWithStorageReservation({
+    organizationId: session.organizationId, bucket: 'data-migration', path: storagePath,
+    body: new Blob([input.csvText], { type: 'text/csv;charset=utf-8' }),
+    contentType: 'text/csv;charset=utf-8',
+  });
   if (uploadError) throw new Error(uploadError.message);
 
   if (input.rowDecisions) {
