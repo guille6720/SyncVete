@@ -318,3 +318,20 @@ export function agendaMemberKey(member: {
 }): string {
   return member.professionalId || member.userId;
 }
+
+/**
+ * Professionals suitable for NEW bookings / referrals.
+ * Hides legacy "Agenda anterior · …" rows that list_agenda_professionals still
+ * returns so old user-assigned appointments remain findable in filters.
+ */
+export function isBookableAgendaProfessional(member: AssignableStaffMember): boolean {
+  const name = member.fullName?.trim() ?? '';
+  if (!name || /^agenda anterior\b/i.test(name)) return false;
+  return Boolean(member.professionalId);
+}
+
+export function filterBookableAgendaProfessionals(
+  staff: AssignableStaffMember[]
+): AssignableStaffMember[] {
+  return staff.filter(isBookableAgendaProfessional);
+}

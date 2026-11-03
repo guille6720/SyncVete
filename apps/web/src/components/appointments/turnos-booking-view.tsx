@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import {
   filterAssignableStaffByBranch,
+  filterBookableAgendaProfessionals,
   formatDateParam,
   type AssignableStaffMember,
 } from '@sincvete/shared';
@@ -44,7 +45,8 @@ export function TurnosBookingView({
   const today = formatDateParam(new Date());
 
   const visibleStaff = useMemo(
-    () => filterAssignableStaffByBranch(staff, branchId || null),
+    () =>
+      filterBookableAgendaProfessionals(filterAssignableStaffByBranch(staff, branchId || null)),
     [staff, branchId]
   );
 

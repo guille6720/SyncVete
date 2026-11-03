@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import {
   DEFAULT_APPOINTMENT_DURATION_MINUTES,
   buildLocalSlotsForDate,
+  filterBookableAgendaProfessionals,
   formatDateParam,
   getPreferredSlotDurationMinutes,
   toLocalDateTimeInput,
@@ -41,13 +42,9 @@ export function ConsultationReferralPanel({
   const [proPending, setProPending] = useState(false);
   const [state, formAction, pending] = useActionState(createReferralFromConsultation, null);
 
-  // Only real professional fichas — hide legacy "Agenda anterior · …" user rows
-  // that list_agenda_professionals still returns for old appointments.
   const others = useMemo(
     () =>
-      staff.filter((member) => {
-        if (!member.professionalId) return false;
-        if (member.fullName.startsWith('Agenda anterior')) return false;
+      filterBookableAgendaProfessionals(staff).filter((member) => {
         const key = agendaMemberKey(member);
         return Boolean(key) && key !== consultation.veterinarian_id;
       }),

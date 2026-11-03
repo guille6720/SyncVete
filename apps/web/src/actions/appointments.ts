@@ -646,9 +646,20 @@ const loadAssignableStaff = cache(async (): Promise<AssignableStaffMember[]> => 
   const supabase = await createServerClient();
   const { data, error } = await supabase.rpc('list_agenda_professionals');
   if (error) throw error;
-  return ((data as unknown as AssignableStaffMember[]) ?? []).sort((a, b) =>
-    a.fullName.localeCompare(b.fullName, 'es')
-  );
+  const rows = ((data as unknown as AssignableStaffMember[]) ?? []).map((row) => {
+    const raw = row as AssignableStaffMember & { professional_id?: string | null };
+    const professionalId = raw.professionalId ?? raw.professional_id ?? null;
+    return {
+      ...raw,
+      professionalId: professionalId || null,
+      userId: raw.userId ?? '',
+      fullName: String(raw.fullName ?? '').trim(),
+      specialty: raw.specialty ?? null,
+      branchIds: Array.isArray(raw.branchIds) ? raw.branchIds : [],
+      role: raw.role ?? 'veterinarian',
+    } satisfies AssignableStaffMember;
+  });
+  return rows.sort((a, b) => a.fullName.localeCompare(b.fullName, 'es'));
 });
 
 async function resolveAssignee(id?: string, branchId?: string | null) {

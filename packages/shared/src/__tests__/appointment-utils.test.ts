@@ -11,6 +11,7 @@ import {
   groupAppointmentsByAssignee,
   groupAppointmentsByDay,
   filterAssignableStaffByBranch,
+  filterBookableAgendaProfessionals,
   isActiveAppointmentStatus,
   parseDateParam,
 } from '../utils/appointments';
@@ -136,5 +137,37 @@ describe('professional identity in calendar selectors', () => {
   });
   it('uses a professional without inventing a login ID', () => {
     expect(agendaMemberKey({ professionalId: 'professional', userId: '' })).toBe('professional');
+  });
+
+  it('hides legacy Agenda anterior rows from booking selectors', () => {
+    const staff = [
+      {
+        userId: 'u1',
+        professionalId: 'p1',
+        fullName: 'Josefina Alem',
+        specialty: 'Clinica',
+        role: 'veterinarian',
+        branchIds: ['b1'],
+      },
+      {
+        userId: 'u1',
+        professionalId: null,
+        fullName: 'Agenda anterior · Josefina Alem',
+        specialty: null,
+        role: 'veterinarian',
+        branchIds: ['b1'],
+      },
+      {
+        userId: 'u2',
+        professionalId: null,
+        fullName: 'castro',
+        specialty: null,
+        role: 'owner',
+        branchIds: ['b1'],
+      },
+    ];
+    expect(filterBookableAgendaProfessionals(staff).map((m) => m.fullName)).toEqual([
+      'Josefina Alem',
+    ]);
   });
 });

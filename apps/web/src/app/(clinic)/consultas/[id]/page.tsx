@@ -17,7 +17,7 @@ import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
-import { buildSettlementDetailBasePath } from '@sincvete/shared';
+import { buildSettlementDetailBasePath, filterBookableAgendaProfessionals } from '@sincvete/shared';
 
 interface ConsultaPageProps {
   params: Promise<{ id: string }>;
@@ -45,7 +45,9 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
       ? await getSettlementClaimForSource('consultation', consultation.id)
       : null;
   const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
-  const staff = canRefer ? await getAssignableStaff().catch(() => []) : [];
+  const staff = canRefer
+    ? filterBookableAgendaProfessionals(await getAssignableStaff().catch(() => []))
+    : [];
 
   const isOpen = consultation.status === 'en_curso' || consultation.status === 'en_espera';
 

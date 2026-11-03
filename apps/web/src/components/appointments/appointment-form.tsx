@@ -33,6 +33,7 @@ import {
   PAYMENT_METHOD_LABELS,
   buildLocalSlotsForDate,
   filterAssignableStaffByBranch,
+  filterBookableAgendaProfessionals,
   fromLocalDateTimeInput,
   findNextLocalSlot,
   getDurationMinutes,
@@ -128,7 +129,10 @@ export function AppointmentForm({
   const [clientError, setClientError] = useState<string | null>(null);
 
   const visibleStaff = useMemo(
-    () => filterAssignableStaffByBranch(staff, selectedBranchId || null),
+    () =>
+      filterBookableAgendaProfessionals(
+        filterAssignableStaffByBranch(staff, selectedBranchId || null)
+      ),
     [staff, selectedBranchId]
   );
 
