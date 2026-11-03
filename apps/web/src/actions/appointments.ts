@@ -7,6 +7,7 @@ import {
   appointmentRescheduleSchema,
   appointmentSchema,
   computeEndTime,
+  filterBookableAgendaProfessionals,
   fromLocalDateTimeInput,
   type ActionResult,
   type Appointment,
@@ -680,6 +681,11 @@ async function resolveAssignee(id?: string, branchId?: string | null) {
 
 export async function getAssignableStaff(): Promise<AssignableStaffMember[]> {
   return loadAssignableStaff();
+}
+
+/** Staff with active professional fichas only — for new bookings and referrals. */
+export async function getBookableAssignableStaff(): Promise<AssignableStaffMember[]> {
+  return filterBookableAgendaProfessionals(await loadAssignableStaff());
 }
 
 export async function canManageAppointments(): Promise<boolean> {

@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import {
   canManageAppointments,
   canReadAppointments,
-  getAssignableStaff,
+  getBookableAssignableStaff,
 } from '@/actions/appointments';
 import { getSessionContext } from '@/actions/auth';
 import { getUserBranches } from '@/actions/settings';
@@ -20,7 +20,7 @@ export default async function TurnosPage({ searchParams }: TurnosPageProps) {
   const params = await searchParams;
   const session = await getSessionContext();
   const [staff, branches, canWrite] = await Promise.all([
-    getAssignableStaff(),
+    getBookableAssignableStaff(),
     getUserBranches(),
     canManageAppointments(),
   ]);

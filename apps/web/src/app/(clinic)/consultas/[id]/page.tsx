@@ -12,12 +12,12 @@ import { ClinicalAiSoapPanel } from '@/components/clinical-ai/clinical-ai-soap-p
 import { Button } from '@/components/ui/button';
 import { canManageBilling } from '@/actions/billing';
 import { getClinicalAiStatus } from '@/actions/clinical-ai';
-import { canManageAppointments, getAssignableStaff } from '@/actions/appointments';
+import { canManageAppointments, getBookableAssignableStaff } from '@/actions/appointments';
 import {
   canReadSettlementSourceClaims,
   getSettlementClaimForSource,
 } from '@/actions/professional-settlements';
-import { buildSettlementDetailBasePath, filterBookableAgendaProfessionals } from '@sincvete/shared';
+import { buildSettlementDetailBasePath } from '@sincvete/shared';
 
 interface ConsultaPageProps {
   params: Promise<{ id: string }>;
@@ -45,9 +45,7 @@ export default async function ConsultaDetailPage({ params }: ConsultaPageProps) 
       ? await getSettlementClaimForSource('consultation', consultation.id)
       : null;
   const settlementDetailBasePath = buildSettlementDetailBasePath(settlementAccess);
-  const staff = canRefer
-    ? filterBookableAgendaProfessionals(await getAssignableStaff().catch(() => []))
-    : [];
+  const staff = canRefer ? await getBookableAssignableStaff().catch(() => []) : [];
 
   const isOpen = consultation.status === 'en_curso' || consultation.status === 'en_espera';
 

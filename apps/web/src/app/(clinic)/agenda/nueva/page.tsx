@@ -2,7 +2,7 @@ import { agendaMemberKey } from '@sincvete/shared';
 import { AgendaProblemNotice } from '@/components/appointments/agenda-problem-notice';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { canManageAppointments, getAssignableStaff } from '@/actions/appointments';
+import { canManageAppointments, getBookableAssignableStaff } from '@/actions/appointments';
 import { getSessionContext } from '@/actions/auth';
 import { getOwner } from '@/actions/owners';
 import { getPatient } from '@/actions/patients';
@@ -38,7 +38,7 @@ export default async function NuevaCitaPage({ searchParams }: NuevaCitaPageProps
     if (patient) owner = await getOwner(patient.owner_id);
   }
 
-  const [staff, branches] = await Promise.all([getAssignableStaff(), getUserBranches()]);
+  const [staff, branches] = await Promise.all([getBookableAssignableStaff(), getUserBranches()]);
 
   const date = parseDateParam(params.date);
   const defaultStartsAt = `${date}T09:00`;

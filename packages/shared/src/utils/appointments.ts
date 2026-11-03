@@ -326,8 +326,10 @@ export function agendaMemberKey(member: {
  */
 export function isBookableAgendaProfessional(member: AssignableStaffMember): boolean {
   const name = member.fullName?.trim() ?? '';
-  if (!name || /^agenda anterior\b/i.test(name)) return false;
-  return Boolean(member.professionalId);
+  const professionalId = member.professionalId?.trim() ?? '';
+  if (!name || !professionalId) return false;
+  if (/agenda\s*anterior/i.test(name)) return false;
+  return true;
 }
 
 export function filterBookableAgendaProfessionals(

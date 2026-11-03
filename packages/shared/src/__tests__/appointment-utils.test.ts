@@ -165,6 +165,14 @@ describe('professional identity in calendar selectors', () => {
         role: 'owner',
         branchIds: ['b1'],
       },
+      {
+        userId: 'u3',
+        professionalId: '   ',
+        fullName: 'Agendaanterior · Ghost',
+        specialty: null,
+        role: 'veterinarian',
+        branchIds: ['b1'],
+      },
     ];
     expect(filterBookableAgendaProfessionals(staff).map((m) => m.fullName)).toEqual([
       'Josefina Alem',
