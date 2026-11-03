@@ -41,12 +41,16 @@ export function ConsultationReferralPanel({
   const [proPending, setProPending] = useState(false);
   const [state, formAction, pending] = useActionState(createReferralFromConsultation, null);
 
+  // Only real professional fichas — hide legacy "Agenda anterior · …" user rows
+  // that list_agenda_professionals still returns for old appointments.
   const others = useMemo(
     () =>
-      staff.filter(
-        (member) =>
-          agendaMemberKey(member) && agendaMemberKey(member) !== consultation.veterinarian_id
-      ),
+      staff.filter((member) => {
+        if (!member.professionalId) return false;
+        if (member.fullName.startsWith('Agenda anterior')) return false;
+        const key = agendaMemberKey(member);
+        return Boolean(key) && key !== consultation.veterinarian_id;
+      }),
     [staff, consultation.veterinarian_id]
   );
 
@@ -137,7 +141,7 @@ export function ConsultationReferralPanel({
           </Select>
           {others.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No hay otros profesionales con usuario de agenda en la clínica.
+              No hay otros profesionales con ficha activa para derivar.
             </p>
           ) : null}
         </div>
